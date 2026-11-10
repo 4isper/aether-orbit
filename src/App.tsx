@@ -282,7 +282,7 @@ function App() {
         {body ? (
           <>
             <section className="intro reveal" aria-labelledby="scene-title" aria-hidden={travelling}>
-              <p className="eyebrow"><span />{body.name} / {activeView === 'star' ? 'Звезда системы' : activeView === 'cinder' ? 'Пустынный мир' : activeView === 'vesper' ? 'Газовый гигант' : activeView === 'comet' ? 'Комета' : 'Экзопланета'}</p>
+              <p className="eyebrow"><span />{body.name} / {activeView === 'star' ? 'Звезда системы' : activeView === 'cinder' ? 'Пустынный мир' : activeView === 'vesper' ? 'Мини-нептун' : activeView === 'comet' ? 'Комета' : 'Экзопланета'}</p>
               <h1 id="scene-title">
                 <span>{body.title[0]}</span>
                 <em>{body.title[1]}</em>
