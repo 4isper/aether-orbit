@@ -89,10 +89,11 @@ function App() {
   }
   const [paused, setPaused] = useState(false)
   const [speed, setSpeed] = useState(1)
+  const [reversed, setReversed] = useState(false)
   const [tour, setTour] = useState(false)
   const [cinema, setCinema] = useState(false)
   const [tabVisible, setTabVisible] = useState(() => !document.hidden)
-  const timeScale = paused ? 0 : speed
+  const timeScale = paused ? 0 : reversed ? -speed : speed
   const resetView = () => window.dispatchEvent(new Event('aether:reset'))
   const saveFrame = () => {
     // The scene renders the composed frame and reads it back itself: the
@@ -253,6 +254,19 @@ function App() {
                 <rect x="7.2" y="1.8" width="2.4" height="8.4" fill="currentColor" />
               </svg>
             )}
+          </button>
+          <button
+            type="button"
+            className="time-button"
+            aria-pressed={reversed}
+            aria-label={reversed ? 'Вернуть обычный ход времени' : 'Обратить ход времени'}
+            disabled={!ready}
+            onClick={() => setReversed((value) => !value)}
+          >
+            <svg viewBox="0 0 12 12" fill="none" aria-hidden="true">
+              <path d="M6.4 1.6v8.8L1.6 6z" fill="currentColor" />
+              <path d="M11 1.6v8.8L6.2 6z" fill="currentColor" />
+            </svg>
           </button>
           <div className="speed-group" role="group" aria-label="Скорость времени">
             {SPEED_OPTIONS.map((option) => (

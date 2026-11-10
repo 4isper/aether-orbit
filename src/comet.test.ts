@@ -78,3 +78,10 @@ test('the dust tail curves farther off the anti-sun line than the ion tail', () 
   const dust = angleFromAntiSun(1.05)
   assert.ok(dust > ion * 1.5, `dust ${dust} vs ion ${ion}`)
 })
+
+test('the comet tracks negative time the same as the equivalent positive time', () => {
+  // Reversed playback feeds negative time into the same Kepler solver.
+  const reversed = cometPosition(-42, new Vector3())
+  const forward = cometPosition(-42 + cometOrbit.period, new Vector3())
+  assert.ok(reversed.distanceTo(forward) < 1e-6, `gap ${reversed.distanceTo(forward)}`)
+})
