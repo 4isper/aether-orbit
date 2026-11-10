@@ -1,4 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useState } from 'react'
+import { SceneErrorBoundary } from './SceneErrorBoundary'
 import { bodies, planetIds, type SceneView } from './planets'
 import './App.css'
 
@@ -101,22 +102,24 @@ function App() {
     >
       {webglSupported && (
         <div className="scene">
-          <Suspense fallback={null}>
-            <SceneCanvas
-              label={travelling
-                ? `Перелёт: ${currentName} — ${destinationName}`
-                : body
-                  ? `${isStar ? 'Интерактивная сцена звезды' : 'Интерактивная сцена планеты'} ${body.label}. Перетаскивайте для вращения и используйте колесо для масштабирования.`
-                  : 'Обзор системы. Выберите мир или звезду нажатием на сферу или подпись.'}
-              activeView={activeView}
-              destination={destination}
-              timeScale={timeScale}
-              reducedMotion={reducedMotion}
-              onReady={handleReady}
-              onArrive={handleArrive}
-              onSelect={travelTo}
-            />
-          </Suspense>
+          <SceneErrorBoundary>
+              <Suspense fallback={null}>
+              <SceneCanvas
+                label={travelling
+                  ? `Перелёт: ${currentName} — ${destinationName}`
+                  : body
+                    ? `${isStar ? 'Интерактивная сцена звезды' : 'Интерактивная сцена планеты'} ${body.label}. Перетаскивайте для вращения и используйте колесо для масштабирования.`
+                    : 'Обзор системы. Выберите мир или звезду нажатием на сферу или подпись.'}
+                activeView={activeView}
+                destination={destination}
+                timeScale={timeScale}
+                reducedMotion={reducedMotion}
+                onReady={handleReady}
+                onArrive={handleArrive}
+                onSelect={travelTo}
+              />
+            </Suspense>
+          </SceneErrorBoundary>
         </div>
       )}
 

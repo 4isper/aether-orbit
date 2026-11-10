@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { PerformanceMonitor } from '@react-three/drei'
 import { ACESFilmicToneMapping, SRGBColorSpace, type WebGLRenderer } from 'three'
+import { SceneErrorBoundary } from './SceneErrorBoundary'
 import { SpaceScene } from './components/SpaceScene'
 import type { SceneView } from './planets'
 
@@ -60,25 +61,27 @@ export default function SceneCanvas({
         gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
         onCreated={handleCreated}
       >
-      <PerformanceMonitor
-        factor={1}
-        step={0.2}
-        iterations={8}
-        ms={250}
-        threshold={0.75}
-        bounds={(refreshRate) => (refreshRate > 100 ? [50, 100] : [42, 56])}
-        onChange={handleQualityChange}
-      >
-        <SpaceScene
-          activeView={activeView}
-          destination={destination}
-          timeScale={timeScale}
-          reducedMotion={reducedMotion}
-          onReady={onReady}
-          onArrive={onArrive}
-          onSelect={onSelect}
-        />
-      </PerformanceMonitor>
+      <SceneErrorBoundary>
+        <PerformanceMonitor
+          factor={1}
+          step={0.2}
+          iterations={8}
+          ms={250}
+          threshold={0.75}
+          bounds={(refreshRate) => (refreshRate > 100 ? [50, 100] : [42, 56])}
+          onChange={handleQualityChange}
+        >
+          <SpaceScene
+            activeView={activeView}
+            destination={destination}
+            timeScale={timeScale}
+            reducedMotion={reducedMotion}
+            onReady={onReady}
+            onArrive={onArrive}
+            onSelect={onSelect}
+          />
+        </PerformanceMonitor>
+      </SceneErrorBoundary>
       </Canvas>
       {contextLost && (
         <div className="webgl-fallback webgl-fallback--overlay" role="alert">
