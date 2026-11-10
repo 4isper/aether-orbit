@@ -466,8 +466,17 @@ h1 > em {
   box-shadow: 0 0 9px rgba(217, 151, 94, 0.16);
 }
 
+.planet-link--vesper .planet-dot {
+  background: radial-gradient(circle at 30% 30%, #d8e6e2, #7fa39e 48%, #223332 75%);
+  box-shadow: 0 0 9px rgba(159, 184, 180, 0.16);
+}
+
 .experience[data-view="cinder"] h1 > em {
   color: #d0ab8b;
+}
+
+.experience[data-view="vesper"] h1 > em {
+  color: #b9d2cf;
 }
 
 .flight-status {
@@ -570,11 +579,11 @@ h1 > em {
   min-width: 134px;
   min-height: 58px;
   padding: 10px 14px;
-  transform: translateY(122px);
+  transform: translateY(56px);
   border: 0;
   border-top: 1px solid rgba(174, 205, 224, 0.35);
   color: #d4e3ed;
-  background: rgba(1, 2, 5, 0.55);
+  background: rgba(1, 2, 5, 0.35);
   font: inherit;
   text-align: center;
   cursor: pointer;
@@ -585,6 +594,11 @@ h1 > em {
 .system-label--cinder {
   color: #dfc0a6;
   border-top-color: rgba(214, 164, 122, 0.35);
+}
+
+.system-label--vesper {
+  color: #c4dad6;
+  border-top-color: rgba(159, 184, 180, 0.35);
 }
 
 .system-label > span {
@@ -823,13 +837,13 @@ h1 > em {
 
 @media (max-aspect-ratio: 9/10) {
   .system-label {
-    transform: translateY(66px);
+    transform: translateY(44px);
   }
 }
 
 @media (max-aspect-ratio: 9/10) and (max-height: 700px) {
   .system-label {
-    transform: translateY(50px);
+    transform: translateY(36px);
     min-width: 120px;
   }
 }

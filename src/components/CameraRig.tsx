@@ -1,35 +1,49 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { MathUtils, Vector3, type PerspectiveCamera } from 'three'
-import { planets, type SceneView } from '../planets'
+import { planetIds, type SceneView } from '../planets'
+import { orbitConfig, planetPosition } from '../orbits'
 
 type CameraRigProps = {
   reducedMotion: boolean
   destination: SceneView
   onArrive: (view: SceneView) => void
+  timeRef: { current: number }
 }
 
-export function CameraRig({ reducedMotion, destination, onArrive }: CameraRigProps) {
+export function CameraRig({ reducedMotion, destination, onArrive, timeRef }: CameraRigProps) {
   const gl = useThree((state) => state.gl)
   const size = useThree((state) => state.size)
   const overviewPose = useMemo(() => {
     const aspect = size.width / size.height
     const portrait = aspect < 0.9
-    const compact = size.width < 700 || portrait
-    const center = new Vector3(compact ? 9.45 : 10.8, compact ? -1.3 : -0.5, -3)
     const direction = new Vector3(0, 0.42, 1).normalize()
     const up = portrait ? new Vector3(-1, 0, 0) : new Vector3(0, 1, 0)
     const right = new Vector3().crossVectors(up, direction).normalize()
     const screenUp = new Vector3().crossVectors(direction, right)
-    const usableHeight = Math.max(size.height - 320, size.height * 0.5)
+    const usableHeight = Math.max(size.height - (portrait ? 320 : 420), size.height * (portrait ? 0.5 : 0.42))
     const usableWidth = size.width - (portrait ? 40 : 110)
     const halfFov = Math.tan(MathUtils.degToRad(18))
+    let halfHeight = 0
+    let halfWidth = 0
+    let maxDepth = 0
+    const point = new Vector3()
+    for (const id of planetIds) {
+      const radius = orbitConfig[id].radius + 3
+      for (let i = 0; i < 48; i++) {
+        const angle = (i / 48) * Math.PI * 2
+        point.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius)
+        halfHeight = Math.max(halfHeight, Math.abs(point.dot(screenUp)))
+        halfWidth = Math.max(halfWidth, Math.abs(point.dot(right)))
+        maxDepth = Math.max(maxDepth, point.dot(direction))
+      }
+    }
     const distance = (Math.max(
-      (portrait ? 24 : 12) / (2 * halfFov * usableHeight / size.height),
-      (portrait ? 10 : 28) / (2 * halfFov * aspect * usableWidth / size.width),
-    ) + 3) * (portrait ? 1.15 : 1)
-    const centerOffset = 60 * (2 * distance * halfFov) / size.height
-    const target = center.addScaledVector(screenUp, centerOffset)
+      halfHeight / (halfFov * usableHeight / size.height),
+      halfWidth / (halfFov * aspect * usableWidth / size.width),
+    ) + maxDepth + 3) * (portrait ? 1.05 : 1)
+    const centerOffset = (portrait ? 60 : 40) * (2 * distance * halfFov) / size.height
+    const target = new Vector3().addScaledVector(screenUp, centerOffset)
     return { target, position: target.clone().addScaledVector(direction, distance), up }
   }, [size.width, size.height])
   const target = useRef({ yaw: 0, pitch: 0, zoom: 9 })
@@ -41,6 +55,8 @@ export function CameraRig({ reducedMotion, destination, onArrive }: CameraRigPro
   const currentView = useRef<SceneView>('aurelia')
   const requestedView = useRef<SceneView>('aurelia')
   const lookAt = useRef(new Vector3())
+  const scratch = useMemo(() => new Vector3(), [])
+  const compOffset = useMemo(() => new Vector3(), [])
   const flight = useRef({
     active: false,
     elapsed: 0,
@@ -134,6 +150,8 @@ export function CameraRig({ reducedMotion, destination, onArrive }: CameraRigPro
     const camera = state.camera as PerspectiveCamera
     const compact = state.size.width < 700
     const journey = flight.current
+    const time = timeRef.current
+    compOffset.set(compact ? -0.45 : -1.8, compact ? 1.3 : 0.5, 0)
 
     if (destination !== requestedView.current) {
       requestedView.current = destination
@@ -160,7 +178,7 @@ export function CameraRig({ reducedMotion, destination, onArrive }: CameraRigPro
         journey.endPosition.copy(overviewPose.position)
         journey.endUp.copy(overviewPose.up)
       } else {
-        journey.endLook.fromArray(planets[destination].anchor)
+        planetPosition(destination, time, journey.endLook).add(compOffset)
         journey.endPosition.copy(journey.endLook)
         journey.endPosition.z += 9 + (compact ? 0.55 : 0)
         journey.endUp.set(0, 1, 0)
@@ -194,11 +212,11 @@ export function CameraRig({ reducedMotion, destination, onArrive }: CameraRigPro
     orbitTime.current += delta
     const introEase = 1 - Math.pow(1 - intro.current, 3)
     const drift = Math.min(orbitTime.current, 1)
-    const time = state.clock.elapsedTime
+    const clock = state.clock.elapsedTime
     const parallaxX = reducedMotion ? 0 : pointer.current.x
     const parallaxY = reducedMotion ? 0 : pointer.current.y
-    const idleX = reducedMotion ? 0 : Math.sin(time * 0.14) * 0.018 * drift
-    const idleY = reducedMotion ? 0 : Math.cos(time * 0.11) * 0.012 * drift
+    const idleX = reducedMotion ? 0 : Math.sin(clock * 0.14) * 0.018 * drift
+    const idleY = reducedMotion ? 0 : Math.cos(clock * 0.11) * 0.012 * drift
 
     current.current.yaw = MathUtils.damp(current.current.yaw, target.current.yaw, 4, delta)
     current.current.pitch = MathUtils.damp(current.current.pitch, target.current.pitch, 4, delta)
@@ -207,13 +225,13 @@ export function CameraRig({ reducedMotion, destination, onArrive }: CameraRigPro
     const distance = current.current.zoom + (compact ? 0.55 : 0) + (1 - introEase) * 2.4
     const yaw = current.current.yaw + parallaxX * 0.018 + idleX
     const pitch = current.current.pitch - parallaxY * 0.012 + idleY
-    const anchor = planets[currentView.current].anchor
+    planetPosition(currentView.current, time, scratch).add(compOffset)
     camera.position.set(
-      anchor[0] + Math.sin(yaw) * distance + parallaxX * 0.06,
-      anchor[1] + Math.sin(pitch) * distance + parallaxY * 0.04,
-      anchor[2] + Math.cos(yaw) * Math.cos(pitch) * distance,
+      scratch.x + Math.sin(yaw) * distance + parallaxX * 0.06,
+      scratch.y + Math.sin(pitch) * distance + parallaxY * 0.04,
+      scratch.z + Math.cos(yaw) * Math.cos(pitch) * distance,
     )
-    lookAt.current.fromArray(anchor)
+    lookAt.current.copy(scratch)
     camera.lookAt(lookAt.current)
   })
 

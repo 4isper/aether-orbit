@@ -7,6 +7,7 @@ import {
   RepeatWrapping,
   SRGBColorSpace,
   Vector3,
+  type Group,
   type Mesh,
   type ShaderMaterial,
 } from 'three'
@@ -181,6 +182,7 @@ type PlanetProps = {
 }
 
 export function Planet({ reducedMotion }: PlanetProps) {
+  const groupRef = useRef<Group>(null)
   const surfaceRef = useRef<Mesh>(null)
   const cloudsRef = useRef<Mesh>(null)
   const surfaceMaterialRef = useRef<ShaderMaterial>(null)
@@ -210,10 +212,8 @@ export function Planet({ reducedMotion }: PlanetProps) {
     configureTextures,
   )
 
-  const sunDirection = useMemo(
-    () => new Vector3(-0.82, 0.25, 0.32).normalize(),
-    [],
-  )
+  const sunDirection = useMemo(() => new Vector3(-1, 0, 0), [])
+  const worldPosition = useMemo(() => new Vector3(), [])
   const surfaceUniforms = useMemo(
     () => ({
       uSunDirection: { value: sunDirection },
@@ -235,6 +235,11 @@ export function Planet({ reducedMotion }: PlanetProps) {
   )
 
   useFrame((_, delta) => {
+    if (groupRef.current) {
+      groupRef.current.getWorldPosition(worldPosition)
+      sunDirection.copy(worldPosition).multiplyScalar(-1).normalize()
+    }
+
     const surface = surfaceRef.current
     const clouds = cloudsRef.current
 
@@ -251,7 +256,7 @@ export function Planet({ reducedMotion }: PlanetProps) {
 
   return (
     <group
-      position={compact ? [0.45, -1.3, 0] : [1.8, -0.5, 0]}
+      ref={groupRef}
       scale={compact ? 0.76 : 1}
       rotation={[0.08, 0, -0.09]}
     >

@@ -3,7 +3,7 @@ import { Canvas } from '@react-three/fiber'
 import { PerformanceMonitor } from '@react-three/drei'
 import { ACESFilmicToneMapping, SRGBColorSpace } from 'three'
 import { SpaceScene } from './components/SpaceScene'
-import { planets, type SceneView } from './planets'
+import { planetIds, planets, type SceneView } from './planets'
 import './App.css'
 
 const MIN_DPR = 0.85
@@ -105,7 +105,7 @@ function App() {
             <OrbitMark className="system-icon" />
             Обзор
           </button>
-          {(['aurelia', 'cinder'] as const).map((id) => (
+          {planetIds.map((id) => (
             <button
               key={id}
               type="button"
@@ -133,7 +133,7 @@ function App() {
         {planet ? (
           <>
             <section className="intro reveal" aria-labelledby="scene-title" aria-hidden={travelling}>
-              <p className="eyebrow"><span />{planet.name} / {activeView === 'cinder' ? 'Пустынный мир' : 'Экзопланета'}</p>
+              <p className="eyebrow"><span />{planet.name} / {activeView === 'cinder' ? 'Пустынный мир' : activeView === 'vesper' ? 'Газовый гигант' : 'Экзопланета'}</p>
               <h1 id="scene-title">
                 <span>{planet.title[0]}</span>
                 <em>{planet.title[1]}</em>
@@ -178,11 +178,11 @@ function App() {
         ) : (
           <>
             <section className="system-intro reveal" aria-labelledby="scene-title" aria-hidden={travelling}>
-              <p className="eyebrow">Aether / Два мира</p>
+              <p className="eyebrow">Aether / Три мира</p>
               <h1 id="scene-title">Обзор системы</h1>
               <p>Выберите планету, чтобы выйти на орбиту.</p>
             </section>
-            <p className="system-note reveal" aria-hidden={travelling}>Локальные орбиты · Масштаб условный</p>
+            <p className="system-note reveal" aria-hidden={travelling}>Орбиты вокруг звезды · Масштаб условный</p>
           </>
         )}
 

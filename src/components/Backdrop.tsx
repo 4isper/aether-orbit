@@ -1,4 +1,5 @@
-import { AdditiveBlending } from 'three'
+import { AdditiveBlending, Color, DoubleSide } from 'three'
+import { useMemo } from 'react'
 import { noiseGLSL } from '../shaders/noise'
 
 const planeVertex = /* glsl */ `
@@ -47,6 +48,7 @@ void main() {
 `
 
 export function Backdrop() {
+  const starColor = useMemo(() => new Color(6, 4.5, 3), [])
   return (
     <>
       <mesh position={[0, 0, -38]}>
@@ -59,14 +61,19 @@ export function Backdrop() {
           blending={AdditiveBlending}
         />
       </mesh>
-      <mesh position={[-7.5, 3, -10]} renderOrder={-1}>
-        <planeGeometry args={[14, 14]} />
+      <mesh>
+        <sphereGeometry args={[1.1, 48, 48]} />
+        <meshBasicMaterial color={starColor} toneMapped={false} />
+      </mesh>
+      <mesh renderOrder={-1}>
+        <planeGeometry args={[6, 6]} />
         <shaderMaterial
           vertexShader={planeVertex}
           fragmentShader={sunFragment}
           transparent
           depthWrite={false}
           depthTest={false}
+          side={DoubleSide}
           blending={AdditiveBlending}
         />
       </mesh>

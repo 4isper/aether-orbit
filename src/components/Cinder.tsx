@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { useTexture } from '@react-three/drei'
-import { RepeatWrapping, SRGBColorSpace, Vector3, type Mesh, type Texture } from 'three'
+import { RepeatWrapping, SRGBColorSpace, Vector3, type Group, type Mesh, type Texture } from 'three'
 import { noiseGLSL } from '../shaders/noise'
 import { Atmosphere } from './Atmosphere'
 
@@ -68,6 +68,7 @@ type CinderProps = {
 }
 
 export function Cinder({ reducedMotion }: CinderProps) {
+  const groupRef = useRef<Group>(null)
   const surfaceRef = useRef<Mesh>(null)
   const { width, height } = useThree((state) => state.viewport)
   const compact = useThree((state) => state.size.width < 700) || width / height < 0.9
@@ -83,10 +84,8 @@ export function Cinder({ reducedMotion }: CinderProps) {
   )
   const dayMap = useTexture('/textures/mars-day.webp', configureTexture)
 
-  const sunDirection = useMemo(
-    () => new Vector3(-0.82, 0.25, 0.32).normalize(),
-    [],
-  )
+  const sunDirection = useMemo(() => new Vector3(-1, 0, 0), [])
+  const worldPosition = useMemo(() => new Vector3(), [])
   const surfaceUniforms = useMemo(
     () => ({
       uSunDirection: { value: sunDirection },
@@ -96,6 +95,11 @@ export function Cinder({ reducedMotion }: CinderProps) {
   )
 
   useFrame((_, delta) => {
+    if (groupRef.current) {
+      groupRef.current.getWorldPosition(worldPosition)
+      sunDirection.copy(worldPosition).multiplyScalar(-1).normalize()
+    }
+
     if (!reducedMotion && surfaceRef.current) {
       surfaceRef.current.rotation.y += delta * 0.004
     }
@@ -103,7 +107,7 @@ export function Cinder({ reducedMotion }: CinderProps) {
 
   return (
     <group
-      position={compact ? [0.45, -1.3, 0] : [1.8, -0.5, 0]}
+      ref={groupRef}
       scale={compact ? 0.7 : 0.92}
       rotation={[0.08, 0, -0.09]}
     >
@@ -116,7 +120,7 @@ export function Cinder({ reducedMotion }: CinderProps) {
         />
       </mesh>
 
-      <Atmosphere sunDirection={sunDirection} dusty />
+      <Atmosphere sunDirection={sunDirection} variant="dust" />
     </group>
   )
 }

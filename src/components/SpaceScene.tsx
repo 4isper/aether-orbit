@@ -1,14 +1,17 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { useCursor } from '@react-three/drei'
 import { Bloom, EffectComposer, Vignette } from '@react-three/postprocessing'
+import { Vector3, type Group } from 'three'
 import { Backdrop } from './Backdrop'
 import { CameraRig } from './CameraRig'
 import { Planet } from './Planet'
 import { Cinder } from './Cinder'
+import { Vesper } from './Vesper'
 import { Starfield } from './Starfield'
 import { SystemOverview } from './SystemOverview'
-import { planets, type PlanetId, type SceneView } from '../planets'
+import { planetIds, type PlanetId, type SceneView } from '../planets'
+import { planetPosition } from '../orbits'
 
 function useReducedMotion() {
   const [reduced, setReduced] = useState(
@@ -52,6 +55,21 @@ export function SpaceScene({ activeView, destination, onReady, onArrive, onSelec
   const overview = activeView === 'system' && !travelling
   useCursor(overview && hovered, 'pointer', travelling ? 'progress' : overview ? 'default' : 'grab', gl.domElement)
 
+  const orbitTime = useRef(0)
+  const groupRefs = useRef<Record<PlanetId, Group | null>>({ aurelia: null, cinder: null, vesper: null })
+  const scratch = useMemo(() => new Vector3(), [])
+  const initialPositions = useMemo(
+    () => planetIds.map((id) => planetPosition(id, 0, new Vector3()).toArray() as [number, number, number]),
+    [],
+  )
+
+  useFrame((_, delta) => {
+    if (!reducedMotion) orbitTime.current += delta
+    for (const id of planetIds) {
+      groupRefs.current[id]?.position.copy(planetPosition(id, orbitTime.current, scratch))
+    }
+  })
+
   const selectPlanet = (id: PlanetId) => {
     setHovered(false)
     onSelect(id)
@@ -73,14 +91,17 @@ export function SpaceScene({ activeView, destination, onReady, onArrive, onSelec
       <color attach="background" args={['#010205']} />
       <Backdrop />
       <Starfield reducedMotion={reducedMotion} />
-      <group position={planets.aurelia.anchor} {...planetEvents('aurelia')}>
+      <group ref={(node) => { groupRefs.current.aurelia = node }} position={initialPositions[0]} {...planetEvents('aurelia')}>
         <Planet reducedMotion={reducedMotion} />
       </group>
-      <group position={planets.cinder.anchor} {...planetEvents('cinder')}>
+      <group ref={(node) => { groupRefs.current.cinder = node }} position={initialPositions[1]} {...planetEvents('cinder')}>
         <Cinder reducedMotion={reducedMotion} />
       </group>
-      <CameraRig reducedMotion={reducedMotion} destination={destination} onArrive={onArrive} />
-      {overview && <SystemOverview onSelect={selectPlanet} />}
+      <group ref={(node) => { groupRefs.current.vesper = node }} position={initialPositions[2]} {...planetEvents('vesper')}>
+        <Vesper reducedMotion={reducedMotion} />
+      </group>
+      <CameraRig reducedMotion={reducedMotion} destination={destination} onArrive={onArrive} timeRef={orbitTime} />
+      {overview && <SystemOverview onSelect={selectPlanet} timeRef={orbitTime} />}
       <SceneReady onReady={onReady} />
       <EffectComposer multisampling={0}>
         <Bloom
