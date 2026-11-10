@@ -74,10 +74,28 @@ void main() {
   float d = length(p);
   float t = uTime * 0.32;
   float wisp = fbm3(vec3(p * 2.4, t)) * 0.5 + 0.5;
-  float halo = exp(-d * 3.4) * (0.30 + wisp * 0.20);
+  float halo = exp(-d * 3.4) * (0.22 + wisp * 0.12);
   float core = exp(-d * 18.0) * 1.35;
   float streak = exp(-abs(p.y) * 44.0) * exp(-abs(p.x) * 3.1) * 0.14;
-  float alpha = halo + core + streak;
+
+  // Coronal streamers: cones along slowly rotating magnetic axes (golden
+  // angle apart), widening and fading outward, broken up by noise wisps.
+  float streamers = 0.0;
+  for (int i = 0; i < 3; i++) {
+    float fi = float(i);
+    float angle = fi * 2.399 + t * 0.05 * (0.6 + 0.4 * fi);
+    vec2 axis = vec2(cos(angle), sin(angle));
+    float along = dot(p, axis);
+    float perp = abs(dot(p, vec2(-axis.y, axis.x)));
+    float outw = smoothstep(0.15, 0.9, along);
+    float width = mix(0.05, 0.34, outw);
+    float fade = exp(-(along - 0.15) * 2.6) * outw;
+    float wobble = 0.6 + 0.8 * fbm3(vec3(p * 3.0, t * 0.5 + fi * 7.3));
+    streamers += exp(-pow(perp / width, 2.0)) * fade * wobble;
+  }
+  streamers *= 0.4;
+
+  float alpha = halo + core + streak + streamers;
   vec3 color = mix(vec3(1.0, 0.76, 0.52), vec3(1.0, 0.97, 0.93), core);
   gl_FragColor = vec4(color * alpha, alpha);
   #include <tonemapping_fragment>
