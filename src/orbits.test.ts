@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { Vector3 } from 'three'
-import { aureliaClock, orbitPoint, planetPeriod, planetPosition } from './orbits.ts'
+import { aureliaClock, orbitPoint, planetPeriod, planetPosition, starFlux } from './orbits.ts'
 import { planetIds } from './planets.ts'
 
 const scratch = new Vector3()
@@ -95,4 +95,13 @@ test('planet speeds follow Kepler-3 relative to Aurelia', () => {
       `${id} speed deviates ${(deviation * 100).toFixed(1)}% from Kepler-3`,
     )
   }
+})
+
+test('starlight falls off with distance, unity at Aurelia', () => {
+  assert.ok(Math.abs(starFlux(new Vector3(9, 0, 0)) - 1) < 1e-9)
+  const cinder = starFlux(new Vector3(14, 0, 0))
+  const vesper = starFlux(new Vector3(20, 0, 0))
+  assert.ok(Math.abs(cinder - (9 / 14) ** 1.5) < 1e-9, `Cinder flux ${cinder}`)
+  assert.ok(Math.abs(vesper - (9 / 20) ** 1.5) < 1e-9, `Vesper flux ${vesper}`)
+  assert.ok(cinder > vesper, 'inner worlds must receive more light')
 })

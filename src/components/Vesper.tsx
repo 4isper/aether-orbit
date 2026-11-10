@@ -1,13 +1,15 @@
 import { useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { DoubleSide, type Group, type Mesh } from 'three'
+import { DoubleSide, type Group, type Mesh, type ShaderMaterial } from 'three'
 import { noiseGLSL } from '../shaders/noise'
 import { bodyVertexGLSL, perturbNormalGLSL } from '../shaders/common'
 import { Atmosphere } from './Atmosphere'
+import { starFlux } from '../orbits'
 import { useSunDirection } from '../hooks/useSunDirection'
 
 const surfaceFragment = /* glsl */ `
 uniform vec3 uSunDirection;
+uniform float uStarFlux;
 varying vec3 vObjectPosition;
 varying vec3 vWorldPosition;
 varying vec3 vWorldNormal;
@@ -40,7 +42,7 @@ void main() {
 
   vec3 L = normalize(uSunDirection);
   float diffuse = max(dot(N, L), 0.0);
-  vec3 color = albedo * (0.006 + diffuse * 1.1);
+  vec3 color = albedo * (0.006 + diffuse * 1.1 * uStarFlux);
 
   gl_FragColor = vec4(color, 1.0);
   #include <tonemapping_fragment>
@@ -68,6 +70,7 @@ void main() {
 
 const ringFragment = /* glsl */ `
 uniform vec3 uSunDirection;
+uniform float uStarFlux;
 varying vec3 vLocalPosition;
 varying vec3 vWorldPosition;
 varying vec3 vWorldNormal;
@@ -85,7 +88,7 @@ void main() {
   float edge = smoothstep(0.0, 0.05, t) * (1.0 - smoothstep(0.93, 1.0, t));
 
   vec3 L = normalize(uSunDirection);
-  float light = abs(dot(normalize(vWorldNormal), L)) * 0.75 + 0.25;
+  float light = abs(dot(normalize(vWorldNormal), L)) * 0.75 * uStarFlux + 0.25;
 
   vec3 d = vWorldPosition - vCenter;
   float along = dot(d, L);
@@ -112,19 +115,23 @@ type VesperProps = {
 export function Vesper({ reducedMotion, timeScale }: VesperProps) {
   const groupRef = useRef<Group>(null)
   const surfaceRef = useRef<Mesh>(null)
+  const surfaceMaterialRef = useRef<ShaderMaterial>(null)
+  const ringMaterialRef = useRef<ShaderMaterial>(null)
   const { width, height } = useThree((state) => state.viewport)
   const compact = useThree((state) => state.size.width < 700) || width / height < 0.9
 
-  const { sunDirection, updateSunDirection } = useSunDirection(groupRef)
+  const { sunDirection, worldPosition, updateSunDirection } = useSunDirection(groupRef)
   const surfaceUniforms = useMemo(
     () => ({
       uSunDirection: { value: sunDirection },
+      uStarFlux: { value: 1 },
     }),
     [sunDirection],
   )
   const ringUniforms = useMemo(
     () => ({
       uSunDirection: { value: sunDirection },
+      uStarFlux: { value: 1 },
     }),
     [sunDirection],
   )
@@ -132,6 +139,9 @@ export function Vesper({ reducedMotion, timeScale }: VesperProps) {
   useFrame((_, rawDelta) => {
     const delta = Math.min(rawDelta, 0.1)
     updateSunDirection()
+    const flux = starFlux(worldPosition)
+    if (surfaceMaterialRef.current) surfaceMaterialRef.current.uniforms.uStarFlux.value = flux
+    if (ringMaterialRef.current) ringMaterialRef.current.uniforms.uStarFlux.value = flux
 
     if (!reducedMotion && surfaceRef.current) {
       surfaceRef.current.rotation.y += delta * 0.005 * timeScale
@@ -147,6 +157,7 @@ export function Vesper({ reducedMotion, timeScale }: VesperProps) {
       <mesh ref={surfaceRef}>
         <sphereGeometry args={[2, 128, 128]} />
         <shaderMaterial
+          ref={surfaceMaterialRef}
           vertexShader={bodyVertexGLSL(false)}
           fragmentShader={surfaceFragment}
           uniforms={surfaceUniforms}
@@ -156,6 +167,7 @@ export function Vesper({ reducedMotion, timeScale }: VesperProps) {
       <mesh rotation-x={-Math.PI / 2} renderOrder={1}>
         <ringGeometry args={[2.5, 4, 180, 1]} />
         <shaderMaterial
+          ref={ringMaterialRef}
           vertexShader={ringVertexShader}
           fragmentShader={ringFragment}
           uniforms={ringUniforms}

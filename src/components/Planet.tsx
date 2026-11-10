@@ -15,7 +15,7 @@ import { noiseGLSL } from '../shaders/noise'
 import { bodyVertexGLSL, perturbNormalGLSL } from '../shaders/common'
 import { Atmosphere } from './Atmosphere'
 import { Moon, MOON_RADIUS } from './Moon'
-import { aureliaClock } from '../orbits'
+import { aureliaClock, starFlux } from '../orbits'
 import { useSunDirection } from '../hooks/useSunDirection'
 
 const textureUrls = [
@@ -36,6 +36,7 @@ uniform float uCloudOffset;
 uniform vec3 uSunDirection;
 uniform vec3 uMoonPosition;
 uniform float uMoonRadius;
+uniform float uStarFlux;
 varying vec2 vUv;
 varying vec3 vObjectPosition;
 varying vec3 vWorldPosition;
@@ -95,7 +96,7 @@ void main() {
   float diffuse = max(dot(N, L), 0.0);
   float cloudDensity = texture2D(uCloudMap, vec2(vUv.x + uCloudOffset, vUv.y)).r;
   float cloudShadow = 1.0 - smoothstep(0.06, 0.76, cloudDensity) * 0.42;
-  vec3 color = albedo * (0.004 + pow(diffuse, 0.78) * 1.18 * cloudShadow);
+  vec3 color = albedo * (0.004 + pow(diffuse, 0.78) * 1.18 * cloudShadow * uStarFlux);
 
   vec3 H = normalize(L + V);
   float NoV = max(dot(N, V), 0.001);
@@ -106,11 +107,11 @@ void main() {
   float G = geometrySchlickGGX(NoV, roughness) * geometrySchlickGGX(NoL, roughness);
   vec3 F = vec3(0.02) + vec3(0.98) * pow(1.0 - VoH, 5.0);
   vec3 specular = (D * G * F) / max(4.0 * NoV * NoL, 0.001);
-  specular *= NoL * oceanMask * daylight * cloudShadow;
+  specular *= NoL * oceanMask * daylight * cloudShadow * uStarFlux;
   color += vec3(0.72, 0.84, 1.0) * specular * 0.85;
 
   float fresnel = pow(1.0 - max(dot(geometricN, V), 0.0), 4.0);
-  color += vec3(0.015, 0.045, 0.09) * fresnel * daylight * 0.7;
+  color += vec3(0.015, 0.045, 0.09) * fresnel * daylight * 0.7 * uStarFlux;
 
   vec3 moonOffset = uMoonPosition - vWorldPosition;
   float moonAlong = dot(moonOffset, L);
@@ -141,6 +142,7 @@ uniform sampler2D uCloudMap;
 uniform vec3 uSunDirection;
 uniform vec3 uMoonPosition;
 uniform float uMoonRadius;
+uniform float uStarFlux;
 varying vec2 vUv;
 varying vec3 vWorldPosition;
 varying vec3 vWorldNormal;
@@ -168,9 +170,9 @@ void main() {
   vec3 color = mix(
     vec3(0.07, 0.09, 0.12),
     vec3(0.72, 0.78, 0.82),
-    diffuse * 0.8 + 0.2
+    diffuse * 0.8 * uStarFlux + 0.2
   );
-  color += vec3(0.2, 0.35, 0.55) * rim * daylight * 0.25;
+  color += vec3(0.2, 0.35, 0.55) * rim * daylight * 0.25 * uStarFlux;
   color *= moonShadow;
   float alpha = coverage * (0.015 + daylight * 0.66) * mix(1.0, moonShadow, 0.35);
 
@@ -234,6 +236,7 @@ export function Planet({ reducedMotion, timeScale, showMoonLabel }: PlanetProps)
       uCloudOffset: { value: 0 },
       uMoonPosition: { value: new Vector3() },
       uMoonRadius: { value: 0.34 },
+      uStarFlux: { value: 1 },
     }),
     [sunDirection, dayMap, nightMap, normalMap, specularMap, cloudMap],
   )
@@ -243,6 +246,7 @@ export function Planet({ reducedMotion, timeScale, showMoonLabel }: PlanetProps)
       uCloudMap: { value: cloudMap },
       uMoonPosition: { value: new Vector3() },
       uMoonRadius: { value: MOON_RADIUS },
+      uStarFlux: { value: 1 },
     }),
     [sunDirection, cloudMap],
   )
@@ -250,6 +254,7 @@ export function Planet({ reducedMotion, timeScale, showMoonLabel }: PlanetProps)
   useFrame((_, rawDelta) => {
     const delta = Math.min(rawDelta, 0.1)
     updateSunDirection()
+    const flux = starFlux(worldPosition)
 
     const surface = surfaceRef.current
     const clouds = cloudsRef.current
@@ -263,6 +268,10 @@ export function Planet({ reducedMotion, timeScale, showMoonLabel }: PlanetProps)
     if (surfaceMaterialRef.current) {
       surfaceMaterialRef.current.uniforms.uCloudOffset.value =
         surface && clouds ? (surface.rotation.y - clouds.rotation.y) / (Math.PI * 2) : 0
+      surfaceMaterialRef.current.uniforms.uStarFlux.value = flux
+    }
+    if (cloudMaterialRef.current) {
+      cloudMaterialRef.current.uniforms.uStarFlux.value = flux
     }
 
     const moon = moonRef.current
@@ -288,6 +297,7 @@ export function Planet({ reducedMotion, timeScale, showMoonLabel }: PlanetProps)
       if (moonMaterialRef.current) {
         moonMaterialRef.current.uniforms.uPlanetPosition.value.copy(worldPosition)
         moonMaterialRef.current.uniforms.uPlanetRadius.value = planetRadius
+        moonMaterialRef.current.uniforms.uStarFlux.value = starFlux(moonWorld)
       }
     }
   })

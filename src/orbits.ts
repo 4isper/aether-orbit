@@ -31,6 +31,17 @@ export function planetPeriod(id: PlanetId) {
 }
 
 /**
+ * Starlight flux at a world position, unity at Aurelia's orbit. Bodies
+ * multiply their diffuse light by this so outer worlds are genuinely dimmer
+ * than the inner ones. The exponent 1.5 is an exposure compromise: a full
+ * inverse-square law (Vesper at 0.20) reads as near-black up close, 1.5
+ * keeps the falloff while the ice giant stays legible.
+ */
+export function starFlux(position: Vector3) {
+  return (orbitConfig.aurelia.radius / Math.max(position.length(), 1e-4)) ** 1.5
+}
+
+/**
  * Aurelia's own clock: how fast the planet spins and how fast its moon
  * orbits. The moon must orbit above the synchronous orbit (its period above
  * the planet's day) or tides would pull it down; with these numbers the day

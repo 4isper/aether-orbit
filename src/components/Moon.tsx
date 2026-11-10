@@ -9,6 +9,7 @@ export const MOON_RADIUS = 0.34
 const moonFragment = /* glsl */ `
 uniform vec3 uPlanetPosition;
 uniform float uPlanetRadius;
+uniform float uStarFlux;
 varying vec3 vObjectPosition;
 varying vec3 vWorldPosition;
 varying vec3 vWorldNormal;
@@ -43,7 +44,7 @@ void main() {
   }
 
   float diffuse = max(dot(N, L), 0.0);
-  vec3 color = albedo * (0.012 + diffuse * 1.1) * lit;
+  vec3 color = albedo * (0.012 + diffuse * 1.1 * uStarFlux) * lit;
 
   gl_FragColor = vec4(color, 1.0);
   #include <tonemapping_fragment>
@@ -63,6 +64,7 @@ export function Moon({ radius = MOON_RADIUS, ref, materialRef, children }: MoonP
     () => ({
       uPlanetPosition: { value: new Vector3() },
       uPlanetRadius: { value: 2 },
+      uStarFlux: { value: 1 },
     }),
     [],
   )
