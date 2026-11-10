@@ -6,6 +6,7 @@ import { Vector3, type Group } from 'three'
 import { Backdrop } from './Backdrop'
 import { Belt } from './Belt'
 import { CameraRig } from './CameraRig'
+import { Comet } from './Comet'
 import { Planet } from './Planet'
 import { Star } from './Star'
 import { Cinder } from './Cinder'
@@ -109,6 +110,7 @@ export function SpaceScene({ activeView, destination, timeScale, onReady, onArri
       <Backdrop />
       <Starfield reducedMotion={reducedMotion} timeScale={timeScale} />
       <Belt timeRef={orbitTime} />
+      <Comet timeRef={orbitTime} />
       <group {...starEvents}>
         <Star reducedMotion={reducedMotion} timeScale={timeScale} />
       </group>

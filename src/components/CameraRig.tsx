@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { MathUtils, Vector3, type PerspectiveCamera } from 'three'
+import { cometOrbitPoint } from '../comet'
 import { planetIds, type SceneView } from '../planets'
 import { orbitConfig, planetPosition } from '../orbits'
 
@@ -56,6 +57,13 @@ export function CameraRig({ reducedMotion, destination, onArrive, timeRef }: Cam
         halfWidth = Math.max(halfWidth, Math.abs(point.dot(right)))
         maxDepth = Math.max(maxDepth, point.dot(direction))
       }
+    }
+    for (let i = 0; i < 32; i++) {
+      cometOrbitPoint((i / 32) * Math.PI * 2, point)
+      point.multiplyScalar((point.length() + 2.2) / point.length())
+      halfHeight = Math.max(halfHeight, Math.abs(point.dot(screenUp)))
+      halfWidth = Math.max(halfWidth, Math.abs(point.dot(right)))
+      maxDepth = Math.max(maxDepth, point.dot(direction))
     }
     const distance = (Math.max(
       halfHeight / (halfFov * usableHeight / size.height),
