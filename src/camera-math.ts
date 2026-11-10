@@ -44,6 +44,15 @@ export function orbitOffset(
   return out
 }
 
+/**
+ * Camera distance for a two-finger pinch, recomputed from the gesture start so
+ * every move is idempotent. Fingers apart (zoom in) shrink the distance.
+ */
+export function pinchZoom(zoom: number, startDistance: number, nextDistance: number, min: number, max: number) {
+  if (startDistance <= 0 || nextDistance <= 0) return zoom
+  return MathUtils.clamp(zoom * (startDistance / nextDistance), min, max)
+}
+
 export type OverviewPose = {
   target: Vector3
   position: Vector3
@@ -54,8 +63,8 @@ export type OverviewRotation = { position: Vector3; up: Vector3 }
 
 const OVERVIEW_MIN_ELEVATION = -0.12
 const OVERVIEW_MAX_ELEVATION = 1.1
-const OVERVIEW_MIN_ZOOM = 0.7
-const OVERVIEW_MAX_ZOOM = 1.35
+export const OVERVIEW_MIN_ZOOM = 0.7
+export const OVERVIEW_MAX_ZOOM = 1.35
 
 /**
  * User-controlled orbit of the overview camera: yaw circles the system, pitch

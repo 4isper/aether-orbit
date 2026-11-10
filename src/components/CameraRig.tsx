@@ -10,7 +10,10 @@ import {
   FLIGHT_DURATION,
   INTRO_DURATION,
   orbitOffset,
+  OVERVIEW_MAX_ZOOM,
+  OVERVIEW_MIN_ZOOM,
   PLANET_VIEW_DISTANCE,
+  pinchZoom,
   rotateOverviewPose,
   STAR_VIEW_DISTANCE,
 } from '../camera-math'
@@ -36,6 +39,8 @@ export function CameraRig({ initialView, reducedMotion, destination, onArrive, t
   const current = useRef({ yaw: 0, pitch: 0, zoom: PLANET_VIEW_DISTANCE })
   const pointer = useRef({ x: 0, y: 0 })
   const drag = useRef({ active: false, x: 0, y: 0 })
+  const pointers = useRef(new Map<number, { x: number; y: number }>())
+  const pinch = useRef<{ startDistance: number; startZoom: number } | null>(null)
   const intro = useRef(reducedMotion ? 1 : 0)
   const orbitTime = useRef(0)
   const currentView = useRef<SceneView>(initialView)
@@ -71,6 +76,18 @@ export function CameraRig({ initialView, reducedMotion, destination, onArrive, t
 
     const onPointerDown = (event: PointerEvent) => {
       if (flight.current.active || (event.pointerType === 'mouse' && event.button !== 0)) return
+      pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
+      if (pointers.current.size >= 2) {
+        drag.current.active = false
+        const [first, second] = [...pointers.current.values()]
+        pinch.current = {
+          startDistance: Math.hypot(first.x - second.x, first.y - second.y),
+          startZoom: currentView.current === 'system'
+            ? overviewTarget.current.zoom
+            : target.current.zoom,
+        }
+        return
+      }
       drag.current = { active: true, x: event.clientX, y: event.clientY }
       element.setPointerCapture(event.pointerId)
       element.focus({ preventScroll: true })
@@ -80,6 +97,28 @@ export function CameraRig({ initialView, reducedMotion, destination, onArrive, t
       if (flight.current.active) return
       pointer.current.x = (event.clientX / window.innerWidth) * 2 - 1
       pointer.current.y = (event.clientY / window.innerHeight) * 2 - 1
+      const tracked = pointers.current.get(event.pointerId)
+      if (tracked) {
+        tracked.x = event.clientX
+        tracked.y = event.clientY
+      }
+
+      if (pointers.current.size >= 2 && pinch.current) {
+        const [first, second] = [...pointers.current.values()]
+        const distance = Math.hypot(first.x - second.x, first.y - second.y)
+        if (currentView.current === 'system') {
+          overviewTarget.current.zoom = pinchZoom(
+            pinch.current.startZoom, pinch.current.startDistance, distance,
+            OVERVIEW_MIN_ZOOM, OVERVIEW_MAX_ZOOM,
+          )
+        } else {
+          target.current.zoom = pinchZoom(
+            pinch.current.startZoom, pinch.current.startDistance, distance,
+            MIN_ZOOM, MAX_ZOOM,
+          )
+        }
+        return
+      }
       if (!drag.current.active) return
 
       const dx = event.clientX - drag.current.x
@@ -96,7 +135,15 @@ export function CameraRig({ initialView, reducedMotion, destination, onArrive, t
     }
 
     const onPointerUp = (event: PointerEvent) => {
-      drag.current.active = false
+      pointers.current.delete(event.pointerId)
+      if (pointers.current.size < 2) pinch.current = null
+      if (pointers.current.size === 1) {
+        // resume rotating from the remaining finger instead of jumping
+        const [rest] = pointers.current.values()
+        drag.current = { active: true, x: rest.x, y: rest.y }
+      } else {
+        drag.current.active = false
+      }
       if (element.hasPointerCapture(event.pointerId)) {
         element.releasePointerCapture(event.pointerId)
       }
@@ -180,6 +227,8 @@ export function CameraRig({ initialView, reducedMotion, destination, onArrive, t
       overviewTarget.current = { yaw: 0, pitch: 0, zoom: 1 }
       overviewCurrent.current = { yaw: 0, pitch: 0, zoom: 1 }
       pointer.current = { x: 0, y: 0 }
+      pointers.current.clear()
+      pinch.current = null
       drag.current.active = false
       intro.current = 1
       orbitTime.current = 0

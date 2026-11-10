@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { Vector3 } from 'three'
-import { orbitOffset, computeOverviewPose, rotateOverviewPose, PLANET_VIEW_DISTANCE } from './camera-math.ts'
+import { orbitOffset, computeOverviewPose, rotateOverviewPose, pinchZoom, PLANET_VIEW_DISTANCE } from './camera-math.ts'
 import { planetIds } from './planets.ts'
 import { planetPosition } from './orbits.ts'
 
@@ -100,4 +100,27 @@ test('overview pitch is clamped so the camera never dives under the plane', () =
     (out.position.y - pose.target.y) / out.position.distanceTo(pose.target),
   )
   assert.ok(elevation >= -0.12 - 1e-9, `elevation ${elevation} below the clamp`)
+})
+
+test('pinch out moves the camera closer, pinch in moves it away', () => {
+  // zoom is the camera distance: fingers apart (2x) should halve it.
+  assert.ok(Math.abs(pinchZoom(10, 100, 200, 5, 40) - 5) < 1e-9)
+  assert.ok(Math.abs(pinchZoom(10, 200, 100, 5, 40) - 20) < 1e-9)
+})
+
+test('pinch zoom clamps to the view range', () => {
+  assert.equal(pinchZoom(10, 300, 50, 5, 40), 40)
+  assert.equal(pinchZoom(10, 50, 300, 5, 40), 5)
+})
+
+test('pinch zoom ignores degenerate distances', () => {
+  assert.equal(pinchZoom(10, 0, 100, 5, 40), 10)
+  assert.equal(pinchZoom(10, 100, 0, 5, 40), 10)
+})
+
+test('pinch zoom scales from the gesture start, so it is restartable', () => {
+  // every frame recomputes from the same base, never compounding drift
+  const first = pinchZoom(9, 120, 60, 5, 40)
+  const again = pinchZoom(9, 120, 60, 5, 40)
+  assert.equal(first, again)
 })
