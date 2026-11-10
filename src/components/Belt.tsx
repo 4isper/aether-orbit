@@ -1,7 +1,17 @@
 import { useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Euler, Matrix4, Quaternion, ShaderMaterial, Vector3, type InstancedMesh } from 'three'
+import {
+  AdditiveBlending,
+  DoubleSide,
+  Euler,
+  Matrix4,
+  Quaternion,
+  ShaderMaterial,
+  Vector3,
+  type InstancedMesh,
+} from 'three'
 import { createRandom } from '../random'
+import { noiseGLSL } from '../shaders/noise'
 
 const rockVertex = /* glsl */ `
 varying vec3 vWorldPosition;
@@ -56,6 +66,42 @@ const rings: RingConfig[] = [
   { inner: 16.7, outer: 17.7, count: 540, speed: 0.0112, spread: 0.42, seed: 2903 },
   { inner: 17.7, outer: 18.6, count: 440, speed: 0.0103, spread: 0.34, seed: 4409 },
 ]
+
+// Zodiacal light: sunlight scattered by the belt's dust, laid in the belt's
+// own plane. Brightest just outside the star's corona, gone by the outer
+// orbits; kept faint so it reads as haze, not as a solid disc.
+const GLOW_INNER = 5
+const GLOW_OUTER = 20
+
+const glowVertex = /* glsl */ `
+varying vec2 vLocal;
+varying float vRadius;
+void main() {
+  vLocal = position.xy;
+  vRadius = length(position.xy);
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+`
+
+const glowFragment = /* glsl */ `
+uniform float uInner;
+uniform float uOuter;
+varying vec2 vLocal;
+varying float vRadius;
+${noiseGLSL}
+
+void main() {
+  float t = (vRadius - uInner) / (uOuter - uInner);
+  float falloff = exp(-t * 3.6) * smoothstep(0.0, 0.15, t);
+  // Broad radial and angular wisps keep it from reading as a flat disc.
+  float wisps = fbm3(vec3(vLocal * 0.22, 3.1)) * 0.5 + 0.5;
+  float alpha = falloff * (0.35 + 0.65 * wisps) * 0.12;
+  vec3 color = vec3(1.0, 0.84, 0.62);
+  gl_FragColor = vec4(color * alpha, alpha);
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
+}
+`
 
 type BeltRingProps = {
   config: RingConfig
@@ -119,9 +165,25 @@ export function Belt({ timeRef }: BeltProps) {
     }),
     [],
   )
+  const glowUniforms = useMemo(
+    () => ({ uInner: { value: GLOW_INNER }, uOuter: { value: GLOW_OUTER } }),
+    [],
+  )
 
   return (
     <group rotation={[0.035, 0, 0.02]}>
+      <mesh rotation-x={-Math.PI / 2} renderOrder={-2} raycast={() => null}>
+        <ringGeometry args={[GLOW_INNER, GLOW_OUTER, 160, 1]} />
+        <shaderMaterial
+          vertexShader={glowVertex}
+          fragmentShader={glowFragment}
+          uniforms={glowUniforms}
+          transparent
+          depthWrite={false}
+          side={DoubleSide}
+          blending={AdditiveBlending}
+        />
+      </mesh>
       {rings.map((config) => (
         <BeltRing key={config.seed} config={config} material={material} timeRef={timeRef} />
       ))}
