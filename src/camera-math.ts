@@ -1,7 +1,7 @@
 import { MathUtils, Vector3 } from 'three'
-import { cometOrbitPoint } from './comet'
-import { planetIds } from './planets'
-import { orbitPoint } from './orbits'
+import { cometOrbitPoint } from './comet.ts'
+import { planetIds } from './planets.ts'
+import { orbitPoint } from './orbits.ts'
 
 export const PLANET_VIEW_DISTANCE = 9
 export const STAR_VIEW_DISTANCE = 11.5
