@@ -1,5 +1,5 @@
 export type PlanetId = 'aurelia' | 'cinder' | 'vesper'
-export type SceneView = PlanetId | 'system' | 'star'
+export type SceneView = PlanetId | 'system' | 'star' | 'comet'
 export const planetIds: PlanetId[] = ['aurelia', 'cinder', 'vesper']
 
 export type BodyInfo = {
@@ -52,8 +52,19 @@ export const starInfo: BodyInfo = {
   metric: ['Температура', '5 800', 'K'],
 }
 
+export const cometInfo: BodyInfo = {
+  name: 'Boreas',
+  label: 'Борея',
+  code: '004',
+  title: ['Ледяной', 'гость'],
+  description: ['Хвост тянется строго от звезды.', 'Возвращается раз в девяносто дней.'],
+  radius: '0.02',
+  metric: ['Эксцентриситет', '0.70', 'e'],
+}
+
 /** Telemetry for every flyable destination except the system overview. */
 export const bodies: Record<Exclude<SceneView, 'system'>, BodyInfo> = {
   ...planets,
   star: starInfo,
+  comet: cometInfo,
 }

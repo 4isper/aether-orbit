@@ -61,14 +61,14 @@ export function SpaceScene({ activeView, destination, initialView, timeScale, re
     }
   })
 
-  const selectPlanet = (id: PlanetId) => {
+  const selectBody = (view: SceneView) => {
     setHovered(false)
-    onSelect(id)
+    onSelect(view)
   }
   const planetEvents = (id: PlanetId) => overview ? {
     onClick: (event: ThreeEvent<MouseEvent>) => {
       event.stopPropagation()
-      if (event.delta <= 5) selectPlanet(id)
+      if (event.delta <= 5) selectBody(id)
     },
     onPointerOver: (event: ThreeEvent<PointerEvent>) => {
       event.stopPropagation()
@@ -81,7 +81,7 @@ export function SpaceScene({ activeView, destination, initialView, timeScale, re
       event.stopPropagation()
       if (event.delta <= 5) {
         setHovered(false)
-        onSelect('star')
+        selectBody('star')
       }
     },
     onPointerOver: (event: ThreeEvent<PointerEvent>) => {
@@ -111,7 +111,7 @@ export function SpaceScene({ activeView, destination, initialView, timeScale, re
         <Vesper reducedMotion={reducedMotion} timeScale={timeScale} />
       </group>
       <CameraRig initialView={initialView} reducedMotion={reducedMotion} destination={destination} onArrive={onArrive} timeRef={orbitTime} />
-      {overview && <SystemOverview onSelect={selectPlanet} timeRef={orbitTime} />}
+      {overview && <SystemOverview onSelect={selectBody} timeRef={orbitTime} />}
       <SceneReady onReady={onReady} />
       <EffectComposer multisampling={0}>
         <Bloom

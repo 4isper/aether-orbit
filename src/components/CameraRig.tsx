@@ -3,19 +3,17 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { MathUtils, Vector3, type PerspectiveCamera } from 'three'
 import { type SceneView } from '../planets'
 import { planetPosition } from '../orbits'
+import { cometPosition } from '../comet'
 import {
   computeOverviewPose,
-  MAX_ZOOM,
-  MIN_ZOOM,
   FLIGHT_DURATION,
   INTRO_DURATION,
   orbitOffset,
   OVERVIEW_MAX_ZOOM,
   OVERVIEW_MIN_ZOOM,
-  PLANET_VIEW_DISTANCE,
   pinchZoom,
   rotateOverviewPose,
-  STAR_VIEW_DISTANCE,
+  viewZoomBounds,
 } from '../camera-math'
 
 type CameraRigProps = {
@@ -35,8 +33,8 @@ export function CameraRig({ initialView, reducedMotion, destination, onArrive, t
     () => computeOverviewPose(size.width, size.height),
     [size.width, size.height],
   )
-  const target = useRef({ yaw: 0, pitch: 0, zoom: PLANET_VIEW_DISTANCE })
-  const current = useRef({ yaw: 0, pitch: 0, zoom: PLANET_VIEW_DISTANCE })
+  const target = useRef({ yaw: 0, pitch: 0, zoom: viewZoomBounds(initialView).distance })
+  const current = useRef({ yaw: 0, pitch: 0, zoom: viewZoomBounds(initialView).distance })
   const pointer = useRef({ x: 0, y: 0 })
   const drag = useRef({ active: false, x: 0, y: 0 })
   const pointers = useRef(new Map<number, { x: number; y: number }>())
@@ -71,7 +69,7 @@ export function CameraRig({ initialView, reducedMotion, destination, onArrive, t
         overviewTarget.current = { yaw: 0, pitch: 0, zoom: 1 }
         return
       }
-      target.current = { yaw: 0, pitch: 0, zoom: PLANET_VIEW_DISTANCE }
+      target.current = { yaw: 0, pitch: 0, zoom: viewZoomBounds(currentView.current).distance }
     }
 
     const onPointerDown = (event: PointerEvent) => {
@@ -112,9 +110,10 @@ export function CameraRig({ initialView, reducedMotion, destination, onArrive, t
             OVERVIEW_MIN_ZOOM, OVERVIEW_MAX_ZOOM,
           )
         } else {
+          const bounds = viewZoomBounds(currentView.current)
           target.current.zoom = pinchZoom(
             pinch.current.startZoom, pinch.current.startDistance, distance,
-            MIN_ZOOM, MAX_ZOOM,
+            bounds.min, bounds.max,
           )
         }
         return
@@ -156,7 +155,8 @@ export function CameraRig({ initialView, reducedMotion, destination, onArrive, t
         overviewTarget.current.zoom = MathUtils.clamp(overviewTarget.current.zoom + event.deltaY * 0.0012, 0.7, 1.35)
         return
       }
-      target.current.zoom = MathUtils.clamp(target.current.zoom + event.deltaY * 0.003, MIN_ZOOM, MAX_ZOOM)
+      const bounds = viewZoomBounds(currentView.current)
+      target.current.zoom = MathUtils.clamp(target.current.zoom + event.deltaY * 0.003, bounds.min, bounds.max)
     }
 
     const onKeyDown = (event: KeyboardEvent) => {
@@ -184,7 +184,8 @@ export function CameraRig({ initialView, reducedMotion, destination, onArrive, t
       if (event.key === '-') target.current.zoom += 0.25
       target.current.yaw = MathUtils.clamp(target.current.yaw, -0.32, 0.32)
       target.current.pitch = MathUtils.clamp(target.current.pitch, -0.18, 0.18)
-      target.current.zoom = MathUtils.clamp(target.current.zoom, MIN_ZOOM, MAX_ZOOM)
+      const bounds = viewZoomBounds(currentView.current)
+      target.current.zoom = MathUtils.clamp(target.current.zoom, bounds.min, bounds.max)
     }
 
     element.addEventListener('pointerdown', onPointerDown)
@@ -212,7 +213,13 @@ export function CameraRig({ initialView, reducedMotion, destination, onArrive, t
     const compact = state.size.width < 700
     const journey = flight.current
     const time = timeRef.current
-    compOffset.set(compact ? -0.45 : -1.8, compact ? 1.3 : 0.5, 0)
+    // The comet is ten times smaller than the planets: its framing offset is
+    // proportionally smaller so it stays inside the frame.
+    if ((journey.active ? destination : currentView.current) === 'comet') {
+      compOffset.set(compact ? -0.3 : -0.6, compact ? 0.9 : 0.3, 0)
+    } else {
+      compOffset.set(compact ? -0.45 : -1.8, compact ? 1.3 : 0.5, 0)
+    }
 
     if (destination !== requestedView.current) {
       requestedView.current = destination
@@ -221,7 +228,7 @@ export function CameraRig({ initialView, reducedMotion, destination, onArrive, t
       journey.startPosition.copy(camera.position)
       journey.startLook.copy(lookAt.current)
       journey.startUp.copy(camera.up)
-      const initialZoom = destination === 'star' ? STAR_VIEW_DISTANCE : PLANET_VIEW_DISTANCE
+      const initialZoom = viewZoomBounds(destination).distance
       target.current = { yaw: 0, pitch: 0, zoom: initialZoom }
       current.current = { yaw: 0, pitch: 0, zoom: initialZoom }
       overviewTarget.current = { yaw: 0, pitch: 0, zoom: 1 }
@@ -245,11 +252,16 @@ export function CameraRig({ initialView, reducedMotion, destination, onArrive, t
         journey.endUp.copy(overviewPose.up)
       } else if (destination === 'star') {
         journey.endLook.copy(compOffset)
-        orbitOffset(journey.endLook, 0, 0, STAR_VIEW_DISTANCE + (compact ? 0.55 : 0), journey.endPosition)
+        orbitOffset(journey.endLook, 0, 0, viewZoomBounds(destination).distance + (compact ? 0.55 : 0), journey.endPosition)
         journey.endUp.set(0, 1, 0)
       } else {
-        planetPosition(destination, time, journey.endLook).add(compOffset)
-        orbitOffset(journey.endLook, 0, 0, PLANET_VIEW_DISTANCE + (compact ? 0.55 : 0), journey.endPosition)
+        if (destination === 'comet') {
+          cometPosition(time, journey.endLook)
+        } else {
+          planetPosition(destination, time, journey.endLook)
+        }
+        journey.endLook.add(compOffset)
+        orbitOffset(journey.endLook, 0, 0, viewZoomBounds(destination).distance + (compact ? 0.55 : 0), journey.endPosition)
         journey.endUp.set(0, 1, 0)
       }
       camera.position.lerpVectors(journey.startPosition, journey.endPosition, eased)
@@ -300,6 +312,8 @@ export function CameraRig({ initialView, reducedMotion, destination, onArrive, t
     const pitch = current.current.pitch - parallaxY * 0.012 + idleY
     if (currentView.current === 'star') {
       scratch.set(0, 0, 0)
+    } else if (currentView.current === 'comet') {
+      cometPosition(time, scratch)
     } else {
       planetPosition(currentView.current, time, scratch)
     }

@@ -6,9 +6,9 @@ import './App.css'
 const SceneCanvas = lazy(() => import('./SceneCanvas'))
 
 const SPEED_OPTIONS = [0.5, 1, 2, 4]
-const TOUR_STOPS: SceneView[] = ['aurelia', 'cinder', 'vesper', 'star', 'system']
+const TOUR_STOPS: SceneView[] = ['aurelia', 'cinder', 'vesper', 'comet', 'star', 'system']
 const TOUR_DWELL_MS = 7000
-const SCENE_VIEWS: SceneView[] = [...planetIds, 'star', 'system']
+const SCENE_VIEWS: SceneView[] = [...planetIds, 'star', 'comet', 'system']
 
 /** Deep link support: ?view=vesper opens the scene already on that orbit. */
 function readInitialView(): SceneView {
@@ -143,7 +143,7 @@ function App() {
                 label={travelling
                   ? `Перелёт: ${currentName} — ${destinationName}`
                   : body
-                    ? `${isStar ? 'Интерактивная сцена звезды' : 'Интерактивная сцена планеты'} ${body.label}. Перетаскивайте для вращения и используйте колесо для масштабирования.`
+                    ? `${isStar ? 'Интерактивная сцена звезды' : activeView === 'comet' ? 'Интерактивная сцена кометы' : 'Интерактивная сцена планеты'} ${body.label}. Перетаскивайте для вращения и используйте колесо для масштабирования.`
                     : 'Обзор системы. Выберите мир или звезду нажатием на сферу или подпись.'}
               activeView={activeView}
               destination={destination}
@@ -221,6 +221,18 @@ function App() {
               {bodies[id].name}
             </button>
           ))}
+          <button
+            type="button"
+            className="planet-link planet-link--comet"
+            aria-pressed={activeView === 'comet'}
+            aria-label={`Перелёт к комете ${bodies.comet.name}`}
+            disabled={!ready || travelling}
+            onClick={() => travelTo('comet')}
+          >
+            <span className="planet-dot" aria-hidden="true" />
+            <span className="planet-number">{bodies.comet.code}</span>
+            {bodies.comet.name}
+          </button>
         </nav>
 
         <div className="time-controls reveal" role="group" aria-label="Управление временем">
@@ -271,7 +283,7 @@ function App() {
         {body ? (
           <>
             <section className="intro reveal" aria-labelledby="scene-title" aria-hidden={travelling}>
-              <p className="eyebrow"><span />{body.name} / {activeView === 'star' ? 'Звезда системы' : activeView === 'cinder' ? 'Пустынный мир' : activeView === 'vesper' ? 'Газовый гигант' : 'Экзопланета'}</p>
+              <p className="eyebrow"><span />{body.name} / {activeView === 'star' ? 'Звезда системы' : activeView === 'cinder' ? 'Пустынный мир' : activeView === 'vesper' ? 'Газовый гигант' : activeView === 'comet' ? 'Комета' : 'Экзопланета'}</p>
               <h1 id="scene-title">
                 <span>{body.title[0]}</span>
                 <em>{body.title[1]}</em>

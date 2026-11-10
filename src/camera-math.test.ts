@@ -1,7 +1,18 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { Vector3 } from 'three'
-import { orbitOffset, computeOverviewPose, rotateOverviewPose, pinchZoom, PLANET_VIEW_DISTANCE } from './camera-math.ts'
+import {
+  orbitOffset,
+  computeOverviewPose,
+  rotateOverviewPose,
+  pinchZoom,
+  viewZoomBounds,
+  COMET_VIEW_DISTANCE,
+  MAX_ZOOM,
+  MIN_ZOOM,
+  PLANET_VIEW_DISTANCE,
+  STAR_VIEW_DISTANCE,
+} from './camera-math.ts'
 import { planetIds } from './planets.ts'
 import { planetPosition } from './orbits.ts'
 
@@ -123,4 +134,18 @@ test('pinch zoom scales from the gesture start, so it is restartable', () => {
   const first = pinchZoom(9, 120, 60, 5, 40)
   const again = pinchZoom(9, 120, 60, 5, 40)
   assert.equal(first, again)
+})
+
+test('viewZoomBounds gives every flyable view its distance and clamp', () => {
+  for (const view of ['aurelia', 'cinder', 'vesper'] as const) {
+    const bounds = viewZoomBounds(view)
+    assert.equal(bounds.distance, PLANET_VIEW_DISTANCE)
+    assert.equal(bounds.min, MIN_ZOOM)
+    assert.equal(bounds.max, MAX_ZOOM)
+  }
+  assert.equal(viewZoomBounds('star').distance, STAR_VIEW_DISTANCE)
+  const comet = viewZoomBounds('comet')
+  assert.equal(comet.distance, COMET_VIEW_DISTANCE)
+  assert.ok(comet.min < comet.distance && comet.distance < comet.max, 'comet default outside its clamp')
+  assert.equal(viewZoomBounds('system').distance, PLANET_VIEW_DISTANCE)
 })

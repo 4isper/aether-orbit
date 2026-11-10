@@ -495,6 +495,11 @@ h1 > em {
   box-shadow: 0 0 9px rgba(224, 152, 78, 0.18);
 }
 
+.planet-link--comet .planet-dot {
+  background: radial-gradient(circle at 30% 30%, #e8f0fb, #8fa3c4 48%, #232c40 75%);
+  box-shadow: 0 0 9px rgba(143, 163, 196, 0.18);
+}
+
 .experience[data-view="star"] h1 > em {
   color: #e2b98a;
 }
@@ -721,6 +726,11 @@ h1 > em {
 .system-label--vesper {
   color: #c4dad6;
   border-top-color: rgba(159, 184, 180, 0.35);
+}
+
+.system-label--comet {
+  color: #bcc9dc;
+  border-top-color: rgba(143, 163, 196, 0.35);
 }
 
 .system-label > span {

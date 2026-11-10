@@ -1,12 +1,15 @@
 import { MathUtils, Vector3 } from 'three'
 import { cometOrbitPoint } from './comet.ts'
-import { planetIds } from './planets.ts'
+import { planetIds, type SceneView } from './planets.ts'
 import { orbitPoint } from './orbits.ts'
 
 export const PLANET_VIEW_DISTANCE = 9
 export const STAR_VIEW_DISTANCE = 11.5
+export const COMET_VIEW_DISTANCE = 3.4
 export const MIN_ZOOM = 7.6
 export const MAX_ZOOM = 12.6
+export const COMET_MIN_ZOOM = 2.2
+export const COMET_MAX_ZOOM = 4.6
 const FLIGHT_TIME = 4.2
 const INTRO_TIME = 4.5
 const OVERVIEW_HALF_FOV_DEG = 18
@@ -51,6 +54,17 @@ export function orbitOffset(
 export function pinchZoom(zoom: number, startDistance: number, nextDistance: number, min: number, max: number) {
   if (startDistance <= 0 || nextDistance <= 0) return zoom
   return MathUtils.clamp(zoom * (startDistance / nextDistance), min, max)
+}
+
+/**
+ * Default orbit distance and zoom clamp for a flyable view. The comet orbits
+ * much closer than the planets, so it gets its own tighter range; 'system'
+ * keeps the planet defaults because the overview has its own pose.
+ */
+export function viewZoomBounds(view: SceneView) {
+  if (view === 'star') return { distance: STAR_VIEW_DISTANCE, min: MIN_ZOOM, max: MAX_ZOOM }
+  if (view === 'comet') return { distance: COMET_VIEW_DISTANCE, min: COMET_MIN_ZOOM, max: COMET_MAX_ZOOM }
+  return { distance: PLANET_VIEW_DISTANCE, min: MIN_ZOOM, max: MAX_ZOOM }
 }
 
 export type OverviewPose = {
