@@ -1,0 +1,852 @@
+.experience {
+  position: relative;
+  width: 100%;
+  height: 100svh;
+  min-height: 540px;
+  overflow: hidden;
+  isolation: isolate;
+  background: #010205;
+}
+
+.scene {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transform: scale(1.015);
+  transition: opacity 1.6s ease, transform 2.4s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.is-ready .scene {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.scene canvas {
+  display: block;
+  touch-action: none;
+  outline: none;
+  cursor: grab;
+}
+
+.scene canvas:active {
+  cursor: grabbing;
+}
+
+.interface {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.reveal {
+  opacity: 0;
+  transition: opacity 1.2s ease, transform 1.4s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.is-ready .reveal {
+  opacity: 1;
+}
+
+.topbar {
+  position: absolute;
+  top: 34px;
+  right: 44px;
+  left: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transform: translateY(-8px);
+  transition-delay: 0.35s;
+}
+
+.is-ready .topbar {
+  transform: translateY(0);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: rgba(237, 243, 247, 0.94);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.3em;
+}
+
+.brand-mark {
+  width: 32px;
+  height: 32px;
+  color: #b8cbd7;
+}
+
+.scene-status {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: rgba(211, 224, 232, 0.54);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.status-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #8fb9ac;
+  box-shadow: 0 0 9px rgba(143, 185, 172, 0.65);
+}
+
+.status-code {
+  margin-left: 14px;
+  padding-left: 22px;
+  border-left: 1px solid rgba(255, 255, 255, 0.13);
+  color: rgba(211, 224, 232, 0.34);
+}
+
+.intro {
+  position: absolute;
+  top: 49%;
+  left: clamp(32px, 5.6vw, 88px);
+  max-width: 560px;
+  transform: translateY(calc(-50% + 18px));
+  transition-delay: 0.5s;
+}
+
+.is-ready .intro {
+  transform: translateY(-50%);
+}
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  margin: 0 0 28px 5px;
+  color: rgba(196, 213, 224, 0.54);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+
+.eyebrow > span {
+  display: block;
+  width: 26px;
+  height: 1px;
+  background: rgba(161, 193, 213, 0.5);
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(66px, 7.8vw, 122px);
+  font-weight: 250;
+  line-height: 0.78;
+  letter-spacing: -0.065em;
+}
+
+h1 > span {
+  display: block;
+  color: rgba(239, 244, 247, 0.96);
+  text-transform: uppercase;
+}
+
+h1 > em {
+  display: block;
+  margin-top: 0.18em;
+  margin-left: 0.62em;
+  color: #a9c0cf;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 0.91em;
+  font-weight: 400;
+  letter-spacing: -0.055em;
+}
+
+.intro-copy {
+  margin: 38px 0 0 6px;
+  color: rgba(204, 217, 225, 0.48);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.85;
+  letter-spacing: 0.04em;
+}
+
+.telemetry {
+  position: absolute;
+  right: 46px;
+  bottom: 108px;
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  transform: translateY(10px);
+  transition-delay: 0.75s;
+}
+
+.is-ready .telemetry {
+  transform: translateY(0);
+}
+
+.telemetry-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.telemetry-label {
+  color: rgba(199, 214, 223, 0.35);
+  font-size: 8px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.telemetry-item strong {
+  color: rgba(229, 238, 243, 0.76);
+  font-size: 21px;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+}
+
+.telemetry-item small {
+  margin-left: 4px;
+  color: rgba(199, 214, 223, 0.4);
+  font-size: 8px;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.telemetry-divider {
+  width: 1px;
+  height: 38px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.control-hint {
+  position: absolute;
+  bottom: 35px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transform: translate(-50%, 8px);
+  transition-delay: 0.9s;
+}
+
+.is-ready .control-hint {
+  transform: translate(-50%, 0);
+}
+
+.control-hint svg {
+  width: 19px;
+  height: 26px;
+  color: rgba(202, 218, 227, 0.32);
+}
+
+.control-hint > div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.control-hint span {
+  color: rgba(220, 231, 237, 0.48);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+
+.control-hint small {
+  color: rgba(202, 218, 227, 0.24);
+  font-size: 7px;
+  letter-spacing: 0.08em;
+}
+
+.reset-view {
+  position: absolute;
+  right: 43px;
+  bottom: 37px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 0 8px 12px;
+  border: 0;
+  color: rgba(211, 225, 233, 0.36);
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: color 0.25s ease, opacity 1.2s ease;
+  transition-delay: 0.9s;
+}
+
+.reset-view:hover,
+.reset-view:focus-visible {
+  color: rgba(232, 240, 245, 0.85);
+}
+
+.reset-view:focus-visible {
+  outline: 1px solid rgba(174, 205, 224, 0.45);
+  outline-offset: 5px;
+}
+
+.reset-view svg {
+  width: 16px;
+  height: 16px;
+}
+
+.reset-view span {
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.footer {
+  position: absolute;
+  bottom: 45px;
+  left: 46px;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  color: rgba(202, 218, 227, 0.24);
+  font-size: 7px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  transition-delay: 0.85s;
+}
+
+.footer-line {
+  width: 22px;
+  height: 1px;
+  background: rgba(202, 218, 227, 0.17);
+}
+
+.footer a {
+  color: inherit;
+  text-decoration: none;
+  white-space: nowrap;
+  pointer-events: auto;
+  transition: color 0.2s ease;
+}
+
+.footer a:hover,
+.footer a:focus-visible {
+  color: rgba(202, 218, 227, 0.65);
+}
+
+.footer a:focus-visible {
+  outline: 1px solid rgba(174, 205, 224, 0.35);
+  outline-offset: 4px;
+}
+
+.loader {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  background: #010205;
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 1s ease, visibility 0s linear 1s;
+}
+
+.is-ready .loader {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.loader-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: rgba(206, 222, 231, 0.45);
+}
+
+.loader-mark {
+  width: 44px;
+  height: 44px;
+  margin-bottom: 22px;
+  animation: orbit-loading 5s linear infinite;
+}
+
+.loader-inner > span {
+  font-size: 8px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+
+.loader-track {
+  width: 118px;
+  height: 1px;
+  margin-top: 18px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.loader-track > span {
+  display: block;
+  width: 45%;
+  height: 100%;
+  background: rgba(171, 204, 222, 0.55);
+  animation: loader-progress 1.4s ease-in-out infinite;
+}
+
+@keyframes orbit-loading {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes loader-progress {
+  from { transform: translateX(-110%); }
+  to { transform: translateX(330%); }
+}
+
+.planet-nav {
+  position: absolute;
+  top: 105px;
+  left: clamp(32px, 5.6vw, 88px);
+  display: flex;
+  gap: 16px;
+  pointer-events: auto;
+  transition-delay: 0.4s;
+}
+
+.planet-link {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 44px;
+  padding: 8px 3px;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  color: rgba(199, 214, 223, 0.45);
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+  transition: color 0.25s ease, border-color 0.25s ease, opacity 0.25s ease;
+}
+
+.planet-link[aria-pressed="true"] {
+  border-bottom-color: rgba(184, 207, 222, 0.4);
+  color: #d1e0e9;
+}
+
+.planet-link:not(:disabled):hover {
+  color: #eef4f7;
+}
+
+.planet-link:focus-visible {
+  outline: 1px solid rgba(174, 205, 224, 0.65);
+  outline-offset: 5px;
+}
+
+.planet-link:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.planet-number {
+  font-size: 7px;
+  color: rgba(199, 214, 223, 0.35);
+}
+
+.planet-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #bad9df, #3b708a 48%, #132430 75%);
+  box-shadow: 0 0 9px rgba(137, 188, 219, 0.16);
+}
+
+.planet-link--cinder .planet-dot {
+  background: radial-gradient(circle at 30% 30%, #e2ba91, #a46744 48%, #342116 75%);
+  box-shadow: 0 0 9px rgba(217, 151, 94, 0.16);
+}
+
+.experience[data-view="cinder"] h1 > em {
+  color: #d0ab8b;
+}
+
+.flight-status {
+  position: absolute;
+  top: 46%;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  width: max-content;
+  max-width: calc(100% - 40px);
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  text-align: center;
+  transition: opacity 0.3s ease;
+}
+
+.flight-status > span {
+  color: rgba(202, 218, 227, 0.55);
+  font-size: 8px;
+  letter-spacing: 0.23em;
+  text-transform: uppercase;
+}
+
+.flight-status strong {
+  color: #d7e2e9;
+  font-size: 18px;
+  font-weight: 300;
+  letter-spacing: 0.12em;
+}
+
+.flight-status strong span {
+  margin: 0 14px;
+  color: rgba(202, 218, 227, 0.35);
+}
+
+.is-travelling .flight-status {
+  opacity: 1;
+}
+
+.is-travelling .intro,
+.is-travelling .telemetry,
+.is-travelling .control-hint,
+.is-travelling .reset-view,
+.is-travelling .system-intro,
+.is-travelling .system-note {
+  opacity: 0;
+  transition-duration: 0.25s;
+  transition-delay: 0s;
+}
+
+.is-travelling .scene canvas {
+  cursor: progress;
+}
+
+.system-icon {
+  width: 19px;
+  height: 19px;
+  color: #a9c0cf;
+}
+
+.system-intro {
+  position: absolute;
+  top: 178px;
+  left: 50%;
+  width: calc(100% - 48px);
+  transform: translateX(-50%);
+  text-align: center;
+}
+
+.system-intro .eyebrow {
+  justify-content: center;
+  margin: 0 0 14px;
+  font-size: 8px;
+}
+
+.system-intro h1 {
+  color: #d9e4eb;
+  font-size: 36px;
+  font-weight: 300;
+  line-height: 1.15;
+  letter-spacing: -0.035em;
+}
+
+.system-intro > p:last-child {
+  margin: 14px 0 0;
+  color: rgba(199, 214, 223, 0.48);
+  font-size: 10px;
+  line-height: 1.7;
+  letter-spacing: 0.03em;
+}
+
+.system-label {
+  display: grid;
+  grid-template-columns: auto auto;
+  justify-content: center;
+  align-items: center;
+  gap: 6px 10px;
+  min-width: 134px;
+  min-height: 58px;
+  padding: 10px 14px;
+  transform: translateY(122px);
+  border: 0;
+  border-top: 1px solid rgba(174, 205, 224, 0.35);
+  color: #d4e3ed;
+  background: rgba(1, 2, 5, 0.55);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.system-label--cinder {
+  color: #dfc0a6;
+  border-top-color: rgba(214, 164, 122, 0.35);
+}
+
+.system-label > span {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+}
+
+.system-label small {
+  color: rgba(199, 214, 223, 0.6);
+  font-size: 7px;
+  letter-spacing: 0.15em;
+}
+
+.system-label small:last-child {
+  grid-column: 1 / -1;
+  text-transform: uppercase;
+}
+
+.system-label:hover,
+.system-label:focus-visible {
+  border-color: currentColor;
+  background: rgba(16, 24, 32, 0.75);
+}
+
+.system-label:focus-visible {
+  outline: 1px solid currentColor;
+  outline-offset: 4px;
+}
+
+.system-note {
+  position: absolute;
+  right: 24px;
+  bottom: 82px;
+  left: 24px;
+  margin: 0;
+  color: rgba(199, 214, 223, 0.4);
+  font-size: 8px;
+  letter-spacing: 0.14em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 900px) {
+  .planet-nav {
+    left: 34px;
+  }
+
+  .intro {
+    left: 34px;
+  }
+
+  h1 {
+    font-size: clamp(58px, 9vw, 82px);
+  }
+
+  .telemetry {
+    right: 34px;
+  }
+
+  .footer {
+    left: 34px;
+  }
+
+  .control-hint {
+    left: 46%;
+  }
+}
+
+@media (max-width: 700px) {
+  .experience {
+    min-height: 580px;
+  }
+
+  .topbar {
+    top: 22px;
+    right: 22px;
+    left: 22px;
+  }
+
+  .brand {
+    gap: 8px;
+    font-size: 10px;
+  }
+
+  .brand-mark {
+    width: 28px;
+    height: 28px;
+  }
+
+  .scene-status > span:not(.status-dot):not(.status-code) {
+    display: none;
+  }
+
+  .status-code {
+    margin-left: 4px;
+    padding-left: 12px;
+  }
+
+  .planet-nav {
+    top: 76px;
+    left: 24px;
+    gap: 14px;
+  }
+
+  .planet-link {
+    font-size: 9px;
+    gap: 7px;
+  }
+
+  .planet-number {
+    display: none;
+  }
+
+  .system-intro {
+    top: 148px;
+  }
+
+  .system-intro h1 {
+    font-size: 30px;
+  }
+
+  .system-intro > p:last-child {
+    font-size: 9px;
+  }
+
+  .system-note {
+    bottom: 73px;
+    font-size: 7px;
+  }
+
+  .flight-status strong {
+    font-size: 16px;
+  }
+
+  .intro {
+    top: max(132px, 17.5%);
+    right: 22px;
+    left: 24px;
+    transform: translateY(12px);
+  }
+
+  .is-ready .intro {
+    transform: translateY(0);
+  }
+
+  .eyebrow {
+    margin-bottom: 21px;
+    font-size: 7px;
+  }
+
+  h1 {
+    font-size: clamp(50px, 15vw, 68px);
+    line-height: 0.8;
+  }
+
+  h1 > em {
+    margin-left: 0.45em;
+  }
+
+  .intro-copy {
+    margin-top: 25px;
+    font-size: 9px;
+    line-height: 1.7;
+  }
+
+  .telemetry {
+    right: auto;
+    bottom: 88px;
+    left: 25px;
+    gap: 20px;
+  }
+
+  .telemetry-item strong {
+    font-size: 18px;
+  }
+
+  .control-hint {
+    display: none;
+  }
+
+  .reset-view {
+    right: 20px;
+    bottom: 24px;
+  }
+
+  .reset-view span {
+    display: none;
+  }
+
+  .reset-view svg {
+    width: 19px;
+    height: 19px;
+  }
+
+  .footer {
+    bottom: 35px;
+    left: 24px;
+    font-size: 6px;
+  }
+
+  .footer > span:first-child,
+  .footer > span:last-child,
+  .footer-line {
+    display: none;
+  }
+}
+
+@media (max-height: 650px) and (min-width: 701px) {
+  .intro-copy {
+    margin-top: 24px;
+  }
+
+  .telemetry {
+    bottom: 88px;
+  }
+}
+
+@media (max-height: 700px) {
+  .system-note {
+    bottom: 56px;
+    font-size: 7px;
+  }
+}
+
+@media (max-aspect-ratio: 9/10) {
+  .system-label {
+    transform: translateY(66px);
+  }
+}
+
+@media (max-aspect-ratio: 9/10) and (max-height: 700px) {
+  .system-label {
+    transform: translateY(50px);
+    min-width: 120px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene,
+  .reveal,
+  .loader,
+  .planet-link,
+  .flight-status,
+  .system-label {
+    transition-duration: 0.01ms;
+    transition-delay: 0s;
+  }
+
+  .loader-mark,
+  .loader-track > span {
+    animation: none;
+  }
+}

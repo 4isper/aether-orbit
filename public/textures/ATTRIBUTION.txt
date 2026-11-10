@@ -1,0 +1,14 @@
+Earth and Mars texture data: Solar System Scope
+Source: https://www.solarsystemscope.com/textures/
+License: Creative Commons Attribution 4.0 International
+License URL: https://creativecommons.org/licenses/by/4.0/
+
+Original files:
+- 8k_earth_daymap.jpg
+- 8k_earth_nightmap.jpg
+- 8k_earth_normal_map.tif
+- 8k_earth_specular_map.tif
+- 8k_earth_clouds.jpg
+- 8k_mars.jpg
+
+Changes: surface maps resized to 4096 x 2048 and the cloud map to 2048 x 1024; all converted to WebP and compressed. The specular map is sampled by the shader to derive surface roughness. The cloud map is sampled as a density mask.

@@ -1,0 +1,96 @@
+import { useEffect, useRef, useState } from 'react'
+import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
+import { useCursor } from '@react-three/drei'
+import { Bloom, EffectComposer, Vignette } from '@react-three/postprocessing'
+import { Backdrop } from './Backdrop'
+import { CameraRig } from './CameraRig'
+import { Planet } from './Planet'
+import { Cinder } from './Cinder'
+import { Starfield } from './Starfield'
+import { SystemOverview } from './SystemOverview'
+import { planets, type PlanetId, type SceneView } from '../planets'
+
+function useReducedMotion() {
+  const [reduced, setReduced] = useState(
+    () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+  )
+
+  useEffect(() => {
+    const query = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const update = () => setReduced(query.matches)
+    query.addEventListener('change', update)
+    return () => query.removeEventListener('change', update)
+  }, [])
+
+  return reduced
+}
+
+function SceneReady({ onReady }: { onReady: () => void }) {
+  const frames = useRef(0)
+
+  useFrame(() => {
+    frames.current += 1
+    if (frames.current === 4) onReady()
+  })
+
+  return null
+}
+
+type SpaceSceneProps = {
+  activeView: SceneView
+  destination: SceneView
+  onReady: () => void
+  onArrive: (view: SceneView) => void
+  onSelect: (planet: PlanetId) => void
+}
+
+export function SpaceScene({ activeView, destination, onReady, onArrive, onSelect }: SpaceSceneProps) {
+  const reducedMotion = useReducedMotion()
+  const gl = useThree((state) => state.gl)
+  const [hovered, setHovered] = useState(false)
+  const travelling = activeView !== destination
+  const overview = activeView === 'system' && !travelling
+  useCursor(overview && hovered, 'pointer', travelling ? 'progress' : overview ? 'default' : 'grab', gl.domElement)
+
+  const selectPlanet = (id: PlanetId) => {
+    setHovered(false)
+    onSelect(id)
+  }
+  const planetEvents = (id: PlanetId) => overview ? {
+    onClick: (event: ThreeEvent<MouseEvent>) => {
+      event.stopPropagation()
+      if (event.delta <= 5) selectPlanet(id)
+    },
+    onPointerOver: (event: ThreeEvent<PointerEvent>) => {
+      event.stopPropagation()
+      setHovered(true)
+    },
+    onPointerOut: () => setHovered(false),
+  } : {}
+
+  return (
+    <>
+      <color attach="background" args={['#010205']} />
+      <Backdrop />
+      <Starfield reducedMotion={reducedMotion} />
+      <group position={planets.aurelia.anchor} {...planetEvents('aurelia')}>
+        <Planet reducedMotion={reducedMotion} />
+      </group>
+      <group position={planets.cinder.anchor} {...planetEvents('cinder')}>
+        <Cinder reducedMotion={reducedMotion} />
+      </group>
+      <CameraRig reducedMotion={reducedMotion} destination={destination} onArrive={onArrive} />
+      {overview && <SystemOverview onSelect={selectPlanet} />}
+      <SceneReady onReady={onReady} />
+      <EffectComposer multisampling={0}>
+        <Bloom
+          mipmapBlur
+          intensity={0.7}
+          luminanceThreshold={0.72}
+          luminanceSmoothing={0.32}
+        />
+        <Vignette offset={0.2} darkness={0.58} />
+      </EffectComposer>
+    </>
+  )
+}
