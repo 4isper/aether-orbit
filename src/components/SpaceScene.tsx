@@ -30,6 +30,7 @@ function SceneReady({ onReady }: { onReady: () => void }) {
 type SpaceSceneProps = {
   activeView: SceneView
   destination: SceneView
+  initialView: SceneView
   timeScale: number
   reducedMotion: boolean
   onReady: () => void
@@ -37,7 +38,7 @@ type SpaceSceneProps = {
   onSelect: (view: SceneView) => void
 }
 
-export function SpaceScene({ activeView, destination, timeScale, reducedMotion, onReady, onArrive, onSelect }: SpaceSceneProps) {
+export function SpaceScene({ activeView, destination, initialView, timeScale, reducedMotion, onReady, onArrive, onSelect }: SpaceSceneProps) {
   const gl = useThree((state) => state.gl)
   const [hovered, setHovered] = useState(false)
   const travelling = activeView !== destination
@@ -109,7 +110,7 @@ export function SpaceScene({ activeView, destination, timeScale, reducedMotion, 
       <group ref={(node) => { groupRefs.current.vesper = node }} position={initialPositions[2]} {...planetEvents('vesper')}>
         <Vesper reducedMotion={reducedMotion} timeScale={timeScale} />
       </group>
-      <CameraRig reducedMotion={reducedMotion} destination={destination} onArrive={onArrive} timeRef={orbitTime} />
+      <CameraRig initialView={initialView} reducedMotion={reducedMotion} destination={destination} onArrive={onArrive} timeRef={orbitTime} />
       {overview && <SystemOverview onSelect={selectPlanet} timeRef={orbitTime} />}
       <SceneReady onReady={onReady} />
       <EffectComposer multisampling={0}>

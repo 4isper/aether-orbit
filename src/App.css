@@ -263,10 +263,23 @@ h1 > em {
   letter-spacing: 0.08em;
 }
 
-.reset-view {
+.view-actions {
   position: absolute;
   right: 43px;
   bottom: 37px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition-delay: 0.9s;
+}
+
+.view-actions-divider {
+  width: 1px;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.reset-view {
   display: flex;
   align-items: center;
   gap: 9px;
@@ -623,7 +636,7 @@ h1 > em {
 .is-travelling .intro,
 .is-travelling .telemetry,
 .is-travelling .control-hint,
-.is-travelling .reset-view,
+.is-travelling .view-actions,
 .is-travelling .time-controls,
 .is-travelling .system-intro,
 .is-travelling .system-note {
@@ -943,7 +956,7 @@ h1 > em {
     display: none;
   }
 
-  .reset-view {
+  .view-actions {
     right: 20px;
     bottom: 24px;
   }

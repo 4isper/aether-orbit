@@ -8,6 +8,17 @@ const SceneCanvas = lazy(() => import('./SceneCanvas'))
 const SPEED_OPTIONS = [0.5, 1, 2, 4]
 const TOUR_STOPS: SceneView[] = ['aurelia', 'cinder', 'vesper', 'star', 'system']
 const TOUR_DWELL_MS = 7000
+const SCENE_VIEWS: SceneView[] = [...planetIds, 'star', 'system']
+
+/** Deep link support: ?view=vesper opens the scene already on that orbit. */
+function readInitialView(): SceneView {
+  const param = new URLSearchParams(window.location.search).get('view')
+  return SCENE_VIEWS.includes(param as SceneView) ? (param as SceneView) : 'aurelia'
+}
+
+function urlFor(view: SceneView) {
+  return view === 'aurelia' ? '/' : `/?view=${view}`
+}
 
 function formatSpeed(speed: number) {
   return speed === 0.5 ? '½' : String(speed)
@@ -51,10 +62,11 @@ function useReducedMotion() {
 }
 
 function App() {
+  const [initialView] = useState(readInitialView)
   const [ready, setReady] = useState(false)
   const [webglSupported] = useState(detectWebGLSupport)
-  const [activeView, setActiveView] = useState<SceneView>('aurelia')
-  const [destination, setDestination] = useState<SceneView>('aurelia')
+  const [activeView, setActiveView] = useState<SceneView>(initialView)
+  const [destination, setDestination] = useState<SceneView>(initialView)
   const reducedMotion = useReducedMotion()
   const travelling = activeView !== destination
   const overview = activeView === 'system'
@@ -65,7 +77,10 @@ function App() {
     ? 'Система'
     : bodies[destination].name
   const handleReady = useCallback(() => setReady(true), [])
-  const handleArrive = useCallback((arrived: SceneView) => setActiveView(arrived), [])
+  const handleArrive = useCallback((arrived: SceneView) => {
+    setActiveView(arrived)
+    window.history.replaceState(null, '', urlFor(arrived))
+  }, [])
   const travelTo = (next: SceneView) => {
     if (!ready) return
     setTour(false)
@@ -78,6 +93,14 @@ function App() {
   const [tabVisible, setTabVisible] = useState(() => !document.hidden)
   const timeScale = paused ? 0 : speed
   const resetView = () => window.dispatchEvent(new Event('aether:reset'))
+  const saveFrame = () => {
+    const canvas = document.querySelector('.scene canvas')
+    if (!canvas) return
+    const link = document.createElement('a')
+    link.download = `aether-${activeView === 'system' ? 'system' : activeView}.png`
+    link.href = (canvas as HTMLCanvasElement).toDataURL('image/png')
+    link.click()
+  }
 
   useEffect(() => {
     const onVisibilityChange = () => setTabVisible(!document.hidden)
@@ -110,9 +133,10 @@ function App() {
                   : body
                     ? `${isStar ? 'Интерактивная сцена звезды' : 'Интерактивная сцена планеты'} ${body.label}. Перетаскивайте для вращения и используйте колесо для масштабирования.`
                     : 'Обзор системы. Выберите мир или звезду нажатием на сферу или подпись.'}
-                activeView={activeView}
-                destination={destination}
-                timeScale={timeScale}
+              activeView={activeView}
+              destination={destination}
+              initialView={initialView}
+              timeScale={timeScale}
                 reducedMotion={reducedMotion}
                 onReady={handleReady}
                 onArrive={handleArrive}
@@ -269,13 +293,24 @@ function App() {
               </div>
             </div>
 
-            <button className="reset-view reveal" type="button" onClick={resetView} disabled={!ready || travelling} aria-label="Сбросить ракурс камеры">
-              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M4.8 8.2A8 8 0 1 1 4 14" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-                <path d="M4.8 3.8v4.4h4.4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              <span>Сбросить ракурс</span>
-            </button>
+            <div className="view-actions reveal">
+              <button className="reset-view" type="button" onClick={resetView} disabled={!ready || travelling} aria-label="Сбросить ракурс камеры">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M4.8 8.2A8 8 0 1 1 4 14" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                  <path d="M4.8 3.8v4.4h4.4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <span>Сбросить ракурс</span>
+              </button>
+              <span className="view-actions-divider" aria-hidden="true" />
+              <button className="reset-view" type="button" onClick={saveFrame} disabled={!ready} aria-label="Сохранить кадр как PNG">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <rect x="3.5" y="6" width="17" height="13" rx="2.5" stroke="currentColor" strokeWidth="1.3" />
+                  <circle cx="12" cy="12.5" r="3.4" stroke="currentColor" strokeWidth="1.3" />
+                  <path d="M9 6l1.2-2h3.6L15 6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <span>Сохранить кадр</span>
+              </button>
+            </div>
           </>
         ) : (
           <>

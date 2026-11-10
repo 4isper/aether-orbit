@@ -15,6 +15,7 @@ import {
 } from '../camera-math'
 
 type CameraRigProps = {
+  initialView: SceneView
   reducedMotion: boolean
   destination: SceneView
   onArrive: (view: SceneView) => void
@@ -23,7 +24,7 @@ type CameraRigProps = {
 
 const MAX_STEP = 0.1
 
-export function CameraRig({ reducedMotion, destination, onArrive, timeRef }: CameraRigProps) {
+export function CameraRig({ initialView, reducedMotion, destination, onArrive, timeRef }: CameraRigProps) {
   const gl = useThree((state) => state.gl)
   const size = useThree((state) => state.size)
   const overviewPose = useMemo(
@@ -36,8 +37,8 @@ export function CameraRig({ reducedMotion, destination, onArrive, timeRef }: Cam
   const drag = useRef({ active: false, x: 0, y: 0 })
   const intro = useRef(reducedMotion ? 1 : 0)
   const orbitTime = useRef(0)
-  const currentView = useRef<SceneView>('aurelia')
-  const requestedView = useRef<SceneView>('aurelia')
+  const currentView = useRef<SceneView>(initialView)
+  const requestedView = useRef<SceneView>(initialView)
   const lookAt = useRef(new Vector3())
   const scratch = useMemo(() => new Vector3(), [])
   const compOffset = useMemo(() => new Vector3(), [])

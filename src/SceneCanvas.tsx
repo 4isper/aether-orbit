@@ -17,6 +17,7 @@ type SceneCanvasProps = {
   label: string
   activeView: SceneView
   destination: SceneView
+  initialView: SceneView
   timeScale: number
   reducedMotion: boolean
   onReady: () => void
@@ -28,6 +29,7 @@ export default function SceneCanvas({
   label,
   activeView,
   destination,
+  initialView,
   timeScale,
   reducedMotion,
   onReady,
@@ -58,7 +60,7 @@ export default function SceneCanvas({
         aria-label={label}
         camera={{ position: [0, 0, 11.4], fov: 36, near: 0.1, far: 160 }}
         dpr={dpr}
-        gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
+        gl={{ antialias: true, alpha: false, powerPreference: 'high-performance', preserveDrawingBuffer: true }}
         onCreated={handleCreated}
       >
       <SceneErrorBoundary>
@@ -74,6 +76,7 @@ export default function SceneCanvas({
           <SpaceScene
             activeView={activeView}
             destination={destination}
+            initialView={initialView}
             timeScale={timeScale}
             reducedMotion={reducedMotion}
             onReady={onReady}
