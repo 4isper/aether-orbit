@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { Vector3 } from 'three'
-import { orbitPoint, planetPosition } from './orbits.ts'
+import { aureliaClock, orbitPoint, planetPeriod, planetPosition } from './orbits.ts'
 import { planetIds } from './planets.ts'
 
 const scratch = new Vector3()
@@ -49,4 +49,32 @@ test('planet positions move continuously', () => {
       previous.copy(next)
     }
   }
+})
+
+test('the moon orbits outside the synchronous orbit', () => {
+  // Below the synchronous orbit the tide keeps pulling the moon in: no
+  // stable satellite can orbit faster than its planet spins.
+  const day = (Math.PI * 2) / aureliaClock.spin
+  const month = (Math.PI * 2) / aureliaClock.moonAngularSpeed
+  assert.ok(month > day, `moon period ${month.toFixed(1)} is not above the ${day.toFixed(1)} day`)
+})
+
+test('the moon makes a handful of orbits per year, Earth-scale', () => {
+  const year = planetPeriod('aurelia')
+  const month = (Math.PI * 2) / aureliaClock.moonAngularSpeed
+  const monthsPerYear = year / month
+  assert.ok(
+    monthsPerYear > 2 && monthsPerYear < 7,
+    `${monthsPerYear.toFixed(1)} months per year is outside the plausible band`,
+  )
+})
+
+test('a year of Aurelia holds several day-night cycles', () => {
+  const year = planetPeriod('aurelia')
+  const day = (Math.PI * 2) / aureliaClock.spin
+  const daysPerYear = year / day
+  assert.ok(
+    daysPerYear > 2 && daysPerYear < 60,
+    `${daysPerYear.toFixed(1)} days per year is outside the plausible band`,
+  )
 })

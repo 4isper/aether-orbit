@@ -23,3 +23,23 @@ export function planetPosition(id: PlanetId, time: number, target: Vector3) {
   const { speed, phase } = orbitConfig[id]
   return orbitPoint(id, phase + time * speed, target)
 }
+
+/** Orbital period of a planet, in time units. */
+export function planetPeriod(id: PlanetId) {
+  return (Math.PI * 2) / orbitConfig[id].speed
+}
+
+/**
+ * Aurelia's own clock: how fast the planet spins and how fast its moon
+ * orbits. The moon must orbit above the synchronous orbit (its period above
+ * the planet's day) or tides would pull it down; with these numbers the day
+ * lasts ~60 units, the moon's month ~79, and a year holds ~4 months.
+ */
+export const aureliaClock = {
+  /** Planet spin, radians per time unit. */
+  spin: 0.105,
+  /** Moon mean motion, radians per time unit. */
+  moonAngularSpeed: 0.08,
+  /** Moon orbit radius around Aurelia, in scene units. */
+  moonOrbitRadius: 3.6,
+} as const

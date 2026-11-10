@@ -14,7 +14,8 @@ import {
 import { noiseGLSL } from '../shaders/noise'
 import { bodyVertexGLSL, perturbNormalGLSL } from '../shaders/common'
 import { Atmosphere } from './Atmosphere'
-import { Moon, MOON_ORBIT_RADIUS, MOON_ANGULAR_SPEED, MOON_RADIUS } from './Moon'
+import { Moon, MOON_RADIUS } from './Moon'
+import { aureliaClock } from '../orbits'
 import { useSunDirection } from '../hooks/useSunDirection'
 
 const textureUrls = [
@@ -254,8 +255,8 @@ export function Planet({ reducedMotion, timeScale, showMoonLabel }: PlanetProps)
     const clouds = cloudsRef.current
 
     if (!reducedMotion) {
-      if (surface) surface.rotation.y += delta * 0.006 * timeScale
-      if (clouds) clouds.rotation.y += delta * 0.009 * timeScale
+      if (surface) surface.rotation.y += delta * aureliaClock.spin * timeScale
+      if (clouds) clouds.rotation.y += delta * aureliaClock.spin * 1.5 * timeScale
     }
 
     const planetRadius = 2 * (compact ? 0.76 : 1)
@@ -266,11 +267,11 @@ export function Planet({ reducedMotion, timeScale, showMoonLabel }: PlanetProps)
 
     const moon = moonRef.current
     if (moon) {
-      if (!reducedMotion) moonAngle.current += delta * MOON_ANGULAR_SPEED * timeScale
+      if (!reducedMotion) moonAngle.current += delta * aureliaClock.moonAngularSpeed * timeScale
       moon.position.set(
-        Math.cos(moonAngle.current) * MOON_ORBIT_RADIUS,
+        Math.cos(moonAngle.current) * aureliaClock.moonOrbitRadius,
         0,
-        Math.sin(moonAngle.current) * MOON_ORBIT_RADIUS,
+        Math.sin(moonAngle.current) * aureliaClock.moonOrbitRadius,
       )
       moon.rotation.y = moonAngle.current + 1.2
       moon.getWorldPosition(moonWorld)

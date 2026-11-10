@@ -5,8 +5,6 @@ import { noiseGLSL } from '../shaders/noise'
 import { bodyVertexGLSL, perturbNormalGLSL } from '../shaders/common'
 
 export const MOON_RADIUS = 0.34
-export const MOON_ORBIT_RADIUS = 3.6
-export const MOON_ANGULAR_SPEED = 0.35
 
 const moonFragment = /* glsl */ `
 uniform vec3 uPlanetPosition;
