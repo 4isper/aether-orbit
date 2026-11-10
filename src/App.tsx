@@ -264,7 +264,7 @@ function App() {
           {travelling ? (
             <><span>Межорбитальный перелёт</span><strong>{currentName} <span aria-hidden="true">→</span> {destinationName}</strong></>
           ) : (
-            <span className="sr-only">{ready ? overview ? 'Обзор системы. Два мира доступны для исследования.' : `На орбите ${currentName}` : 'Формируем орбиту'}</span>
+            <span className="sr-only">{ready ? overview ? 'Обзор системы. Три мира доступны для исследования.' : `На орбите ${currentName}` : 'Формируем орбиту'}</span>
           )}
         </div>
 
