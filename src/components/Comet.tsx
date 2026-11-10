@@ -12,6 +12,14 @@ import {
 import { cometPosition } from '../comet'
 
 const TAIL_COUNT = 44
+const TAIL_LENGTH_FACTOR = 130
+const TAIL_ACTIVITY_FACTOR = 150
+const MIN_TAIL_LENGTH = 2.2
+const MAX_TAIL_LENGTH = 7.5
+const MIN_TAIL_ACTIVITY = 0.45
+const MAX_TAIL_ACTIVITY = 1.3
+const TAIL_LAG_CURVE = 0.32
+const TAIL_SPREAD = 0.16
 
 const comaVertex = /* glsl */ `
 varying vec2 vUv;
@@ -103,8 +111,8 @@ export function Comet({ timeRef }: CometProps) {
     velocity.copy(head).sub(previous)
     antiSun.copy(head).normalize()
     const distance = head.length()
-    const tailLength = Math.min(7.5, Math.max(0.9, 130 / (distance * distance)))
-    const activity = Math.min(1.3, Math.max(0.14, 150 / (distance * distance)))
+    const tailLength = Math.min(MAX_TAIL_LENGTH, Math.max(MIN_TAIL_LENGTH, TAIL_LENGTH_FACTOR / (distance * distance)))
+    const activity = Math.min(MAX_TAIL_ACTIVITY, Math.max(MIN_TAIL_ACTIVITY, TAIL_ACTIVITY_FACTOR / (distance * distance)))
     if (comaMaterialRef.current) {
       comaMaterialRef.current.uniforms.uActivity.value = activity
     }
@@ -113,12 +121,12 @@ export function Comet({ timeRef }: CometProps) {
     if (geometry) {
       const tailPositions = geometry.attributes.position.array as Float32Array
       const tailAlphas = geometry.attributes.aAlpha.array as Float32Array
-      const clock = state.clock.elapsedTime
+      const clock = time
       for (let i = 0; i < TAIL_COUNT; i++) {
         const t = (i + 1) / TAIL_COUNT
-        const lag = t * t * tailLength * 0.32
+        const lag = t * t * tailLength * TAIL_LAG_CURVE
         const seed = i * 12.9898
-        const spread = t * tailLength * 0.16 + 0.05
+        const spread = t * tailLength * TAIL_SPREAD + 0.05
         tailPositions[i * 3] = head.x
           + antiSun.x * (t * tailLength)
           - velocity.x * lag

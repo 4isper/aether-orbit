@@ -54,18 +54,25 @@ function App() {
   const [paused, setPaused] = useState(false)
   const [speed, setSpeed] = useState(1)
   const [tour, setTour] = useState(false)
+  const [tabVisible, setTabVisible] = useState(() => !document.hidden)
   const timeScale = paused ? 0 : speed
   const cycleSpeed = () => setSpeed((s) => SPEEDS[(SPEEDS.indexOf(s) + 1) % SPEEDS.length])
   const resetView = () => window.dispatchEvent(new Event('aether:reset'))
 
   useEffect(() => {
-    if (!tour || !ready || travelling) return
+    const onVisibilityChange = () => setTabVisible(!document.hidden)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
+  }, [])
+
+  useEffect(() => {
+    if (!tour || !ready || travelling || !tabVisible) return
     const timer = window.setTimeout(() => {
       const index = TOUR_STOPS.indexOf(activeView)
       setDestination(TOUR_STOPS[(index + 1) % TOUR_STOPS.length])
     }, TOUR_DWELL_MS)
     return () => window.clearTimeout(timer)
-  }, [tour, ready, travelling, activeView])
+  }, [tour, ready, travelling, activeView, tabVisible])
 
   return (
     <main className={`experience ${ready ? 'is-ready' : ''} ${travelling ? 'is-travelling' : ''} ${overview ? 'is-system' : ''}`} data-view={activeView}>

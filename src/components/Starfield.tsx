@@ -97,10 +97,10 @@ export function Starfield({ reducedMotion, timeScale }: StarfieldProps) {
     [],
   )
 
-  useFrame((state, delta) => {
+  useFrame((state, rawDelta) => {
     if (!materialRef.current) return
     materialRef.current.uniforms.uPixelRatio.value = state.gl.getPixelRatio()
-    if (!reducedMotion) materialRef.current.uniforms.uTime.value += delta * timeScale
+    if (!reducedMotion) materialRef.current.uniforms.uTime.value += Math.min(rawDelta, 0.1) * timeScale
   })
 
   return (

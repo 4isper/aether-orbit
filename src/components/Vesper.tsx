@@ -153,7 +153,8 @@ export function Vesper({ reducedMotion, timeScale }: VesperProps) {
     [sunDirection],
   )
 
-  useFrame((_, delta) => {
+  useFrame((_, rawDelta) => {
+    const delta = Math.min(rawDelta, 0.1)
     if (groupRef.current) {
       groupRef.current.getWorldPosition(worldPosition)
       sunDirection.copy(worldPosition).multiplyScalar(-1).normalize()

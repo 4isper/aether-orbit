@@ -1,9 +1,18 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { MathUtils, Vector3, type PerspectiveCamera } from 'three'
-import { cometOrbitPoint } from '../comet'
-import { planetIds, type SceneView } from '../planets'
-import { orbitPoint, planetPosition } from '../orbits'
+import { type SceneView } from '../planets'
+import { planetPosition } from '../orbits'
+import {
+  computeOverviewPose,
+  MAX_ZOOM,
+  MIN_ZOOM,
+  FLIGHT_DURATION,
+  INTRO_DURATION,
+  orbitOffset,
+  PLANET_VIEW_DISTANCE,
+  STAR_VIEW_DISTANCE,
+} from '../camera-math'
 
 type CameraRigProps = {
   reducedMotion: boolean
@@ -12,68 +21,17 @@ type CameraRigProps = {
   timeRef: { current: number }
 }
 
-// Camera offset in the orbit plane: tangential at yaw 0 (keeps the star at a
-// safe distance and varies the lighting as the planet moves), tilting outward
-// with yaw. Radial basis is taken from the center's XZ direction.
-function orbitOffset(center: Vector3, yaw: number, pitch: number, distance: number, out: Vector3) {
-  const radialLength = Math.hypot(center.x, center.z) || 1
-  const radialX = center.x / radialLength
-  const radialZ = center.z / radialLength
-  const cosYaw = Math.cos(yaw)
-  const sinYaw = Math.sin(yaw)
-  const dirX = -radialZ * cosYaw + radialX * sinYaw
-  const dirZ = radialX * cosYaw + radialZ * sinYaw
-  const horizontal = Math.cos(pitch) * distance
-  out.set(
-    center.x + dirX * horizontal,
-    center.y + Math.sin(pitch) * distance,
-    center.z + dirZ * horizontal,
-  )
-}
+const MAX_STEP = 0.1
 
 export function CameraRig({ reducedMotion, destination, onArrive, timeRef }: CameraRigProps) {
   const gl = useThree((state) => state.gl)
   const size = useThree((state) => state.size)
-  const overviewPose = useMemo(() => {
-    const aspect = size.width / size.height
-    const portrait = aspect < 0.9
-    const direction = new Vector3(0, 0.42, 1).normalize()
-    const up = portrait ? new Vector3(-1, 0, 0) : new Vector3(0, 1, 0)
-    const right = new Vector3().crossVectors(up, direction).normalize()
-    const screenUp = new Vector3().crossVectors(direction, right)
-    const usableHeight = Math.max(size.height - (portrait ? 320 : 420), size.height * (portrait ? 0.5 : 0.42))
-    const usableWidth = size.width - (portrait ? 40 : 110)
-    const halfFov = Math.tan(MathUtils.degToRad(18))
-    let halfHeight = 0
-    let halfWidth = 0
-    let maxDepth = 0
-    const point = new Vector3()
-    for (const id of planetIds) {
-      for (let i = 0; i < 48; i++) {
-        orbitPoint(id, (i / 48) * Math.PI * 2, point)
-        point.addScaledVector(point.clone().normalize(), 3)
-        halfHeight = Math.max(halfHeight, Math.abs(point.dot(screenUp)))
-        halfWidth = Math.max(halfWidth, Math.abs(point.dot(right)))
-        maxDepth = Math.max(maxDepth, point.dot(direction))
-      }
-    }
-    for (let i = 0; i < 32; i++) {
-      cometOrbitPoint((i / 32) * Math.PI * 2, point)
-      point.multiplyScalar((point.length() + 2.2) / point.length())
-      halfHeight = Math.max(halfHeight, Math.abs(point.dot(screenUp)))
-      halfWidth = Math.max(halfWidth, Math.abs(point.dot(right)))
-      maxDepth = Math.max(maxDepth, point.dot(direction))
-    }
-    const distance = (Math.max(
-      halfHeight / (halfFov * usableHeight / size.height),
-      halfWidth / (halfFov * aspect * usableWidth / size.width),
-    ) + maxDepth + 3) * (portrait ? 1.05 : 1)
-    const centerOffset = (portrait ? 60 : 40) * (2 * distance * halfFov) / size.height
-    const target = new Vector3().addScaledVector(screenUp, centerOffset)
-    return { target, position: target.clone().addScaledVector(direction, distance), up }
-  }, [size.width, size.height])
-  const target = useRef({ yaw: 0, pitch: 0, zoom: 9 })
-  const current = useRef({ yaw: 0, pitch: 0, zoom: 9 })
+  const overviewPose = useMemo(
+    () => computeOverviewPose(size.width, size.height),
+    [size.width, size.height],
+  )
+  const target = useRef({ yaw: 0, pitch: 0, zoom: PLANET_VIEW_DISTANCE })
+  const current = useRef({ yaw: 0, pitch: 0, zoom: PLANET_VIEW_DISTANCE })
   const pointer = useRef({ x: 0, y: 0 })
   const drag = useRef({ active: false, x: 0, y: 0 })
   const intro = useRef(reducedMotion ? 1 : 0)
@@ -99,7 +57,7 @@ export function CameraRig({ reducedMotion, destination, onArrive, timeRef }: Cam
 
     const reset = () => {
       if (flight.current.active || currentView.current === 'system') return
-      target.current = { yaw: 0, pitch: 0, zoom: 9 }
+      target.current = { yaw: 0, pitch: 0, zoom: PLANET_VIEW_DISTANCE }
     }
 
     const onPointerDown = (event: PointerEvent) => {
@@ -133,7 +91,7 @@ export function CameraRig({ reducedMotion, destination, onArrive, timeRef }: Cam
     const onWheel = (event: WheelEvent) => {
       event.preventDefault()
       if (flight.current.active || currentView.current === 'system') return
-      target.current.zoom = MathUtils.clamp(target.current.zoom + event.deltaY * 0.003, 7.6, 12.6)
+      target.current.zoom = MathUtils.clamp(target.current.zoom + event.deltaY * 0.003, MIN_ZOOM, MAX_ZOOM)
     }
 
     const onKeyDown = (event: KeyboardEvent) => {
@@ -150,7 +108,7 @@ export function CameraRig({ reducedMotion, destination, onArrive, timeRef }: Cam
       if (event.key === '-') target.current.zoom += 0.25
       target.current.yaw = MathUtils.clamp(target.current.yaw, -0.32, 0.32)
       target.current.pitch = MathUtils.clamp(target.current.pitch, -0.18, 0.18)
-      target.current.zoom = MathUtils.clamp(target.current.zoom, 7.6, 12.6)
+      target.current.zoom = MathUtils.clamp(target.current.zoom, MIN_ZOOM, MAX_ZOOM)
     }
 
     element.addEventListener('pointerdown', onPointerDown)
@@ -172,7 +130,8 @@ export function CameraRig({ reducedMotion, destination, onArrive, timeRef }: Cam
     }
   }, [gl])
 
-  useFrame((state, delta) => {
+  useFrame((state, rawDelta) => {
+    const delta = Math.min(rawDelta, MAX_STEP)
     const camera = state.camera as PerspectiveCamera
     const compact = state.size.width < 700
     const journey = flight.current
@@ -186,7 +145,7 @@ export function CameraRig({ reducedMotion, destination, onArrive, timeRef }: Cam
       journey.startPosition.copy(camera.position)
       journey.startLook.copy(lookAt.current)
       journey.startUp.copy(camera.up)
-      const initialZoom = destination === 'star' ? 11.5 : 9
+      const initialZoom = destination === 'star' ? STAR_VIEW_DISTANCE : PLANET_VIEW_DISTANCE
       target.current = { yaw: 0, pitch: 0, zoom: initialZoom }
       current.current = { yaw: 0, pitch: 0, zoom: initialZoom }
       pointer.current = { x: 0, y: 0 }
@@ -197,7 +156,7 @@ export function CameraRig({ reducedMotion, destination, onArrive, timeRef }: Cam
 
     if (journey.active) {
       journey.elapsed += delta
-      const progress = reducedMotion ? 1 : Math.min(journey.elapsed / 4.2, 1)
+      const progress = reducedMotion ? 1 : Math.min(journey.elapsed / FLIGHT_DURATION, 1)
       const eased = progress * progress * (3 - 2 * progress)
       const arc = Math.sin(progress * Math.PI) ** 2
       if (destination === 'system') {
@@ -206,11 +165,11 @@ export function CameraRig({ reducedMotion, destination, onArrive, timeRef }: Cam
         journey.endUp.copy(overviewPose.up)
       } else if (destination === 'star') {
         journey.endLook.copy(compOffset)
-        orbitOffset(journey.endLook, 0, 0, 11.5 + (compact ? 0.55 : 0), journey.endPosition)
+        orbitOffset(journey.endLook, 0, 0, STAR_VIEW_DISTANCE + (compact ? 0.55 : 0), journey.endPosition)
         journey.endUp.set(0, 1, 0)
       } else {
         planetPosition(destination, time, journey.endLook).add(compOffset)
-        orbitOffset(journey.endLook, 0, 0, 9 + (compact ? 0.55 : 0), journey.endPosition)
+        orbitOffset(journey.endLook, 0, 0, PLANET_VIEW_DISTANCE + (compact ? 0.55 : 0), journey.endPosition)
         journey.endUp.set(0, 1, 0)
       }
       camera.position.lerpVectors(journey.startPosition, journey.endPosition, eased)
@@ -238,7 +197,7 @@ export function CameraRig({ reducedMotion, destination, onArrive, timeRef }: Cam
       return
     }
 
-    intro.current = Math.min(1, intro.current + delta / 4.5)
+    intro.current = Math.min(1, intro.current + delta / INTRO_DURATION)
     orbitTime.current += delta
     const introEase = 1 - Math.pow(1 - intro.current, 3)
     const drift = Math.min(orbitTime.current, 1)

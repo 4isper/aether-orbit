@@ -1,6 +1,11 @@
+import { useMemo } from 'react'
 import type { Ref } from 'react'
-import type { Mesh } from 'three'
+import { Vector3, type Mesh, type ShaderMaterial } from 'three'
 import { noiseGLSL } from '../shaders/noise'
+
+export const MOON_RADIUS = 0.34
+export const MOON_ORBIT_RADIUS = 3.6
+export const MOON_ANGULAR_SPEED = 0.35
 
 const moonVertex = /* glsl */ `
 varying vec3 vObjectPosition;
@@ -17,6 +22,8 @@ void main() {
 `
 
 const moonFragment = /* glsl */ `
+uniform vec3 uPlanetPosition;
+uniform float uPlanetRadius;
 varying vec3 vObjectPosition;
 varying vec3 vWorldPosition;
 varying vec3 vWorldNormal;
@@ -53,8 +60,16 @@ void main() {
   vec3 N = perturbNormal(vWorldPosition, geometricN, elevation);
 
   vec3 L = normalize(-vWorldPosition);
+  vec3 toPlanet = uPlanetPosition - vWorldPosition;
+  float planetAlong = dot(toPlanet, L);
+  float lit = 1.0;
+  if (planetAlong > 0.0) {
+    float perp = sqrt(max(dot(toPlanet, toPlanet) - planetAlong * planetAlong, 0.0));
+    lit = 1.0 - (1.0 - smoothstep(uPlanetRadius * 0.82, uPlanetRadius * 1.04, perp)) * 0.92;
+  }
+
   float diffuse = max(dot(N, L), 0.0);
-  vec3 color = albedo * (0.012 + diffuse * 1.1);
+  vec3 color = albedo * (0.012 + diffuse * 1.1) * lit;
 
   gl_FragColor = vec4(color, 1.0);
   #include <tonemapping_fragment>
@@ -65,13 +80,27 @@ void main() {
 type MoonProps = {
   radius?: number
   ref?: Ref<Mesh>
+  materialRef?: Ref<ShaderMaterial>
 }
 
-export function Moon({ radius = 0.34, ref }: MoonProps) {
+export function Moon({ radius = MOON_RADIUS, ref, materialRef }: MoonProps) {
+  const uniforms = useMemo(
+    () => ({
+      uPlanetPosition: { value: new Vector3() },
+      uPlanetRadius: { value: 2 },
+    }),
+    [],
+  )
+
   return (
     <mesh ref={ref} scale={radius}>
       <sphereGeometry args={[1, 48, 48]} />
-      <shaderMaterial vertexShader={moonVertex} fragmentShader={moonFragment} />
+      <shaderMaterial
+        ref={materialRef}
+        vertexShader={moonVertex}
+        fragmentShader={moonFragment}
+        uniforms={uniforms}
+      />
     </mesh>
   )
 }

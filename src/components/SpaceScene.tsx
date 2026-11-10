@@ -67,7 +67,8 @@ export function SpaceScene({ activeView, destination, timeScale, onReady, onArri
     [],
   )
 
-  useFrame((_, delta) => {
+  useFrame((_, rawDelta) => {
+    const delta = Math.min(rawDelta, 0.1)
     if (!reducedMotion) orbitTime.current += delta * timeScale
     for (const id of planetIds) {
       groupRefs.current[id]?.position.copy(planetPosition(id, orbitTime.current, scratch))

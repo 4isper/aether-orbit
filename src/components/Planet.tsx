@@ -13,7 +13,7 @@ import {
 } from 'three'
 import { noiseGLSL } from '../shaders/noise'
 import { Atmosphere } from './Atmosphere'
-import { Moon } from './Moon'
+import { Moon, MOON_ORBIT_RADIUS, MOON_ANGULAR_SPEED, MOON_RADIUS } from './Moon'
 
 const textureUrls = [
   '/textures/earth-day.webp',
@@ -159,6 +159,8 @@ void main() {
 const cloudFragment = /* glsl */ `
 uniform sampler2D uCloudMap;
 uniform vec3 uSunDirection;
+uniform vec3 uMoonPosition;
+uniform float uMoonRadius;
 varying vec2 vUv;
 varying vec3 vWorldPosition;
 varying vec3 vWorldNormal;
@@ -169,10 +171,19 @@ void main() {
 
   vec3 N = normalize(vWorldNormal);
   vec3 V = normalize(cameraPosition - vWorldPosition);
-  float ndl = dot(N, normalize(uSunDirection));
+  vec3 L = normalize(uSunDirection);
+  float ndl = dot(N, L);
   float daylight = smoothstep(-0.25, 0.22, ndl);
   float diffuse = max(ndl, 0.0);
   float rim = pow(1.0 - max(dot(N, V), 0.0), 3.0);
+
+  vec3 moonOffset = uMoonPosition - vWorldPosition;
+  float moonAlong = dot(moonOffset, L);
+  float moonShadow = 1.0;
+  if (moonAlong > 0.0) {
+    float moonPerp = sqrt(max(dot(moonOffset, moonOffset) - moonAlong * moonAlong, 0.0));
+    moonShadow = 1.0 - (1.0 - smoothstep(uMoonRadius * 0.5, uMoonRadius * 1.3, moonPerp)) * 0.86;
+  }
 
   vec3 color = mix(
     vec3(0.07, 0.09, 0.12),
@@ -180,7 +191,8 @@ void main() {
     diffuse * 0.8 + 0.2
   );
   color += vec3(0.2, 0.35, 0.55) * rim * daylight * 0.25;
-  float alpha = coverage * (0.015 + daylight * 0.66);
+  color *= moonShadow;
+  float alpha = coverage * (0.015 + daylight * 0.66) * mix(1.0, moonShadow, 0.35);
 
   gl_FragColor = vec4(color, alpha);
   #include <tonemapping_fragment>
@@ -199,6 +211,8 @@ export function Planet({ reducedMotion, timeScale }: PlanetProps) {
   const cloudsRef = useRef<Mesh>(null)
   const moonRef = useRef<Mesh>(null)
   const surfaceMaterialRef = useRef<ShaderMaterial>(null)
+  const cloudMaterialRef = useRef<ShaderMaterial>(null)
+  const moonMaterialRef = useRef<ShaderMaterial>(null)
   const { width, height } = useThree((state) => state.viewport)
   const compact = useThree((state) => state.size.width < 700) || width / height < 0.9
   const gl = useThree((state) => state.gl)
@@ -247,11 +261,14 @@ export function Planet({ reducedMotion, timeScale }: PlanetProps) {
     () => ({
       uSunDirection: { value: sunDirection },
       uCloudMap: { value: cloudMap },
+      uMoonPosition: { value: new Vector3() },
+      uMoonRadius: { value: MOON_RADIUS },
     }),
     [sunDirection, cloudMap],
   )
 
-  useFrame((_, delta) => {
+  useFrame((_, rawDelta) => {
+    const delta = Math.min(rawDelta, 0.1)
     if (groupRef.current) {
       groupRef.current.getWorldPosition(worldPosition)
       sunDirection.copy(worldPosition).multiplyScalar(-1).normalize()
@@ -265,23 +282,36 @@ export function Planet({ reducedMotion, timeScale }: PlanetProps) {
       if (clouds) clouds.rotation.y += delta * 0.009 * timeScale
     }
 
-    if (surfaceMaterialRef.current && surface && clouds) {
+    const planetRadius = 2 * (compact ? 0.76 : 1)
+    if (surfaceMaterialRef.current) {
       surfaceMaterialRef.current.uniforms.uCloudOffset.value =
-        (surface.rotation.y - clouds.rotation.y) / (Math.PI * 2)
+        surface && clouds ? (surface.rotation.y - clouds.rotation.y) / (Math.PI * 2) : 0
     }
 
     const moon = moonRef.current
-    if (moon && surfaceMaterialRef.current) {
-      if (!reducedMotion) moonAngle.current += delta * 0.35 * timeScale
+    if (moon) {
+      if (!reducedMotion) moonAngle.current += delta * MOON_ANGULAR_SPEED * timeScale
       moon.position.set(
-        Math.cos(moonAngle.current) * 3.6,
+        Math.cos(moonAngle.current) * MOON_ORBIT_RADIUS,
         0,
-        Math.sin(moonAngle.current) * 3.6,
+        Math.sin(moonAngle.current) * MOON_ORBIT_RADIUS,
       )
       moon.rotation.y = moonAngle.current + 1.2
       moon.getWorldPosition(moonWorld)
-      surfaceMaterialRef.current.uniforms.uMoonPosition.value.copy(moonWorld)
-      surfaceMaterialRef.current.uniforms.uMoonRadius.value = 0.34 * (compact ? 0.76 : 1)
+
+      const moonWorldRadius = MOON_RADIUS * (compact ? 0.76 : 1)
+      if (surfaceMaterialRef.current) {
+        surfaceMaterialRef.current.uniforms.uMoonPosition.value.copy(moonWorld)
+        surfaceMaterialRef.current.uniforms.uMoonRadius.value = moonWorldRadius
+      }
+      if (cloudMaterialRef.current) {
+        cloudMaterialRef.current.uniforms.uMoonPosition.value.copy(moonWorld)
+        cloudMaterialRef.current.uniforms.uMoonRadius.value = moonWorldRadius
+      }
+      if (moonMaterialRef.current) {
+        moonMaterialRef.current.uniforms.uPlanetPosition.value.copy(worldPosition)
+        moonMaterialRef.current.uniforms.uPlanetRadius.value = planetRadius
+      }
     }
   })
 
@@ -304,6 +334,7 @@ export function Planet({ reducedMotion, timeScale }: PlanetProps) {
       <mesh ref={cloudsRef} rotation={[0, -1.1, 0]} renderOrder={1}>
         <sphereGeometry args={[2.025, 128, 128]} />
         <shaderMaterial
+          ref={cloudMaterialRef}
           vertexShader={vertexShader}
           fragmentShader={cloudFragment}
           uniforms={cloudUniforms}
@@ -314,7 +345,7 @@ export function Planet({ reducedMotion, timeScale }: PlanetProps) {
       </mesh>
 
       <group rotation={[0.24, 0, 0.09]}>
-        <Moon ref={moonRef} />
+        <Moon ref={moonRef} materialRef={moonMaterialRef} />
       </group>
 
       <Atmosphere sunDirection={sunDirection} />

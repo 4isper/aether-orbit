@@ -114,7 +114,8 @@ export function Star({ reducedMotion, timeScale }: StarProps) {
   const surfaceUniforms = useMemo(() => ({ uTime: { value: 0 } }), [])
   const glowUniforms = useMemo(() => ({ uTime: { value: 0 } }), [])
 
-  useFrame((state, delta) => {
+  useFrame((state, rawDelta) => {
+    const delta = Math.min(rawDelta, 0.1)
     const glow = glowRef.current
     if (glow) {
       glow.quaternion.copy(state.camera.quaternion)
