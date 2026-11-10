@@ -1,6 +1,6 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { AdditiveBlending, BackSide, DoubleSide, type Mesh, type ShaderMaterial } from 'three'
+import { AdditiveBlending, BackSide, type Mesh, type ShaderMaterial } from 'three'
 import { noiseGLSL } from '../shaders/noise'
 
 const bodyVertex = /* glsl */ `
@@ -108,12 +108,18 @@ type StarProps = {
 
 export function Star({ reducedMotion, timeScale }: StarProps) {
   const surfaceRef = useRef<Mesh>(null)
+  const glowRef = useRef<Mesh>(null)
   const surfaceMaterialRef = useRef<ShaderMaterial>(null)
   const glowMaterialRef = useRef<ShaderMaterial>(null)
   const surfaceUniforms = useMemo(() => ({ uTime: { value: 0 } }), [])
   const glowUniforms = useMemo(() => ({ uTime: { value: 0 } }), [])
 
-  useFrame((_, delta) => {
+  useFrame((state, delta) => {
+    const glow = glowRef.current
+    if (glow) {
+      glow.quaternion.copy(state.camera.quaternion)
+      glow.position.copy(state.camera.position).normalize().multiplyScalar(2.42)
+    }
     if (reducedMotion) return
     if (surfaceRef.current) surfaceRef.current.rotation.y += delta * 0.004 * timeScale
     if (surfaceMaterialRef.current) surfaceMaterialRef.current.uniforms.uTime.value += delta * timeScale
@@ -122,7 +128,7 @@ export function Star({ reducedMotion, timeScale }: StarProps) {
 
   return (
     <>
-      <mesh renderOrder={-1} raycast={() => null}>
+      <mesh ref={glowRef} renderOrder={-1} raycast={() => null}>
         <planeGeometry args={[11, 11]} />
         <shaderMaterial
           ref={glowMaterialRef}
@@ -131,8 +137,6 @@ export function Star({ reducedMotion, timeScale }: StarProps) {
           uniforms={glowUniforms}
           transparent
           depthWrite={false}
-          depthTest={false}
-          side={DoubleSide}
           blending={AdditiveBlending}
         />
       </mesh>

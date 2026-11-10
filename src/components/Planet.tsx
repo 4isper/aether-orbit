@@ -13,6 +13,7 @@ import {
 } from 'three'
 import { noiseGLSL } from '../shaders/noise'
 import { Atmosphere } from './Atmosphere'
+import { Moon } from './Moon'
 
 const textureUrls = [
   '/textures/earth-day.webp',
@@ -46,6 +47,8 @@ uniform sampler2D uSpecularMap;
 uniform sampler2D uCloudMap;
 uniform float uCloudOffset;
 uniform vec3 uSunDirection;
+uniform vec3 uMoonPosition;
+uniform float uMoonRadius;
 varying vec2 vUv;
 varying vec3 vObjectPosition;
 varying vec3 vWorldPosition;
@@ -133,6 +136,14 @@ void main() {
   float fresnel = pow(1.0 - max(dot(geometricN, V), 0.0), 4.0);
   color += vec3(0.015, 0.045, 0.09) * fresnel * daylight * 0.7;
 
+  vec3 moonOffset = uMoonPosition - vWorldPosition;
+  float moonAlong = dot(moonOffset, L);
+  if (moonAlong > 0.0) {
+    float moonPerp = sqrt(max(dot(moonOffset, moonOffset) - moonAlong * moonAlong, 0.0));
+    float umbra = 1.0 - smoothstep(uMoonRadius * 0.5, uMoonRadius * 1.3, moonPerp);
+    color *= 1.0 - umbra * 0.86;
+  }
+
   vec3 nightSample = texture2D(uNightMap, vUv).rgb;
   float lightPeak = max(max(nightSample.r, nightSample.g), nightSample.b);
   float cityMask = smoothstep(0.018, 0.09, lightPeak);
@@ -186,6 +197,7 @@ export function Planet({ reducedMotion, timeScale }: PlanetProps) {
   const groupRef = useRef<Group>(null)
   const surfaceRef = useRef<Mesh>(null)
   const cloudsRef = useRef<Mesh>(null)
+  const moonRef = useRef<Mesh>(null)
   const surfaceMaterialRef = useRef<ShaderMaterial>(null)
   const { width, height } = useThree((state) => state.viewport)
   const compact = useThree((state) => state.size.width < 700) || width / height < 0.9
@@ -215,6 +227,8 @@ export function Planet({ reducedMotion, timeScale }: PlanetProps) {
 
   const sunDirection = useMemo(() => new Vector3(-1, 0, 0), [])
   const worldPosition = useMemo(() => new Vector3(), [])
+  const moonWorld = useMemo(() => new Vector3(), [])
+  const moonAngle = useRef(2.1)
   const surfaceUniforms = useMemo(
     () => ({
       uSunDirection: { value: sunDirection },
@@ -224,6 +238,8 @@ export function Planet({ reducedMotion, timeScale }: PlanetProps) {
       uSpecularMap: { value: specularMap },
       uCloudMap: { value: cloudMap },
       uCloudOffset: { value: 0 },
+      uMoonPosition: { value: new Vector3() },
+      uMoonRadius: { value: 0.34 },
     }),
     [sunDirection, dayMap, nightMap, normalMap, specularMap, cloudMap],
   )
@@ -252,6 +268,20 @@ export function Planet({ reducedMotion, timeScale }: PlanetProps) {
     if (surfaceMaterialRef.current && surface && clouds) {
       surfaceMaterialRef.current.uniforms.uCloudOffset.value =
         (surface.rotation.y - clouds.rotation.y) / (Math.PI * 2)
+    }
+
+    const moon = moonRef.current
+    if (moon && surfaceMaterialRef.current) {
+      if (!reducedMotion) moonAngle.current += delta * 0.35 * timeScale
+      moon.position.set(
+        Math.cos(moonAngle.current) * 3.6,
+        0,
+        Math.sin(moonAngle.current) * 3.6,
+      )
+      moon.rotation.y = moonAngle.current + 1.2
+      moon.getWorldPosition(moonWorld)
+      surfaceMaterialRef.current.uniforms.uMoonPosition.value.copy(moonWorld)
+      surfaceMaterialRef.current.uniforms.uMoonRadius.value = 0.34 * (compact ? 0.76 : 1)
     }
   })
 
@@ -282,6 +312,10 @@ export function Planet({ reducedMotion, timeScale }: PlanetProps) {
           depthWrite={false}
         />
       </mesh>
+
+      <group rotation={[0.24, 0, 0.09]}>
+        <Moon ref={moonRef} />
+      </group>
 
       <Atmosphere sunDirection={sunDirection} />
     </group>

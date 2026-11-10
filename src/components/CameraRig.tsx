@@ -11,6 +11,25 @@ type CameraRigProps = {
   timeRef: { current: number }
 }
 
+// Camera offset in the orbit plane: tangential at yaw 0 (keeps the star at a
+// safe distance and varies the lighting as the planet moves), tilting outward
+// with yaw. Radial basis is taken from the center's XZ direction.
+function orbitOffset(center: Vector3, yaw: number, pitch: number, distance: number, out: Vector3) {
+  const radialLength = Math.hypot(center.x, center.z) || 1
+  const radialX = center.x / radialLength
+  const radialZ = center.z / radialLength
+  const cosYaw = Math.cos(yaw)
+  const sinYaw = Math.sin(yaw)
+  const dirX = -radialZ * cosYaw + radialX * sinYaw
+  const dirZ = radialX * cosYaw + radialZ * sinYaw
+  const horizontal = Math.cos(pitch) * distance
+  out.set(
+    center.x + dirX * horizontal,
+    center.y + Math.sin(pitch) * distance,
+    center.z + dirZ * horizontal,
+  )
+}
+
 export function CameraRig({ reducedMotion, destination, onArrive, timeRef }: CameraRigProps) {
   const gl = useThree((state) => state.gl)
   const size = useThree((state) => state.size)
@@ -180,14 +199,11 @@ export function CameraRig({ reducedMotion, destination, onArrive, timeRef }: Cam
         journey.endUp.copy(overviewPose.up)
       } else if (destination === 'star') {
         journey.endLook.copy(compOffset)
-        journey.endPosition.copy(compOffset)
-        journey.endPosition.y += 0.4
-        journey.endPosition.z += 11.5 + (compact ? 0.55 : 0)
+        orbitOffset(journey.endLook, 0, 0, 11.5 + (compact ? 0.55 : 0), journey.endPosition)
         journey.endUp.set(0, 1, 0)
       } else {
         planetPosition(destination, time, journey.endLook).add(compOffset)
-        journey.endPosition.copy(journey.endLook)
-        journey.endPosition.z += 9 + (compact ? 0.55 : 0)
+        orbitOffset(journey.endLook, 0, 0, 9 + (compact ? 0.55 : 0), journey.endPosition)
         journey.endUp.set(0, 1, 0)
       }
       camera.position.lerpVectors(journey.startPosition, journey.endPosition, eased)
@@ -238,11 +254,9 @@ export function CameraRig({ reducedMotion, destination, onArrive, timeRef }: Cam
       planetPosition(currentView.current, time, scratch)
     }
     scratch.add(compOffset)
-    camera.position.set(
-      scratch.x + Math.sin(yaw) * distance + parallaxX * 0.06,
-      scratch.y + Math.sin(pitch) * distance + parallaxY * 0.04,
-      scratch.z + Math.cos(yaw) * Math.cos(pitch) * distance,
-    )
+    orbitOffset(scratch, yaw, pitch, distance, camera.position)
+    camera.position.x += parallaxX * 0.06
+    camera.position.y += parallaxY * 0.04
     lookAt.current.copy(scratch)
     camera.lookAt(lookAt.current)
   })
