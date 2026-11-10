@@ -78,3 +78,21 @@ test('a year of Aurelia holds several day-night cycles', () => {
     `${daysPerYear.toFixed(1)} days per year is outside the plausible band`,
   )
 })
+
+test('planet speeds follow Kepler-3 relative to Aurelia', () => {
+  // T ∝ a^1.5, so the mean motion must fall off as a^-1.5 across the system.
+  const aurelia = {
+    radius: orbitPoint('aurelia', 0, new Vector3()).length(),
+    speed: (Math.PI * 2) / planetPeriod('aurelia'),
+  }
+  for (const id of ['cinder', 'vesper'] as const) {
+    const radius = orbitPoint(id, 0, new Vector3()).length()
+    const speed = (Math.PI * 2) / planetPeriod(id)
+    const expected = aurelia.speed * Math.pow(aurelia.radius / radius, 1.5)
+    const deviation = Math.abs(speed / expected - 1)
+    assert.ok(
+      deviation < 0.01,
+      `${id} speed deviates ${(deviation * 100).toFixed(1)}% from Kepler-3`,
+    )
+  }
+})

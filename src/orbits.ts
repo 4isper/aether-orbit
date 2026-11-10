@@ -2,9 +2,10 @@ import { Vector3 } from 'three'
 import type { PlanetId } from './planets'
 
 const orbitConfig: Record<PlanetId, { radius: number; speed: number; phase: number; inclination: number }> = {
+  // Speeds follow Kepler-3 relative to Aurelia: w ∝ a^-1.5.
   aurelia: { radius: 9, speed: 0.02, phase: 3.6, inclination: 0.028 },
-  cinder: { radius: 14, speed: 0.013, phase: 5.8, inclination: 0.05 },
-  vesper: { radius: 20, speed: 0.009, phase: 1.35, inclination: 0.075 },
+  cinder: { radius: 14, speed: 0.0103, phase: 5.8, inclination: 0.05 },
+  vesper: { radius: 20, speed: 0.006, phase: 1.35, inclination: 0.075 },
 }
 
 /** Point on a planet's circular orbit, tilted by its inclination around the X axis. */
