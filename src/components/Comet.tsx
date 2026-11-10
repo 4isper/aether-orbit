@@ -9,7 +9,7 @@ import {
   type Points,
   type ShaderMaterial,
 } from 'three'
-import { cometPosition } from '../comet'
+import { cometPosition, tailParticlePosition } from '../comet'
 
 const TAIL_COUNT = 44
 const TAIL_LENGTH_FACTOR = 130
@@ -18,8 +18,14 @@ const MIN_TAIL_LENGTH = 2.2
 const MAX_TAIL_LENGTH = 7.5
 const MIN_TAIL_ACTIVITY = 0.45
 const MAX_TAIL_ACTIVITY = 1.3
+// The ion tail hugs the anti-sun line; the dust tail lags far harder behind
+// the path of motion, which is what curves it along the orbit's wake, and
+// spreads into a broader, dimmer, warmer cloud.
 const TAIL_LAG_CURVE = 0.32
 const TAIL_SPREAD = 0.16
+const DUST_COUNT = 52
+const DUST_LAG_CURVE = 1.05
+const DUST_SPREAD = 0.35
 
 const comaVertex = /* glsl */ `
 varying vec2 vUv;
@@ -57,6 +63,7 @@ void main() {
 `
 
 const tailFragment = /* glsl */ `
+uniform vec3 uColor;
 varying float vAlpha;
 
 void main() {
@@ -65,7 +72,7 @@ void main() {
   float core = smoothstep(1.0, 0.0, d);
   float alpha = core * core * vAlpha;
   if (alpha < 0.01) discard;
-  gl_FragColor = vec4(vec3(0.62, 0.78, 1.0) * alpha, alpha);
+  gl_FragColor = vec4(uColor * alpha, alpha);
 }
 `
 
@@ -77,11 +84,13 @@ export function Comet({ timeRef }: CometProps) {
   const headRef = useRef<Mesh>(null)
   const comaRef = useRef<Mesh>(null)
   const comaMaterialRef = useRef<ShaderMaterial>(null)
-  const pointsRef = useRef<Points>(null)
-  const materialRef = useRef<ShaderMaterial>(null)
+  const ionPointsRef = useRef<Points>(null)
+  const ionMaterialRef = useRef<ShaderMaterial>(null)
+  const dustPointsRef = useRef<Points>(null)
+  const dustMaterialRef = useRef<ShaderMaterial>(null)
 
-  const positions = useMemo(() => new Float32Array(TAIL_COUNT * 3), [])
-  const sizes = useMemo(() => {
+  const ionPositions = useMemo(() => new Float32Array(TAIL_COUNT * 3), [])
+  const ionSizes = useMemo(() => {
     const values = new Float32Array(TAIL_COUNT)
     for (let i = 0; i < TAIL_COUNT; i++) {
       const t = (i + 1) / TAIL_COUNT
@@ -89,13 +98,33 @@ export function Comet({ timeRef }: CometProps) {
     }
     return values
   }, [])
-  const alphas = useMemo(() => new Float32Array(TAIL_COUNT), [])
+  const ionAlphas = useMemo(() => new Float32Array(TAIL_COUNT), [])
+  const dustPositions = useMemo(() => new Float32Array(DUST_COUNT * 3), [])
+  const dustSizes = useMemo(() => {
+    const values = new Float32Array(DUST_COUNT)
+    for (let i = 0; i < DUST_COUNT; i++) {
+      const t = (i + 1) / DUST_COUNT
+      values[i] = 0.95 - t * 0.4
+    }
+    return values
+  }, [])
+  const dustAlphas = useMemo(() => new Float32Array(DUST_COUNT), [])
+  const ionColor = useMemo(() => new Color(0.62, 0.78, 1.0), [])
+  const dustColor = useMemo(() => new Color(1.0, 0.85, 0.62), [])
   const headColor = useMemo(() => new Color(2.4, 3.4, 5.2), [])
-  const uniforms = useMemo(
+  const ionUniforms = useMemo(
     () => ({
       uPixelRatio: { value: Math.min(window.devicePixelRatio, 1.75) },
+      uColor: { value: ionColor },
     }),
-    [],
+    [ionColor],
+  )
+  const dustUniforms = useMemo(
+    () => ({
+      uPixelRatio: { value: Math.min(window.devicePixelRatio, 1.75) },
+      uColor: { value: dustColor },
+    }),
+    [dustColor],
   )
   const comaUniforms = useMemo(() => ({ uActivity: { value: 1 } }), [])
 
@@ -103,6 +132,7 @@ export function Comet({ timeRef }: CometProps) {
   const previous = useMemo(() => new Vector3(), [])
   const velocity = useMemo(() => new Vector3(), [])
   const antiSun = useMemo(() => new Vector3(), [])
+  const scratch = useMemo(() => new Vector3(), [])
 
   useFrame((state) => {
     const time = timeRef.current
@@ -117,32 +147,40 @@ export function Comet({ timeRef }: CometProps) {
       comaMaterialRef.current.uniforms.uActivity.value = activity
     }
 
-    const geometry = pointsRef.current?.geometry as BufferGeometry | undefined
-    if (geometry) {
-      const tailPositions = geometry.attributes.position.array as Float32Array
-      const tailAlphas = geometry.attributes.aAlpha.array as Float32Array
-      const clock = time
+    const ionGeometry = ionPointsRef.current?.geometry as BufferGeometry | undefined
+    if (ionGeometry) {
+      const tailPositions = ionGeometry.attributes.position.array as Float32Array
+      const tailAlphas = ionGeometry.attributes.aAlpha.array as Float32Array
       for (let i = 0; i < TAIL_COUNT; i++) {
         const t = (i + 1) / TAIL_COUNT
-        const lag = t * t * tailLength * TAIL_LAG_CURVE
         const seed = i * 12.9898
         const spread = t * tailLength * TAIL_SPREAD + 0.05
-        tailPositions[i * 3] = head.x
-          + antiSun.x * (t * tailLength)
-          - velocity.x * lag
-          + Math.sin(clock * 0.9 + seed) * spread
-        tailPositions[i * 3 + 1] = head.y
-          + antiSun.y * (t * tailLength)
-          - velocity.y * lag
-          + Math.cos(clock * 1.3 + seed * 1.7) * spread
-        tailPositions[i * 3 + 2] = head.z
-          + antiSun.z * (t * tailLength)
-          - velocity.z * lag
-          + Math.sin(clock * 1.1 + seed * 2.3) * spread
+        tailParticlePosition(t, tailLength, TAIL_LAG_CURVE, spread, head, velocity, antiSun, time, seed, scratch)
+        tailPositions[i * 3] = scratch.x
+        tailPositions[i * 3 + 1] = scratch.y
+        tailPositions[i * 3 + 2] = scratch.z
         tailAlphas[i] = Math.pow(1 - t, 1.6) * activity
       }
-      geometry.attributes.position.needsUpdate = true
-      geometry.attributes.aAlpha.needsUpdate = true
+      ionGeometry.attributes.position.needsUpdate = true
+      ionGeometry.attributes.aAlpha.needsUpdate = true
+    }
+
+    const dustGeometry = dustPointsRef.current?.geometry as BufferGeometry | undefined
+    if (dustGeometry) {
+      const tailPositions = dustGeometry.attributes.position.array as Float32Array
+      const tailAlphas = dustGeometry.attributes.aAlpha.array as Float32Array
+      for (let i = 0; i < DUST_COUNT; i++) {
+        const t = (i + 1) / DUST_COUNT
+        const seed = 40 + i * 7.31
+        const spread = t * tailLength * DUST_SPREAD + 0.06
+        tailParticlePosition(t, tailLength, DUST_LAG_CURVE, spread, head, velocity, antiSun, time, seed, scratch)
+        tailPositions[i * 3] = scratch.x
+        tailPositions[i * 3 + 1] = scratch.y
+        tailPositions[i * 3 + 2] = scratch.z
+        tailAlphas[i] = Math.pow(1 - t, 1.1) * activity * 0.85
+      }
+      dustGeometry.attributes.position.needsUpdate = true
+      dustGeometry.attributes.aAlpha.needsUpdate = true
     }
 
     if (headRef.current) headRef.current.position.copy(head)
@@ -150,8 +188,11 @@ export function Comet({ timeRef }: CometProps) {
       comaRef.current.position.copy(head)
       comaRef.current.quaternion.copy(state.camera.quaternion)
     }
-    if (materialRef.current) {
-      materialRef.current.uniforms.uPixelRatio.value = state.gl.getPixelRatio()
+    if (ionMaterialRef.current) {
+      ionMaterialRef.current.uniforms.uPixelRatio.value = state.gl.getPixelRatio()
+    }
+    if (dustMaterialRef.current) {
+      dustMaterialRef.current.uniforms.uPixelRatio.value = state.gl.getPixelRatio()
     }
   })
 
@@ -174,17 +215,34 @@ export function Comet({ timeRef }: CometProps) {
           toneMapped={false}
         />
       </mesh>
-      <points ref={pointsRef} renderOrder={3} frustumCulled={false} raycast={() => null}>
+      <points ref={dustPointsRef} renderOrder={3} frustumCulled={false} raycast={() => null}>
         <bufferGeometry>
-          <bufferAttribute attach="attributes-position" args={[positions, 3]} />
-          <bufferAttribute attach="attributes-aSize" args={[sizes, 1]} />
-          <bufferAttribute attach="attributes-aAlpha" args={[alphas, 1]} />
+          <bufferAttribute attach="attributes-position" args={[dustPositions, 3]} />
+          <bufferAttribute attach="attributes-aSize" args={[dustSizes, 1]} />
+          <bufferAttribute attach="attributes-aAlpha" args={[dustAlphas, 1]} />
         </bufferGeometry>
         <shaderMaterial
-          ref={materialRef}
+          ref={dustMaterialRef}
           vertexShader={tailVertex}
           fragmentShader={tailFragment}
-          uniforms={uniforms}
+          uniforms={dustUniforms}
+          transparent
+          depthWrite={false}
+          blending={AdditiveBlending}
+          toneMapped={false}
+        />
+      </points>
+      <points ref={ionPointsRef} renderOrder={4} frustumCulled={false} raycast={() => null}>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[ionPositions, 3]} />
+          <bufferAttribute attach="attributes-aSize" args={[ionSizes, 1]} />
+          <bufferAttribute attach="attributes-aAlpha" args={[ionAlphas, 1]} />
+        </bufferGeometry>
+        <shaderMaterial
+          ref={ionMaterialRef}
+          vertexShader={tailVertex}
+          fragmentShader={tailFragment}
+          uniforms={ionUniforms}
           transparent
           depthWrite={false}
           blending={AdditiveBlending}

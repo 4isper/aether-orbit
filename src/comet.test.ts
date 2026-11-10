@@ -1,9 +1,14 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { Vector3 } from 'three'
-import { cometOrbit, cometOrbitPoint, cometPosition } from './comet.ts'
+import { cometOrbit, cometOrbitPoint, cometPosition, tailParticlePosition } from './comet.ts'
 
 const scratch = new Vector3()
+
+const HEAD = new Vector3(4, 0.5, -2)
+const VELOCITY = new Vector3(0.8, -0.2, 0.4)
+const ANTI_SUN = HEAD.clone().normalize()
+const TAIL_LENGTH = 6
 
 test('periapsis and apoapsis match the configured ellipse', () => {
   const peri = cometOrbitPoint(0, scratch).length()
@@ -40,4 +45,36 @@ test('the comet moves faster near periapsis than near apoapsis (Kepler II)', () 
   const nearApo = cometPosition(timeAtApoapsis - 0.4, new Vector3())
     .distanceTo(cometPosition(timeAtApoapsis, scratch))
   assert.ok(nearPeri > nearApo * 2, `periapsis step ${nearPeri} vs apoapsis step ${nearApo}`)
+})
+
+test('tail particles stream away from the star', () => {
+  const point = tailParticlePosition(
+    1, TAIL_LENGTH, 0, 0, HEAD, new Vector3(), ANTI_SUN, 0, 0, new Vector3(),
+  )
+  const expected = HEAD.clone().addScaledVector(ANTI_SUN, TAIL_LENGTH)
+  assert.ok(point.distanceTo(expected) < 1e-9, `point ${point.toArray()}`)
+})
+
+test('velocity lag pulls tail particles back along the path of motion', () => {
+  const noLag = tailParticlePosition(
+    1, TAIL_LENGTH, 0, 0, HEAD, VELOCITY, ANTI_SUN, 0, 0, new Vector3(),
+  )
+  const lagged = tailParticlePosition(
+    1, TAIL_LENGTH, 0.32, 0, HEAD, VELOCITY, ANTI_SUN, 0, 0, new Vector3(),
+  )
+  const shift = lagged.clone().sub(noLag)
+  assert.ok(shift.dot(VELOCITY) < 0, `shift ${shift.toArray()} opposes velocity`)
+})
+
+test('the dust tail curves farther off the anti-sun line than the ion tail', () => {
+  const angleFromAntiSun = (lagCurve: number) => {
+    const point = tailParticlePosition(
+      1, TAIL_LENGTH, lagCurve, 0, HEAD, VELOCITY, ANTI_SUN, 0, 0, new Vector3(),
+    )
+    const direction = point.sub(HEAD).normalize()
+    return Math.acos(direction.dot(ANTI_SUN))
+  }
+  const ion = angleFromAntiSun(0.32)
+  const dust = angleFromAntiSun(1.05)
+  assert.ok(dust > ion * 1.5, `dust ${dust} vs ion ${ion}`)
 })

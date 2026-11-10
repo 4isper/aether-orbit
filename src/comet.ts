@@ -41,3 +41,37 @@ export function cometOrbitPoint(meanAnomaly: number, target: Vector3) {
 export function cometPosition(time: number, target: Vector3) {
   return cometOrbitPoint(cometOrbit.meanAnomalyAtZero + meanMotion * time, target)
 }
+
+const scratchAntiSun = new Vector3()
+
+/**
+ * Position of one tail particle: it streams anti-sunward along `antiSun`,
+ * falls back along the path of motion by a quadratic lag (`lagCurve` decides
+ * how strongly - the dust tail lags far harder than the ion tail, which is
+ * what curves it away from the straight anti-sun line), and wobbles by
+ * `spread` on a per-particle seed. `t` runs 0..1 from the head outward.
+ */
+export function tailParticlePosition(
+  t: number,
+  tailLength: number,
+  lagCurve: number,
+  spread: number,
+  head: Vector3,
+  velocity: Vector3,
+  antiSun: Vector3,
+  clock: number,
+  seed: number,
+  target: Vector3,
+): Vector3 {
+  const lag = t * t * tailLength * lagCurve
+  scratchAntiSun.copy(antiSun).normalize()
+  return target
+    .copy(head)
+    .addScaledVector(scratchAntiSun, t * tailLength)
+    .addScaledVector(velocity, -lag)
+    .add({
+      x: Math.sin(clock * 0.9 + seed) * spread,
+      y: Math.cos(clock * 1.3 + seed * 1.7) * spread,
+      z: Math.sin(clock * 1.1 + seed * 2.3) * spread,
+    })
+}
