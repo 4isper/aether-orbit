@@ -115,8 +115,12 @@ void main() {
   float moonAlong = dot(moonOffset, L);
   if (moonAlong > 0.0) {
     float moonPerp = sqrt(max(dot(moonOffset, moonOffset) - moonAlong * moonAlong, 0.0));
-    float umbra = 1.0 - smoothstep(uMoonRadius * 0.5, uMoonRadius * 1.3, moonPerp);
-    color *= 1.0 - umbra * 0.86;
+    // The moon is angularly smaller than Solis from the surface, so its shadow
+    // is a wide soft penumbra (annular eclipse) with a warm refracted rim,
+    // not a hard umbra disc.
+    float penumbra = 1.0 - smoothstep(uMoonRadius * 1.2, uMoonRadius * 3.3, moonPerp);
+    color *= 1.0 - penumbra * 0.68;
+    color *= mix(vec3(1.0), vec3(1.35, 0.78, 0.6), penumbra);
   }
 
   vec3 nightSample = texture2D(uNightMap, vUv).rgb;
@@ -157,7 +161,7 @@ void main() {
   float moonShadow = 1.0;
   if (moonAlong > 0.0) {
     float moonPerp = sqrt(max(dot(moonOffset, moonOffset) - moonAlong * moonAlong, 0.0));
-    moonShadow = 1.0 - (1.0 - smoothstep(uMoonRadius * 0.5, uMoonRadius * 1.3, moonPerp)) * 0.86;
+    moonShadow = 1.0 - (1.0 - smoothstep(uMoonRadius * 1.2, uMoonRadius * 3.3, moonPerp)) * 0.68;
   }
 
   vec3 color = mix(
