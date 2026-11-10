@@ -95,12 +95,11 @@ function App() {
   const timeScale = paused ? 0 : speed
   const resetView = () => window.dispatchEvent(new Event('aether:reset'))
   const saveFrame = () => {
-    const canvas = document.querySelector('.scene canvas')
-    if (!canvas) return
-    const link = document.createElement('a')
-    link.download = `aether-${activeView === 'system' ? 'system' : activeView}.png`
-    link.href = (canvas as HTMLCanvasElement).toDataURL('image/png')
-    link.click()
+    // The scene renders the composed frame and reads it back itself: the
+    // drawing buffer is not preserved between frames.
+    window.dispatchEvent(new CustomEvent('aether:screenshot', {
+      detail: { name: `aether-${activeView === 'system' ? 'system' : activeView}.png` },
+    }))
   }
 
   useEffect(() => {

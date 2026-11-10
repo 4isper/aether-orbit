@@ -1,7 +1,7 @@
-import { useMemo, useRef, useState } from 'react'
+import { useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { useCursor } from '@react-three/drei'
-import { Bloom, EffectComposer, Vignette } from '@react-three/postprocessing'
+import { Bloom, EffectComposer, EffectComposerContext, Vignette } from '@react-three/postprocessing'
 import { Vector3, type Group } from 'three'
 import { Backdrop } from './Backdrop'
 import { Belt } from './Belt'
@@ -23,6 +23,32 @@ function SceneReady({ onReady }: { onReady: () => void }) {
     frames.current += 1
     if (frames.current === 4) onReady()
   })
+
+  return null
+}
+
+/**
+ * Lives inside the EffectComposer so it can re-render the effect chain on
+ * demand: without preserveDrawingBuffer the canvas may only be read in the
+ * same task that drew it.
+ */
+function ComposerCapture() {
+  const { composer } = useContext(EffectComposerContext)
+  const gl = useThree((state) => state.gl)
+
+  useEffect(() => {
+    const capture = (event: Event) => {
+      const name = (event as CustomEvent<{ name?: string }>).detail?.name
+      if (!name) return
+      composer.render()
+      const link = document.createElement('a')
+      link.download = name
+      link.href = gl.domElement.toDataURL('image/png')
+      link.click()
+    }
+    window.addEventListener('aether:screenshot', capture)
+    return () => window.removeEventListener('aether:screenshot', capture)
+  }, [composer, gl])
 
   return null
 }
@@ -114,6 +140,7 @@ export function SpaceScene({ activeView, destination, initialView, timeScale, re
       {overview && <SystemOverview onSelect={selectBody} timeRef={orbitTime} />}
       <SceneReady onReady={onReady} />
       <EffectComposer multisampling={0}>
+        <ComposerCapture />
         <Bloom
           mipmapBlur
           intensity={0.7}

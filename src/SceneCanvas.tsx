@@ -60,7 +60,7 @@ export default function SceneCanvas({
         aria-label={label}
         camera={{ position: [0, 0, 11.4], fov: 36, near: 0.1, far: 160 }}
         dpr={dpr}
-        gl={{ antialias: true, alpha: false, powerPreference: 'high-performance', preserveDrawingBuffer: true }}
+        gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
         onCreated={handleCreated}
       >
       <SceneErrorBoundary>
