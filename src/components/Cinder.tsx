@@ -1,9 +1,10 @@
 import { useCallback, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { useTexture } from '@react-three/drei'
-import { RepeatWrapping, SRGBColorSpace, Vector3, type Group, type Mesh, type Texture } from 'three'
+import { RepeatWrapping, SRGBColorSpace, type Group, type Mesh, type Texture } from 'three'
 import { noiseGLSL } from '../shaders/noise'
 import { bodyVertexGLSL, perturbNormalGLSL } from '../shaders/common'
+import { useSunDirection } from '../hooks/useSunDirection'
 import { Atmosphere } from './Atmosphere'
 
 const surfaceFragment = /* glsl */ `
@@ -59,8 +60,7 @@ export function Cinder({ reducedMotion, timeScale }: CinderProps) {
   )
   const dayMap = useTexture('/textures/mars-day.webp', configureTexture)
 
-  const sunDirection = useMemo(() => new Vector3(-1, 0, 0), [])
-  const worldPosition = useMemo(() => new Vector3(), [])
+  const { sunDirection, updateSunDirection } = useSunDirection(groupRef)
   const surfaceUniforms = useMemo(
     () => ({
       uSunDirection: { value: sunDirection },
@@ -71,10 +71,7 @@ export function Cinder({ reducedMotion, timeScale }: CinderProps) {
 
   useFrame((_, rawDelta) => {
     const delta = Math.min(rawDelta, 0.1)
-    if (groupRef.current) {
-      groupRef.current.getWorldPosition(worldPosition)
-      sunDirection.copy(worldPosition).multiplyScalar(-1).normalize()
-    }
+    updateSunDirection()
 
     if (!reducedMotion && surfaceRef.current) {
       surfaceRef.current.rotation.y += delta * 0.004 * timeScale

@@ -15,6 +15,7 @@ import { noiseGLSL } from '../shaders/noise'
 import { bodyVertexGLSL, perturbNormalGLSL } from '../shaders/common'
 import { Atmosphere } from './Atmosphere'
 import { Moon, MOON_ORBIT_RADIUS, MOON_ANGULAR_SPEED, MOON_RADIUS } from './Moon'
+import { useSunDirection } from '../hooks/useSunDirection'
 
 const textureUrls = [
   '/textures/earth-day.webp',
@@ -214,8 +215,7 @@ export function Planet({ reducedMotion, timeScale, showMoonLabel }: PlanetProps)
     configureTextures,
   )
 
-  const sunDirection = useMemo(() => new Vector3(-1, 0, 0), [])
-  const worldPosition = useMemo(() => new Vector3(), [])
+  const { sunDirection, worldPosition, updateSunDirection } = useSunDirection(groupRef)
   const moonWorld = useMemo(() => new Vector3(), [])
   const moonAngle = useRef(2.1)
   const surfaceUniforms = useMemo(
@@ -244,10 +244,7 @@ export function Planet({ reducedMotion, timeScale, showMoonLabel }: PlanetProps)
 
   useFrame((_, rawDelta) => {
     const delta = Math.min(rawDelta, 0.1)
-    if (groupRef.current) {
-      groupRef.current.getWorldPosition(worldPosition)
-      sunDirection.copy(worldPosition).multiplyScalar(-1).normalize()
-    }
+    updateSunDirection()
 
     const surface = surfaceRef.current
     const clouds = cloudsRef.current
