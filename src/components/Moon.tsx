@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import type { Ref } from 'react'
 import { Vector3, type Mesh, type ShaderMaterial } from 'three'
 import { noiseGLSL } from '../shaders/noise'
@@ -81,9 +81,10 @@ type MoonProps = {
   radius?: number
   ref?: Ref<Mesh>
   materialRef?: Ref<ShaderMaterial>
+  children?: ReactNode
 }
 
-export function Moon({ radius = MOON_RADIUS, ref, materialRef }: MoonProps) {
+export function Moon({ radius = MOON_RADIUS, ref, materialRef, children }: MoonProps) {
   const uniforms = useMemo(
     () => ({
       uPlanetPosition: { value: new Vector3() },
@@ -94,6 +95,7 @@ export function Moon({ radius = MOON_RADIUS, ref, materialRef }: MoonProps) {
 
   return (
     <mesh ref={ref} scale={radius}>
+      {children}
       <sphereGeometry args={[1, 48, 48]} />
       <shaderMaterial
         ref={materialRef}

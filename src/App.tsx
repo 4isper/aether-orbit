@@ -8,9 +8,13 @@ import './App.css'
 
 const MIN_DPR = 0.85
 const MAX_DPR = 1.75
-const SPEEDS = [1, 2, 4, 0.5]
+const SPEED_OPTIONS = [0.5, 1, 2, 4]
 const TOUR_STOPS: SceneView[] = ['aurelia', 'cinder', 'vesper', 'star', 'system']
 const TOUR_DWELL_MS = 7000
+
+function formatSpeed(speed: number) {
+  return speed === 0.5 ? '½' : String(speed)
+}
 
 function getMaxDpr() {
   return Math.max(MIN_DPR, Math.min(window.devicePixelRatio, MAX_DPR))
@@ -56,7 +60,6 @@ function App() {
   const [tour, setTour] = useState(false)
   const [tabVisible, setTabVisible] = useState(() => !document.hidden)
   const timeScale = paused ? 0 : speed
-  const cycleSpeed = () => setSpeed((s) => SPEEDS[(SPEEDS.indexOf(s) + 1) % SPEEDS.length])
   const resetView = () => window.dispatchEvent(new Event('aether:reset'))
 
   useEffect(() => {
@@ -193,16 +196,21 @@ function App() {
               </svg>
             )}
           </button>
-          <button
-            type="button"
-            className="time-button time-button--speed"
-            aria-label={`Скорость времени ×${speed}`}
-            disabled={!ready}
-            onClick={cycleSpeed}
-          >
-            <span>Время</span>
-            <strong>×{speed === 0.5 ? '½' : speed}</strong>
-          </button>
+          <div className="speed-group" role="group" aria-label="Скорость времени">
+            {SPEED_OPTIONS.map((option) => (
+              <button
+                key={option}
+                type="button"
+                className="time-button speed-option"
+                aria-pressed={speed === option}
+                aria-label={`Скорость времени ×${formatSpeed(option)}`}
+                disabled={!ready}
+                onClick={() => setSpeed(option)}
+              >
+                <strong>×{formatSpeed(option)}</strong>
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="flight-status" role="status" aria-live="polite" aria-atomic="true">

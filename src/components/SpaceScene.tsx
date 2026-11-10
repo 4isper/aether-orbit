@@ -116,7 +116,7 @@ export function SpaceScene({ activeView, destination, timeScale, onReady, onArri
         <Star reducedMotion={reducedMotion} timeScale={timeScale} />
       </group>
       <group ref={(node) => { groupRefs.current.aurelia = node }} position={initialPositions[0]} {...planetEvents('aurelia')}>
-        <Planet reducedMotion={reducedMotion} timeScale={timeScale} />
+        <Planet reducedMotion={reducedMotion} timeScale={timeScale} showMoonLabel={overview} />
       </group>
       <group ref={(node) => { groupRefs.current.cinder = node }} position={initialPositions[1]} {...planetEvents('cinder')}>
         <Cinder reducedMotion={reducedMotion} timeScale={timeScale} />

@@ -480,6 +480,27 @@ h1 > em {
   color: #e2b98a;
 }
 
+.experience[data-view="star"] .telemetry {
+  padding: 12px 18px;
+  background: rgba(1, 2, 5, 0.55);
+  backdrop-filter: blur(6px);
+}
+
+.experience[data-view="star"] .intro-copy {
+  text-shadow: 0 1px 14px rgba(1, 2, 5, 0.95), 0 0 4px rgba(1, 2, 5, 0.8);
+}
+
+.moon-label {
+  display: block;
+  transform: translateY(-2px);
+  color: rgba(199, 214, 223, 0.55);
+  font-size: 7px;
+  letter-spacing: 0.16em;
+  text-shadow: 0 1px 8px rgba(1, 2, 5, 0.9);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
 .experience[data-view="cinder"] h1 > em {
   color: #d0ab8b;
 }
@@ -539,18 +560,25 @@ h1 > em {
   height: 11px;
 }
 
-.time-button--speed span {
-  font-size: 8px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+.speed-group {
+  display: flex;
+  align-items: center;
 }
 
-.time-button--speed strong {
-  font-size: 10px;
+.speed-option {
+  min-height: 40px;
+  padding: 6px 8px;
+}
+
+.speed-option strong {
+  font-size: 9px;
   font-weight: 400;
   letter-spacing: 0.06em;
-  min-width: 24px;
-  text-align: left;
+}
+
+.speed-option[aria-pressed="true"] {
+  border-bottom-color: rgba(184, 207, 222, 0.4);
+  color: #d1e0e9;
 }
 
 .flight-status {

@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { useTexture, type MappedTextureType } from '@react-three/drei'
+import { Html, useTexture, type MappedTextureType } from '@react-three/drei'
 import {
   FrontSide,
   NoColorSpace,
@@ -203,9 +203,10 @@ void main() {
 type PlanetProps = {
   reducedMotion: boolean
   timeScale: number
+  showMoonLabel?: boolean
 }
 
-export function Planet({ reducedMotion, timeScale }: PlanetProps) {
+export function Planet({ reducedMotion, timeScale, showMoonLabel }: PlanetProps) {
   const groupRef = useRef<Group>(null)
   const surfaceRef = useRef<Mesh>(null)
   const cloudsRef = useRef<Mesh>(null)
@@ -345,7 +346,13 @@ export function Planet({ reducedMotion, timeScale }: PlanetProps) {
       </mesh>
 
       <group rotation={[0.24, 0, 0.09]}>
-        <Moon ref={moonRef} materialRef={moonMaterialRef} />
+        <Moon ref={moonRef} materialRef={moonMaterialRef}>
+          {showMoonLabel && (
+            <Html center position={[0, 2.4, 0]} zIndexRange={[1, 1]} style={{ pointerEvents: 'none' }}>
+              <span className="moon-label" aria-hidden="true">Луна</span>
+            </Html>
+          )}
+        </Moon>
       </group>
 
       <Atmosphere sunDirection={sunDirection} />
