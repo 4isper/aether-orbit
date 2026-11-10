@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import { Vector3, type Group } from 'three'
 import { planetIds, planets, type PlanetId } from '../planets'
-import { orbitConfig, planetPosition } from '../orbits'
+import { orbitPoint, planetPosition } from '../orbits'
 
 const guideColors: Record<PlanetId, string> = {
   aurelia: '#8197aa',
@@ -21,12 +21,13 @@ export function SystemOverview({ onSelect, timeRef }: SystemOverviewProps) {
   const scratch = useMemo(() => new Vector3(), [])
   const orbits = useMemo(
     () => planetIds.map((id) => {
-      const radius = orbitConfig[id].radius
       const points = new Float32Array(160 * 3)
+      const scratch = new Vector3()
       for (let i = 0; i < 160; i++) {
-        const angle = (i / 160) * Math.PI * 2
-        points[i * 3] = Math.cos(angle) * radius
-        points[i * 3 + 2] = Math.sin(angle) * radius
+        orbitPoint(id, (i / 160) * Math.PI * 2, scratch)
+        points[i * 3] = scratch.x
+        points[i * 3 + 1] = scratch.y
+        points[i * 3 + 2] = scratch.z
       }
       return points
     }),

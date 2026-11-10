@@ -3,7 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { MathUtils, Vector3, type PerspectiveCamera } from 'three'
 import { cometOrbitPoint } from '../comet'
 import { planetIds, type SceneView } from '../planets'
-import { orbitConfig, planetPosition } from '../orbits'
+import { orbitPoint, planetPosition } from '../orbits'
 
 type CameraRigProps = {
   reducedMotion: boolean
@@ -49,10 +49,9 @@ export function CameraRig({ reducedMotion, destination, onArrive, timeRef }: Cam
     let maxDepth = 0
     const point = new Vector3()
     for (const id of planetIds) {
-      const radius = orbitConfig[id].radius + 3
       for (let i = 0; i < 48; i++) {
-        const angle = (i / 48) * Math.PI * 2
-        point.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius)
+        orbitPoint(id, (i / 48) * Math.PI * 2, point)
+        point.addScaledVector(point.clone().normalize(), 3)
         halfHeight = Math.max(halfHeight, Math.abs(point.dot(screenUp)))
         halfWidth = Math.max(halfWidth, Math.abs(point.dot(right)))
         maxDepth = Math.max(maxDepth, point.dot(direction))
