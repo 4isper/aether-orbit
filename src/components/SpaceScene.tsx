@@ -59,12 +59,13 @@ type SpaceSceneProps = {
   initialView: SceneView
   timeScale: number
   reducedMotion: boolean
+  lowEnd?: boolean
   onReady: () => void
   onArrive: (view: SceneView) => void
   onSelect: (view: SceneView) => void
 }
 
-export function SpaceScene({ activeView, destination, initialView, timeScale, reducedMotion, onReady, onArrive, onSelect }: SpaceSceneProps) {
+export function SpaceScene({ activeView, destination, initialView, timeScale, reducedMotion, lowEnd = false, onReady, onArrive, onSelect }: SpaceSceneProps) {
   const gl = useThree((state) => state.gl)
   const [hovered, setHovered] = useState(false)
   const travelling = activeView !== destination
@@ -139,15 +140,19 @@ export function SpaceScene({ activeView, destination, initialView, timeScale, re
       <CameraRig initialView={initialView} reducedMotion={reducedMotion} destination={destination} onArrive={onArrive} timeRef={orbitTime} />
       {overview && <SystemOverview onSelect={selectBody} timeRef={orbitTime} />}
       <SceneReady onReady={onReady} />
-      <EffectComposer multisampling={0}>
+      <EffectComposer multisampling={0} enabled={!lowEnd}>
         <ComposerCapture />
-        <Bloom
-          mipmapBlur
-          intensity={0.7}
-          luminanceThreshold={0.72}
-          luminanceSmoothing={0.32}
-        />
-        <Vignette offset={0.2} darkness={0.58} />
+        {lowEnd ? null : (
+          <>
+            <Bloom
+              mipmapBlur
+              intensity={0.7}
+              luminanceThreshold={0.72}
+              luminanceSmoothing={0.32}
+            />
+            <Vignette offset={0.2} darkness={0.58} />
+          </>
+        )}
       </EffectComposer>
     </>
   )

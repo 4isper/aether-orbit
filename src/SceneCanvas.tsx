@@ -37,10 +37,14 @@ export default function SceneCanvas({
   onSelect,
 }: SceneCanvasProps) {
   const [dpr, setDpr] = useState(getMaxDpr)
+  const [lowEnd, setLowEnd] = useState(false)
   const [contextLost, setContextLost] = useState(false)
   const handleQualityChange = useCallback(({ factor }: { factor: number }) => {
     const nextDpr = MIN_DPR + (getMaxDpr() - MIN_DPR) * factor
     setDpr(Math.round(nextDpr * 20) / 20)
+    // Hysteresis: drop the expensive postprocessing below 0.35, restore it
+    // only above 0.5 so the toggle cannot flicker around one threshold.
+    setLowEnd((prev) => (prev ? factor > 0.5 : factor < 0.35))
   }, [])
   const handleCreated = useCallback(({ gl }: { gl: WebGLRenderer }) => {
     gl.domElement.tabIndex = 0
@@ -79,6 +83,7 @@ export default function SceneCanvas({
             initialView={initialView}
             timeScale={timeScale}
             reducedMotion={reducedMotion}
+            lowEnd={lowEnd}
             onReady={onReady}
             onArrive={onArrive}
             onSelect={onSelect}
