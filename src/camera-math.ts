@@ -50,6 +50,50 @@ export type OverviewPose = {
   up: Vector3
 }
 
+export type OverviewRotation = { position: Vector3; up: Vector3 }
+
+const OVERVIEW_MIN_ELEVATION = -0.12
+const OVERVIEW_MAX_ELEVATION = 1.1
+const OVERVIEW_MIN_ZOOM = 0.7
+const OVERVIEW_MAX_ZOOM = 1.35
+
+/**
+ * User-controlled orbit of the overview camera: yaw circles the system, pitch
+ * changes elevation (clamped so the camera never dives under the ecliptic),
+ * zoom scales the distance. The up vector rotates by the same yaw so the roll
+ * of the framing stays as composed.
+ */
+export function rotateOverviewPose(
+  pose: OverviewPose,
+  yaw: number,
+  pitch: number,
+  zoom: number,
+  out: OverviewRotation,
+) {
+  const offset = new Vector3().subVectors(pose.position, pose.target)
+  const radius = offset.length()
+  const baseElevation = Math.asin(MathUtils.clamp(offset.y / radius, -1, 1))
+  const baseAzimuth = Math.atan2(offset.x, offset.z)
+  const elevation = MathUtils.clamp(baseElevation + pitch, OVERVIEW_MIN_ELEVATION, OVERVIEW_MAX_ELEVATION)
+  const azimuth = baseAzimuth + yaw
+  const distance = radius * MathUtils.clamp(zoom, OVERVIEW_MIN_ZOOM, OVERVIEW_MAX_ZOOM)
+
+  out.position.set(
+    pose.target.x + distance * Math.cos(elevation) * Math.sin(azimuth),
+    pose.target.y + distance * Math.sin(elevation),
+    pose.target.z + distance * Math.cos(elevation) * Math.cos(azimuth),
+  )
+
+  const upLengthXZ = Math.hypot(pose.up.x, pose.up.z)
+  if (upLengthXZ > 1e-6) {
+    const upAzimuth = Math.atan2(pose.up.x, pose.up.z) + yaw
+    out.up.set(Math.sin(upAzimuth) * upLengthXZ, pose.up.y, Math.cos(upAzimuth) * upLengthXZ)
+  } else {
+    out.up.copy(pose.up)
+  }
+  return out
+}
+
 /**
  * Static camera pose that frames the whole system: every inclined orbit with a
  * margin around the planets and the comet's far reach, compensating for the

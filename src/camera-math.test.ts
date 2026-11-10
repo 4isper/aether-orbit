@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { Vector3 } from 'three'
-import { orbitOffset, computeOverviewPose, PLANET_VIEW_DISTANCE } from './camera-math.ts'
+import { orbitOffset, computeOverviewPose, rotateOverviewPose, PLANET_VIEW_DISTANCE } from './camera-math.ts'
 import { planetIds } from './planets.ts'
 import { planetPosition } from './orbits.ts'
 
@@ -60,4 +60,44 @@ test('overview pose frames the system from a sane distance', () => {
       assert.ok(Number.isFinite(value))
     }
   }
+})
+
+test('overview rotation with zero angles reproduces the base pose', () => {
+  const pose = computeOverviewPose(1440, 900)
+  const out = { position: new Vector3(), up: new Vector3() }
+  rotateOverviewPose(pose, 0, 0, 1, out)
+  assert.ok(out.position.distanceTo(pose.position) < 1e-9)
+  assert.ok(out.up.distanceTo(pose.up) < 1e-9)
+})
+
+test('overview yaw orbits the camera around the target at constant distance', () => {
+  const pose = computeOverviewPose(1440, 900)
+  const out = { position: new Vector3(), up: new Vector3() }
+  rotateOverviewPose(pose, 0.4, 0, 1, out)
+  const baseRadius = pose.position.distanceTo(pose.target)
+  assert.ok(Math.abs(out.position.distanceTo(pose.target) - baseRadius) < 1e-9)
+  const azimuth = (v: Vector3) => Math.atan2(v.x - pose.target.x, v.z - pose.target.z)
+  const delta = azimuth(out.position) - azimuth(pose.position)
+  assert.ok(Math.abs(delta - 0.4) < 1e-9, `azimuth delta ${delta}`)
+  assert.ok(Math.abs(out.up.length() - 1) < 1e-9)
+})
+
+test('overview zoom scales the distance to the target', () => {
+  const pose = computeOverviewPose(1440, 900)
+  const out = { position: new Vector3(), up: new Vector3() }
+  rotateOverviewPose(pose, 0, 0, 1.3, out)
+  const baseRadius = pose.position.distanceTo(pose.target)
+  assert.ok(Math.abs(out.position.distanceTo(pose.target) - baseRadius * 1.3) < 1e-9)
+})
+
+test('overview pitch is clamped so the camera never dives under the plane', () => {
+  const pose = computeOverviewPose(1440, 900)
+  const out = { position: new Vector3(), up: new Vector3() }
+  rotateOverviewPose(pose, 0, 10, 1, out)
+  assert.ok(out.position.y > 0, `camera fell below the ecliptic: y=${out.position.y}`)
+  rotateOverviewPose(pose, 0, -10, 1, out)
+  const elevation = Math.asin(
+    (out.position.y - pose.target.y) / out.position.distanceTo(pose.target),
+  )
+  assert.ok(elevation >= -0.12 - 1e-9, `elevation ${elevation} below the clamp`)
 })

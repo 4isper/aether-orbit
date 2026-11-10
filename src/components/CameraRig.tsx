@@ -11,6 +11,7 @@ import {
   INTRO_DURATION,
   orbitOffset,
   PLANET_VIEW_DISTANCE,
+  rotateOverviewPose,
   STAR_VIEW_DISTANCE,
 } from '../camera-math'
 
@@ -41,6 +42,9 @@ export function CameraRig({ initialView, reducedMotion, destination, onArrive, t
   const requestedView = useRef<SceneView>(initialView)
   const lookAt = useRef(new Vector3())
   const scratch = useMemo(() => new Vector3(), [])
+  const overviewRotated = useMemo(() => ({ position: new Vector3(), up: new Vector3() }), [])
+  const overviewTarget = useRef({ yaw: 0, pitch: 0, zoom: 1 })
+  const overviewCurrent = useRef({ yaw: 0, pitch: 0, zoom: 1 })
   const compOffset = useMemo(() => new Vector3(), [])
   const flight = useRef({
     active: false,
@@ -57,27 +61,36 @@ export function CameraRig({ initialView, reducedMotion, destination, onArrive, t
     const element = gl.domElement
 
     const reset = () => {
-      if (flight.current.active || currentView.current === 'system') return
+      if (flight.current.active) return
+      if (currentView.current === 'system') {
+        overviewTarget.current = { yaw: 0, pitch: 0, zoom: 1 }
+        return
+      }
       target.current = { yaw: 0, pitch: 0, zoom: PLANET_VIEW_DISTANCE }
     }
 
     const onPointerDown = (event: PointerEvent) => {
-      if (flight.current.active || currentView.current === 'system' || (event.pointerType === 'mouse' && event.button !== 0)) return
+      if (flight.current.active || (event.pointerType === 'mouse' && event.button !== 0)) return
       drag.current = { active: true, x: event.clientX, y: event.clientY }
       element.setPointerCapture(event.pointerId)
       element.focus({ preventScroll: true })
     }
 
     const onPointerMove = (event: PointerEvent) => {
-      if (flight.current.active || currentView.current === 'system') return
+      if (flight.current.active) return
       pointer.current.x = (event.clientX / window.innerWidth) * 2 - 1
       pointer.current.y = (event.clientY / window.innerHeight) * 2 - 1
       if (!drag.current.active) return
 
       const dx = event.clientX - drag.current.x
       const dy = event.clientY - drag.current.y
-      target.current.yaw = MathUtils.clamp(target.current.yaw - dx * 0.0028, -0.32, 0.32)
-      target.current.pitch = MathUtils.clamp(target.current.pitch + dy * 0.0022, -0.18, 0.18)
+      if (currentView.current === 'system') {
+        overviewTarget.current.yaw = MathUtils.clamp(overviewTarget.current.yaw - dx * 0.0035, -Math.PI, Math.PI)
+        overviewTarget.current.pitch = MathUtils.clamp(overviewTarget.current.pitch + dy * 0.0022, -0.6, 0.6)
+      } else {
+        target.current.yaw = MathUtils.clamp(target.current.yaw - dx * 0.0028, -0.32, 0.32)
+        target.current.pitch = MathUtils.clamp(target.current.pitch + dy * 0.0022, -0.18, 0.18)
+      }
       drag.current.x = event.clientX
       drag.current.y = event.clientY
     }
@@ -91,16 +104,31 @@ export function CameraRig({ initialView, reducedMotion, destination, onArrive, t
 
     const onWheel = (event: WheelEvent) => {
       event.preventDefault()
-      if (flight.current.active || currentView.current === 'system') return
+      if (flight.current.active) return
+      if (currentView.current === 'system') {
+        overviewTarget.current.zoom = MathUtils.clamp(overviewTarget.current.zoom + event.deltaY * 0.0012, 0.7, 1.35)
+        return
+      }
       target.current.zoom = MathUtils.clamp(target.current.zoom + event.deltaY * 0.003, MIN_ZOOM, MAX_ZOOM)
     }
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (flight.current.active || currentView.current === 'system') return
+      if (flight.current.active) return
       if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', '+', '=', '-'].includes(event.key)) {
         event.preventDefault()
       }
       if (event.key.toLowerCase() === 'r') reset()
+      if (currentView.current === 'system') {
+        if (event.key === 'ArrowLeft') overviewTarget.current.yaw += 0.12
+        if (event.key === 'ArrowRight') overviewTarget.current.yaw -= 0.12
+        if (event.key === 'ArrowUp') overviewTarget.current.pitch += 0.08
+        if (event.key === 'ArrowDown') overviewTarget.current.pitch -= 0.08
+        if (event.key === '+' || event.key === '=') overviewTarget.current.zoom += 0.08
+        if (event.key === '-') overviewTarget.current.zoom -= 0.08
+        overviewTarget.current.pitch = MathUtils.clamp(overviewTarget.current.pitch, -0.6, 0.6)
+        overviewTarget.current.zoom = MathUtils.clamp(overviewTarget.current.zoom, 0.7, 1.35)
+        return
+      }
       if (event.key === 'ArrowLeft') target.current.yaw += 0.035
       if (event.key === 'ArrowRight') target.current.yaw -= 0.035
       if (event.key === 'ArrowUp') target.current.pitch -= 0.025
@@ -149,6 +177,8 @@ export function CameraRig({ initialView, reducedMotion, destination, onArrive, t
       const initialZoom = destination === 'star' ? STAR_VIEW_DISTANCE : PLANET_VIEW_DISTANCE
       target.current = { yaw: 0, pitch: 0, zoom: initialZoom }
       current.current = { yaw: 0, pitch: 0, zoom: initialZoom }
+      overviewTarget.current = { yaw: 0, pitch: 0, zoom: 1 }
+      overviewCurrent.current = { yaw: 0, pitch: 0, zoom: 1 }
       pointer.current = { x: 0, y: 0 }
       drag.current.active = false
       intro.current = 1
@@ -191,8 +221,12 @@ export function CameraRig({ initialView, reducedMotion, destination, onArrive, t
     }
 
     if (currentView.current === 'system') {
-      camera.position.copy(overviewPose.position)
-      camera.up.copy(overviewPose.up)
+      overviewCurrent.current.yaw = MathUtils.damp(overviewCurrent.current.yaw, overviewTarget.current.yaw, 4, delta)
+      overviewCurrent.current.pitch = MathUtils.damp(overviewCurrent.current.pitch, overviewTarget.current.pitch, 4, delta)
+      overviewCurrent.current.zoom = MathUtils.damp(overviewCurrent.current.zoom, overviewTarget.current.zoom, 3, delta)
+      rotateOverviewPose(overviewPose, overviewCurrent.current.yaw, overviewCurrent.current.pitch, overviewCurrent.current.zoom, overviewRotated)
+      camera.position.copy(overviewRotated.position)
+      camera.up.copy(overviewRotated.up)
       lookAt.current.copy(overviewPose.target)
       camera.lookAt(lookAt.current)
       return
