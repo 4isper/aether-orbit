@@ -2,6 +2,8 @@
 
 Интерактивная космическая сцена в браузере: два вымышленных мира, кинематографичные перелёты между ними и обзор системы с тонкими орбитами. Без видео и предрендеров — всё считается в реальном времени на WebGL.
 
+**Живая версия: [aether-orbit-three.vercel.app](https://aether-orbit-three.vercel.app)**
+
 ![Обзор системы Aether](docs/screenshots/overview.png)
 
 ## Что внутри
@@ -98,3 +100,7 @@ docs/screenshots/      # кадры для этого README
 ## Текстуры и атрибуция
 
 Карты поверхностей и облаков — [Solar System Scope](https://www.solarsystemscope.com/textures/), лицензия [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Карты уменьшены и пережаты в WebP; specular-карта используется шейдером как маска шероховатости, облачная — как маска плотности и теней. Подробности и список исходных файлов: [`public/textures/ATTRIBUTION.txt`](public/textures/ATTRIBUTION.txt).
+
+## Лицензия
+
+Код проекта — [MIT](LICENSE). Текстуры остаются под CC BY 4.0 и требуют атрибуции при повторном использовании; MIT на них не распространяется.
