@@ -1,39 +1,37 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { MathUtils, Vector3, type PerspectiveCamera } from 'three'
-import { planets, type SceneView } from '../planets'
+import { type SceneView } from '../planets'
+import { planetPosition } from '../orbits'
+import {
+  computeOverviewPose,
+  MAX_ZOOM,
+  MIN_ZOOM,
+  FLIGHT_DURATION,
+  INTRO_DURATION,
+  orbitOffset,
+  PLANET_VIEW_DISTANCE,
+  STAR_VIEW_DISTANCE,
+} from '../camera-math'
 
 type CameraRigProps = {
   reducedMotion: boolean
   destination: SceneView
   onArrive: (view: SceneView) => void
+  timeRef: { current: number }
 }
 
-export function CameraRig({ reducedMotion, destination, onArrive }: CameraRigProps) {
+const MAX_STEP = 0.1
+
+export function CameraRig({ reducedMotion, destination, onArrive, timeRef }: CameraRigProps) {
   const gl = useThree((state) => state.gl)
   const size = useThree((state) => state.size)
-  const overviewPose = useMemo(() => {
-    const aspect = size.width / size.height
-    const portrait = aspect < 0.9
-    const compact = size.width < 700 || portrait
-    const center = new Vector3(compact ? 9.45 : 10.8, compact ? -1.3 : -0.5, -3)
-    const direction = new Vector3(0, 0.42, 1).normalize()
-    const up = portrait ? new Vector3(-1, 0, 0) : new Vector3(0, 1, 0)
-    const right = new Vector3().crossVectors(up, direction).normalize()
-    const screenUp = new Vector3().crossVectors(direction, right)
-    const usableHeight = Math.max(size.height - 320, size.height * 0.5)
-    const usableWidth = size.width - (portrait ? 40 : 110)
-    const halfFov = Math.tan(MathUtils.degToRad(18))
-    const distance = (Math.max(
-      (portrait ? 24 : 12) / (2 * halfFov * usableHeight / size.height),
-      (portrait ? 10 : 28) / (2 * halfFov * aspect * usableWidth / size.width),
-    ) + 3) * (portrait ? 1.15 : 1)
-    const centerOffset = 60 * (2 * distance * halfFov) / size.height
-    const target = center.addScaledVector(screenUp, centerOffset)
-    return { target, position: target.clone().addScaledVector(direction, distance), up }
-  }, [size.width, size.height])
-  const target = useRef({ yaw: 0, pitch: 0, zoom: 9 })
-  const current = useRef({ yaw: 0, pitch: 0, zoom: 9 })
+  const overviewPose = useMemo(
+    () => computeOverviewPose(size.width, size.height),
+    [size.width, size.height],
+  )
+  const target = useRef({ yaw: 0, pitch: 0, zoom: PLANET_VIEW_DISTANCE })
+  const current = useRef({ yaw: 0, pitch: 0, zoom: PLANET_VIEW_DISTANCE })
   const pointer = useRef({ x: 0, y: 0 })
   const drag = useRef({ active: false, x: 0, y: 0 })
   const intro = useRef(reducedMotion ? 1 : 0)
@@ -41,6 +39,8 @@ export function CameraRig({ reducedMotion, destination, onArrive }: CameraRigPro
   const currentView = useRef<SceneView>('aurelia')
   const requestedView = useRef<SceneView>('aurelia')
   const lookAt = useRef(new Vector3())
+  const scratch = useMemo(() => new Vector3(), [])
+  const compOffset = useMemo(() => new Vector3(), [])
   const flight = useRef({
     active: false,
     elapsed: 0,
@@ -57,7 +57,7 @@ export function CameraRig({ reducedMotion, destination, onArrive }: CameraRigPro
 
     const reset = () => {
       if (flight.current.active || currentView.current === 'system') return
-      target.current = { yaw: 0, pitch: 0, zoom: 9 }
+      target.current = { yaw: 0, pitch: 0, zoom: PLANET_VIEW_DISTANCE }
     }
 
     const onPointerDown = (event: PointerEvent) => {
@@ -91,7 +91,7 @@ export function CameraRig({ reducedMotion, destination, onArrive }: CameraRigPro
     const onWheel = (event: WheelEvent) => {
       event.preventDefault()
       if (flight.current.active || currentView.current === 'system') return
-      target.current.zoom = MathUtils.clamp(target.current.zoom + event.deltaY * 0.003, 7.6, 10.6)
+      target.current.zoom = MathUtils.clamp(target.current.zoom + event.deltaY * 0.003, MIN_ZOOM, MAX_ZOOM)
     }
 
     const onKeyDown = (event: KeyboardEvent) => {
@@ -108,7 +108,7 @@ export function CameraRig({ reducedMotion, destination, onArrive }: CameraRigPro
       if (event.key === '-') target.current.zoom += 0.25
       target.current.yaw = MathUtils.clamp(target.current.yaw, -0.32, 0.32)
       target.current.pitch = MathUtils.clamp(target.current.pitch, -0.18, 0.18)
-      target.current.zoom = MathUtils.clamp(target.current.zoom, 7.6, 10.6)
+      target.current.zoom = MathUtils.clamp(target.current.zoom, MIN_ZOOM, MAX_ZOOM)
     }
 
     element.addEventListener('pointerdown', onPointerDown)
@@ -130,10 +130,13 @@ export function CameraRig({ reducedMotion, destination, onArrive }: CameraRigPro
     }
   }, [gl])
 
-  useFrame((state, delta) => {
+  useFrame((state, rawDelta) => {
+    const delta = Math.min(rawDelta, MAX_STEP)
     const camera = state.camera as PerspectiveCamera
     const compact = state.size.width < 700
     const journey = flight.current
+    const time = timeRef.current
+    compOffset.set(compact ? -0.45 : -1.8, compact ? 1.3 : 0.5, 0)
 
     if (destination !== requestedView.current) {
       requestedView.current = destination
@@ -142,8 +145,9 @@ export function CameraRig({ reducedMotion, destination, onArrive }: CameraRigPro
       journey.startPosition.copy(camera.position)
       journey.startLook.copy(lookAt.current)
       journey.startUp.copy(camera.up)
-      target.current = { yaw: 0, pitch: 0, zoom: 9 }
-      current.current = { yaw: 0, pitch: 0, zoom: 9 }
+      const initialZoom = destination === 'star' ? STAR_VIEW_DISTANCE : PLANET_VIEW_DISTANCE
+      target.current = { yaw: 0, pitch: 0, zoom: initialZoom }
+      current.current = { yaw: 0, pitch: 0, zoom: initialZoom }
       pointer.current = { x: 0, y: 0 }
       drag.current.active = false
       intro.current = 1
@@ -152,17 +156,20 @@ export function CameraRig({ reducedMotion, destination, onArrive }: CameraRigPro
 
     if (journey.active) {
       journey.elapsed += delta
-      const progress = reducedMotion ? 1 : Math.min(journey.elapsed / 4.2, 1)
+      const progress = reducedMotion ? 1 : Math.min(journey.elapsed / FLIGHT_DURATION, 1)
       const eased = progress * progress * (3 - 2 * progress)
       const arc = Math.sin(progress * Math.PI) ** 2
       if (destination === 'system') {
         journey.endLook.copy(overviewPose.target)
         journey.endPosition.copy(overviewPose.position)
         journey.endUp.copy(overviewPose.up)
+      } else if (destination === 'star') {
+        journey.endLook.copy(compOffset)
+        orbitOffset(journey.endLook, 0, 0, STAR_VIEW_DISTANCE + (compact ? 0.55 : 0), journey.endPosition)
+        journey.endUp.set(0, 1, 0)
       } else {
-        journey.endLook.fromArray(planets[destination].anchor)
-        journey.endPosition.copy(journey.endLook)
-        journey.endPosition.z += 9 + (compact ? 0.55 : 0)
+        planetPosition(destination, time, journey.endLook).add(compOffset)
+        orbitOffset(journey.endLook, 0, 0, PLANET_VIEW_DISTANCE + (compact ? 0.55 : 0), journey.endPosition)
         journey.endUp.set(0, 1, 0)
       }
       camera.position.lerpVectors(journey.startPosition, journey.endPosition, eased)
@@ -190,15 +197,15 @@ export function CameraRig({ reducedMotion, destination, onArrive }: CameraRigPro
       return
     }
 
-    intro.current = Math.min(1, intro.current + delta / 4.5)
+    intro.current = Math.min(1, intro.current + delta / INTRO_DURATION)
     orbitTime.current += delta
     const introEase = 1 - Math.pow(1 - intro.current, 3)
     const drift = Math.min(orbitTime.current, 1)
-    const time = state.clock.elapsedTime
+    const clock = state.clock.elapsedTime
     const parallaxX = reducedMotion ? 0 : pointer.current.x
     const parallaxY = reducedMotion ? 0 : pointer.current.y
-    const idleX = reducedMotion ? 0 : Math.sin(time * 0.14) * 0.018 * drift
-    const idleY = reducedMotion ? 0 : Math.cos(time * 0.11) * 0.012 * drift
+    const idleX = reducedMotion ? 0 : Math.sin(clock * 0.14) * 0.018 * drift
+    const idleY = reducedMotion ? 0 : Math.cos(clock * 0.11) * 0.012 * drift
 
     current.current.yaw = MathUtils.damp(current.current.yaw, target.current.yaw, 4, delta)
     current.current.pitch = MathUtils.damp(current.current.pitch, target.current.pitch, 4, delta)
@@ -207,13 +214,16 @@ export function CameraRig({ reducedMotion, destination, onArrive }: CameraRigPro
     const distance = current.current.zoom + (compact ? 0.55 : 0) + (1 - introEase) * 2.4
     const yaw = current.current.yaw + parallaxX * 0.018 + idleX
     const pitch = current.current.pitch - parallaxY * 0.012 + idleY
-    const anchor = planets[currentView.current].anchor
-    camera.position.set(
-      anchor[0] + Math.sin(yaw) * distance + parallaxX * 0.06,
-      anchor[1] + Math.sin(pitch) * distance + parallaxY * 0.04,
-      anchor[2] + Math.cos(yaw) * Math.cos(pitch) * distance,
-    )
-    lookAt.current.fromArray(anchor)
+    if (currentView.current === 'star') {
+      scratch.set(0, 0, 0)
+    } else {
+      planetPosition(currentView.current, time, scratch)
+    }
+    scratch.add(compOffset)
+    orbitOffset(scratch, yaw, pitch, distance, camera.position)
+    camera.position.x += parallaxX * 0.06
+    camera.position.y += parallaxY * 0.04
+    lookAt.current.copy(scratch)
     camera.lookAt(lookAt.current)
   })
 

@@ -1,17 +1,19 @@
 import { useCallback, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { useTexture, type MappedTextureType } from '@react-three/drei'
+import { Html, useTexture, type MappedTextureType } from '@react-three/drei'
 import {
   FrontSide,
   NoColorSpace,
   RepeatWrapping,
   SRGBColorSpace,
   Vector3,
+  type Group,
   type Mesh,
   type ShaderMaterial,
 } from 'three'
 import { noiseGLSL } from '../shaders/noise'
 import { Atmosphere } from './Atmosphere'
+import { Moon, MOON_ORBIT_RADIUS, MOON_ANGULAR_SPEED, MOON_RADIUS } from './Moon'
 
 const textureUrls = [
   '/textures/earth-day.webp',
@@ -45,6 +47,8 @@ uniform sampler2D uSpecularMap;
 uniform sampler2D uCloudMap;
 uniform float uCloudOffset;
 uniform vec3 uSunDirection;
+uniform vec3 uMoonPosition;
+uniform float uMoonRadius;
 varying vec2 vUv;
 varying vec3 vObjectPosition;
 varying vec3 vWorldPosition;
@@ -132,6 +136,14 @@ void main() {
   float fresnel = pow(1.0 - max(dot(geometricN, V), 0.0), 4.0);
   color += vec3(0.015, 0.045, 0.09) * fresnel * daylight * 0.7;
 
+  vec3 moonOffset = uMoonPosition - vWorldPosition;
+  float moonAlong = dot(moonOffset, L);
+  if (moonAlong > 0.0) {
+    float moonPerp = sqrt(max(dot(moonOffset, moonOffset) - moonAlong * moonAlong, 0.0));
+    float umbra = 1.0 - smoothstep(uMoonRadius * 0.5, uMoonRadius * 1.3, moonPerp);
+    color *= 1.0 - umbra * 0.86;
+  }
+
   vec3 nightSample = texture2D(uNightMap, vUv).rgb;
   float lightPeak = max(max(nightSample.r, nightSample.g), nightSample.b);
   float cityMask = smoothstep(0.018, 0.09, lightPeak);
@@ -147,6 +159,8 @@ void main() {
 const cloudFragment = /* glsl */ `
 uniform sampler2D uCloudMap;
 uniform vec3 uSunDirection;
+uniform vec3 uMoonPosition;
+uniform float uMoonRadius;
 varying vec2 vUv;
 varying vec3 vWorldPosition;
 varying vec3 vWorldNormal;
@@ -157,10 +171,19 @@ void main() {
 
   vec3 N = normalize(vWorldNormal);
   vec3 V = normalize(cameraPosition - vWorldPosition);
-  float ndl = dot(N, normalize(uSunDirection));
+  vec3 L = normalize(uSunDirection);
+  float ndl = dot(N, L);
   float daylight = smoothstep(-0.25, 0.22, ndl);
   float diffuse = max(ndl, 0.0);
   float rim = pow(1.0 - max(dot(N, V), 0.0), 3.0);
+
+  vec3 moonOffset = uMoonPosition - vWorldPosition;
+  float moonAlong = dot(moonOffset, L);
+  float moonShadow = 1.0;
+  if (moonAlong > 0.0) {
+    float moonPerp = sqrt(max(dot(moonOffset, moonOffset) - moonAlong * moonAlong, 0.0));
+    moonShadow = 1.0 - (1.0 - smoothstep(uMoonRadius * 0.5, uMoonRadius * 1.3, moonPerp)) * 0.86;
+  }
 
   vec3 color = mix(
     vec3(0.07, 0.09, 0.12),
@@ -168,7 +191,8 @@ void main() {
     diffuse * 0.8 + 0.2
   );
   color += vec3(0.2, 0.35, 0.55) * rim * daylight * 0.25;
-  float alpha = coverage * (0.015 + daylight * 0.66);
+  color *= moonShadow;
+  float alpha = coverage * (0.015 + daylight * 0.66) * mix(1.0, moonShadow, 0.35);
 
   gl_FragColor = vec4(color, alpha);
   #include <tonemapping_fragment>
@@ -178,12 +202,18 @@ void main() {
 
 type PlanetProps = {
   reducedMotion: boolean
+  timeScale: number
+  showMoonLabel?: boolean
 }
 
-export function Planet({ reducedMotion }: PlanetProps) {
+export function Planet({ reducedMotion, timeScale, showMoonLabel }: PlanetProps) {
+  const groupRef = useRef<Group>(null)
   const surfaceRef = useRef<Mesh>(null)
   const cloudsRef = useRef<Mesh>(null)
+  const moonRef = useRef<Mesh>(null)
   const surfaceMaterialRef = useRef<ShaderMaterial>(null)
+  const cloudMaterialRef = useRef<ShaderMaterial>(null)
+  const moonMaterialRef = useRef<ShaderMaterial>(null)
   const { width, height } = useThree((state) => state.viewport)
   const compact = useThree((state) => state.size.width < 700) || width / height < 0.9
   const gl = useThree((state) => state.gl)
@@ -210,10 +240,10 @@ export function Planet({ reducedMotion }: PlanetProps) {
     configureTextures,
   )
 
-  const sunDirection = useMemo(
-    () => new Vector3(-0.82, 0.25, 0.32).normalize(),
-    [],
-  )
+  const sunDirection = useMemo(() => new Vector3(-1, 0, 0), [])
+  const worldPosition = useMemo(() => new Vector3(), [])
+  const moonWorld = useMemo(() => new Vector3(), [])
+  const moonAngle = useRef(2.1)
   const surfaceUniforms = useMemo(
     () => ({
       uSunDirection: { value: sunDirection },
@@ -223,6 +253,8 @@ export function Planet({ reducedMotion }: PlanetProps) {
       uSpecularMap: { value: specularMap },
       uCloudMap: { value: cloudMap },
       uCloudOffset: { value: 0 },
+      uMoonPosition: { value: new Vector3() },
+      uMoonRadius: { value: 0.34 },
     }),
     [sunDirection, dayMap, nightMap, normalMap, specularMap, cloudMap],
   )
@@ -230,28 +262,63 @@ export function Planet({ reducedMotion }: PlanetProps) {
     () => ({
       uSunDirection: { value: sunDirection },
       uCloudMap: { value: cloudMap },
+      uMoonPosition: { value: new Vector3() },
+      uMoonRadius: { value: MOON_RADIUS },
     }),
     [sunDirection, cloudMap],
   )
 
-  useFrame((_, delta) => {
+  useFrame((_, rawDelta) => {
+    const delta = Math.min(rawDelta, 0.1)
+    if (groupRef.current) {
+      groupRef.current.getWorldPosition(worldPosition)
+      sunDirection.copy(worldPosition).multiplyScalar(-1).normalize()
+    }
+
     const surface = surfaceRef.current
     const clouds = cloudsRef.current
 
     if (!reducedMotion) {
-      if (surface) surface.rotation.y += delta * 0.006
-      if (clouds) clouds.rotation.y += delta * 0.009
+      if (surface) surface.rotation.y += delta * 0.006 * timeScale
+      if (clouds) clouds.rotation.y += delta * 0.009 * timeScale
     }
 
-    if (surfaceMaterialRef.current && surface && clouds) {
+    const planetRadius = 2 * (compact ? 0.76 : 1)
+    if (surfaceMaterialRef.current) {
       surfaceMaterialRef.current.uniforms.uCloudOffset.value =
-        (surface.rotation.y - clouds.rotation.y) / (Math.PI * 2)
+        surface && clouds ? (surface.rotation.y - clouds.rotation.y) / (Math.PI * 2) : 0
+    }
+
+    const moon = moonRef.current
+    if (moon) {
+      if (!reducedMotion) moonAngle.current += delta * MOON_ANGULAR_SPEED * timeScale
+      moon.position.set(
+        Math.cos(moonAngle.current) * MOON_ORBIT_RADIUS,
+        0,
+        Math.sin(moonAngle.current) * MOON_ORBIT_RADIUS,
+      )
+      moon.rotation.y = moonAngle.current + 1.2
+      moon.getWorldPosition(moonWorld)
+
+      const moonWorldRadius = MOON_RADIUS * (compact ? 0.76 : 1)
+      if (surfaceMaterialRef.current) {
+        surfaceMaterialRef.current.uniforms.uMoonPosition.value.copy(moonWorld)
+        surfaceMaterialRef.current.uniforms.uMoonRadius.value = moonWorldRadius
+      }
+      if (cloudMaterialRef.current) {
+        cloudMaterialRef.current.uniforms.uMoonPosition.value.copy(moonWorld)
+        cloudMaterialRef.current.uniforms.uMoonRadius.value = moonWorldRadius
+      }
+      if (moonMaterialRef.current) {
+        moonMaterialRef.current.uniforms.uPlanetPosition.value.copy(worldPosition)
+        moonMaterialRef.current.uniforms.uPlanetRadius.value = planetRadius
+      }
     }
   })
 
   return (
     <group
-      position={compact ? [0.45, -1.3, 0] : [1.8, -0.5, 0]}
+      ref={groupRef}
       scale={compact ? 0.76 : 1}
       rotation={[0.08, 0, -0.09]}
     >
@@ -268,6 +335,7 @@ export function Planet({ reducedMotion }: PlanetProps) {
       <mesh ref={cloudsRef} rotation={[0, -1.1, 0]} renderOrder={1}>
         <sphereGeometry args={[2.025, 128, 128]} />
         <shaderMaterial
+          ref={cloudMaterialRef}
           vertexShader={vertexShader}
           fragmentShader={cloudFragment}
           uniforms={cloudUniforms}
@@ -276,6 +344,16 @@ export function Planet({ reducedMotion }: PlanetProps) {
           depthWrite={false}
         />
       </mesh>
+
+      <group rotation={[0.24, 0, 0.09]}>
+        <Moon ref={moonRef} materialRef={moonMaterialRef}>
+          {showMoonLabel && (
+            <Html center position={[0, 2.4, 0]} zIndexRange={[1, 1]} style={{ pointerEvents: 'none' }}>
+              <span className="moon-label" aria-hidden="true">Луна</span>
+            </Html>
+          )}
+        </Moon>
+      </group>
 
       <Atmosphere sunDirection={sunDirection} />
     </group>

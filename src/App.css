@@ -466,8 +466,119 @@ h1 > em {
   box-shadow: 0 0 9px rgba(217, 151, 94, 0.16);
 }
 
+.planet-link--vesper .planet-dot {
+  background: radial-gradient(circle at 30% 30%, #d8e6e2, #7fa39e 48%, #223332 75%);
+  box-shadow: 0 0 9px rgba(159, 184, 180, 0.16);
+}
+
+.planet-link--star .planet-dot {
+  background: radial-gradient(circle at 30% 30%, #ffe0b0, #df8a3a 48%, #4a1d08 75%);
+  box-shadow: 0 0 9px rgba(224, 152, 78, 0.18);
+}
+
+.experience[data-view="star"] h1 > em {
+  color: #e2b98a;
+}
+
+.experience[data-view="star"] .telemetry {
+  padding: 12px 18px;
+  background: rgba(1, 2, 5, 0.55);
+  backdrop-filter: blur(6px);
+}
+
+.experience[data-view="star"] .intro-copy {
+  text-shadow: 0 1px 14px rgba(1, 2, 5, 0.95), 0 0 4px rgba(1, 2, 5, 0.8);
+}
+
+.moon-label {
+  display: block;
+  transform: translateY(-2px);
+  color: rgba(199, 214, 223, 0.55);
+  font-size: 7px;
+  letter-spacing: 0.16em;
+  text-shadow: 0 1px 8px rgba(1, 2, 5, 0.9);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
 .experience[data-view="cinder"] h1 > em {
   color: #d0ab8b;
+}
+
+.experience[data-view="vesper"] h1 > em {
+  color: #b9d2cf;
+}
+
+.time-controls {
+  position: absolute;
+  top: 86px;
+  right: 44px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  transform: translateY(-8px);
+  transition-delay: 0.55s;
+}
+
+.is-ready .time-controls {
+  transform: translateY(0);
+}
+
+.time-button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 0;
+  background: transparent;
+  color: rgba(211, 225, 233, 0.36);
+  font: inherit;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: color 0.25s ease, opacity 1.2s ease;
+  transition-delay: 0.55s;
+}
+
+.time-button:hover,
+.time-button:focus-visible {
+  color: rgba(232, 240, 245, 0.85);
+}
+
+.time-button:focus-visible {
+  outline: 1px solid rgba(174, 205, 224, 0.45);
+  outline-offset: 5px;
+}
+
+.time-button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.time-button svg {
+  width: 11px;
+  height: 11px;
+}
+
+.speed-group {
+  display: flex;
+  align-items: center;
+}
+
+.speed-option {
+  min-height: 40px;
+  padding: 6px 8px;
+}
+
+.speed-option strong {
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+}
+
+.speed-option[aria-pressed="true"] {
+  border-bottom-color: rgba(184, 207, 222, 0.4);
+  color: #d1e0e9;
 }
 
 .flight-status {
@@ -513,6 +624,7 @@ h1 > em {
 .is-travelling .telemetry,
 .is-travelling .control-hint,
 .is-travelling .reset-view,
+.is-travelling .time-controls,
 .is-travelling .system-intro,
 .is-travelling .system-note {
   opacity: 0;
@@ -570,11 +682,11 @@ h1 > em {
   min-width: 134px;
   min-height: 58px;
   padding: 10px 14px;
-  transform: translateY(122px);
+  transform: translateY(56px);
   border: 0;
   border-top: 1px solid rgba(174, 205, 224, 0.35);
   color: #d4e3ed;
-  background: rgba(1, 2, 5, 0.55);
+  background: rgba(1, 2, 5, 0.35);
   font: inherit;
   text-align: center;
   cursor: pointer;
@@ -585,6 +697,11 @@ h1 > em {
 .system-label--cinder {
   color: #dfc0a6;
   border-top-color: rgba(214, 164, 122, 0.35);
+}
+
+.system-label--vesper {
+  color: #c4dad6;
+  border-top-color: rgba(159, 184, 180, 0.35);
 }
 
 .system-label > span {
@@ -625,6 +742,50 @@ h1 > em {
   letter-spacing: 0.14em;
   text-align: center;
   text-transform: uppercase;
+}
+
+.webgl-fallback {
+  position: absolute;
+  inset: 0;
+  z-index: 11;
+  display: grid;
+  place-items: center;
+  background: #010205;
+}
+
+.webgl-fallback--overlay {
+  z-index: 3;
+  background: rgba(1, 2, 5, 0.92);
+}
+
+.webgl-fallback-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 460px;
+  padding: 24px;
+  color: rgba(206, 222, 231, 0.5);
+  text-align: center;
+}
+
+.webgl-fallback h2 {
+  margin: 22px 0 14px;
+  color: rgba(229, 238, 243, 0.85);
+  font-size: 22px;
+  font-weight: 300;
+  letter-spacing: 0.02em;
+}
+
+.webgl-fallback p {
+  margin: 0;
+  font-size: 10px;
+  line-height: 1.8;
+  letter-spacing: 0.04em;
+}
+
+.webgl-fallback-hint {
+  margin-top: 14px;
+  color: rgba(199, 214, 223, 0.35);
 }
 
 .sr-only {
@@ -699,6 +860,11 @@ h1 > em {
     top: 76px;
     left: 24px;
     gap: 14px;
+  }
+
+  .time-controls {
+    top: 60px;
+    right: 12px;
   }
 
   .planet-link {
@@ -823,30 +989,33 @@ h1 > em {
 
 @media (max-aspect-ratio: 9/10) {
   .system-label {
-    transform: translateY(66px);
+    transform: translateY(44px);
   }
 }
 
 @media (max-aspect-ratio: 9/10) and (max-height: 700px) {
   .system-label {
-    transform: translateY(50px);
+    transform: translateY(36px);
     min-width: 120px;
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .scene,
-  .reveal,
-  .loader,
-  .planet-link,
-  .flight-status,
-  .system-label {
-    transition-duration: 0.01ms;
-    transition-delay: 0s;
-  }
+.experience[data-reduced-motion="true"] .scene,
+.experience[data-reduced-motion="true"] .reveal,
+.experience[data-reduced-motion="true"] .loader,
+.experience[data-reduced-motion="true"] .planet-link,
+.experience[data-reduced-motion="true"] .flight-status,
+.experience[data-reduced-motion="true"] .system-label {
+  transition-duration: 0.01ms;
+  transition-delay: 0s;
+}
 
-  .loader-mark,
-  .loader-track > span {
-    animation: none;
-  }
+.experience[data-reduced-motion="true"] .loader-mark,
+.experience[data-reduced-motion="true"] .loader-track > span {
+  animation: none;
+}
+
+.experience[data-reduced-motion="true"] .time-controls,
+.experience[data-reduced-motion="true"] .tour-link {
+  display: none;
 }

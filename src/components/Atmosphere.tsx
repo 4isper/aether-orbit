@@ -125,23 +125,27 @@ void main() {
 }
 `
 
+const presets = {
+  aurelia: { rayleigh: [0.43, 1.3, 2.72], mie: 0.8, intensity: 2.4 },
+  dust: { rayleigh: [1.35, 0.72, 0.28], mie: 0.45, intensity: 1.5 },
+  ice: { rayleigh: [0.55, 0.85, 1.05], mie: 0.3, intensity: 1.3 },
+} as const
+
 type AtmosphereProps = {
   sunDirection: Vector3
-  dusty?: boolean
+  variant?: 'aurelia' | 'dust' | 'ice'
 }
 
-export function Atmosphere({ sunDirection, dusty = false }: AtmosphereProps) {
-  const atmosphereUniforms = useMemo(
-    () => ({
+export function Atmosphere({ sunDirection, variant = 'aurelia' }: AtmosphereProps) {
+  const atmosphereUniforms = useMemo(() => {
+    const preset = presets[variant]
+    return {
       uSunDirection: { value: sunDirection },
-      uRayleighCoefficients: {
-        value: dusty ? new Vector3(1.35, 0.72, 0.28) : new Vector3(0.43, 1.30, 2.72),
-      },
-      uMieCoefficient: { value: dusty ? 0.45 : 0.8 },
-      uIntensity: { value: dusty ? 1.5 : 2.4 },
-    }),
-    [sunDirection, dusty],
-  )
+      uRayleighCoefficients: { value: new Vector3(...preset.rayleigh) },
+      uMieCoefficient: { value: preset.mie },
+      uIntensity: { value: preset.intensity },
+    }
+  }, [sunDirection, variant])
 
   return (
     <mesh scale={1.05} renderOrder={2}>

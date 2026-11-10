@@ -29,47 +29,17 @@ void main() {
 }
 `
 
-const sunFragment = /* glsl */ `
-varying vec2 vUv;
-
-void main() {
-  vec2 p = (vUv - 0.5) * 2.0;
-  float d = length(p);
-  float halo = exp(-d * 5.0) * 0.32;
-  float core = exp(-d * 45.0) * 2.0;
-  float streak = exp(-abs(p.y) * 70.0) * exp(-abs(p.x) * 4.0) * 0.16;
-  float alpha = halo + core + streak;
-  vec3 color = mix(vec3(1.0, 0.67, 0.38), vec3(1.0, 0.94, 0.8), core);
-  gl_FragColor = vec4(color * alpha, alpha);
-  #include <tonemapping_fragment>
-  #include <colorspace_fragment>
-}
-`
-
 export function Backdrop() {
   return (
-    <>
-      <mesh position={[0, 0, -38]}>
-        <planeGeometry args={[90, 55]} />
-        <shaderMaterial
-          vertexShader={planeVertex}
-          fragmentShader={nebulaFragment}
-          transparent
-          depthWrite={false}
-          blending={AdditiveBlending}
-        />
-      </mesh>
-      <mesh position={[-7.5, 3, -10]} renderOrder={-1}>
-        <planeGeometry args={[14, 14]} />
-        <shaderMaterial
-          vertexShader={planeVertex}
-          fragmentShader={sunFragment}
-          transparent
-          depthWrite={false}
-          depthTest={false}
-          blending={AdditiveBlending}
-        />
-      </mesh>
-    </>
+    <mesh position={[0, 0, -38]}>
+      <planeGeometry args={[90, 55]} />
+      <shaderMaterial
+        vertexShader={planeVertex}
+        fragmentShader={nebulaFragment}
+        transparent
+        depthWrite={false}
+        blending={AdditiveBlending}
+      />
+    </mesh>
   )
 }

@@ -1,16 +1,27 @@
-import { Suspense, useCallback, useState } from 'react'
-import { Canvas } from '@react-three/fiber'
-import { PerformanceMonitor } from '@react-three/drei'
-import { ACESFilmicToneMapping, SRGBColorSpace } from 'three'
-import { SpaceScene } from './components/SpaceScene'
-import { planets, type SceneView } from './planets'
+import { Suspense, lazy, useCallback, useEffect, useState } from 'react'
+import { bodies, planetIds, type SceneView } from './planets'
 import './App.css'
 
-const MIN_DPR = 0.85
-const MAX_DPR = 1.75
+const SceneCanvas = lazy(() => import('./SceneCanvas'))
 
-function getMaxDpr() {
-  return Math.max(MIN_DPR, Math.min(window.devicePixelRatio, MAX_DPR))
+const SPEED_OPTIONS = [0.5, 1, 2, 4]
+const TOUR_STOPS: SceneView[] = ['aurelia', 'cinder', 'vesper', 'star', 'system']
+const TOUR_DWELL_MS = 7000
+
+function formatSpeed(speed: number) {
+  return speed === 0.5 ? '½' : String(speed)
+}
+
+function detectWebGLSupport() {
+  try {
+    const canvas = document.createElement('canvas')
+    return Boolean(
+      window.WebGLRenderingContext
+        && (canvas.getContext('webgl2') || canvas.getContext('webgl')),
+    )
+  } catch {
+    return false
+  }
 }
 
 function OrbitMark({ className = '' }: { className?: string }) {
@@ -23,64 +34,93 @@ function OrbitMark({ className = '' }: { className?: string }) {
   )
 }
 
+function useReducedMotion() {
+  const [reduced, setReduced] = useState(
+    () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+  )
+
+  useEffect(() => {
+    const query = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const update = () => setReduced(query.matches)
+    query.addEventListener('change', update)
+    return () => query.removeEventListener('change', update)
+  }, [])
+
+  return reduced
+}
+
 function App() {
   const [ready, setReady] = useState(false)
-  const [dpr, setDpr] = useState(getMaxDpr)
+  const [webglSupported] = useState(detectWebGLSupport)
   const [activeView, setActiveView] = useState<SceneView>('aurelia')
   const [destination, setDestination] = useState<SceneView>('aurelia')
+  const reducedMotion = useReducedMotion()
   const travelling = activeView !== destination
   const overview = activeView === 'system'
-  const planet = overview ? null : planets[activeView]
-  const currentName = planet ? planet.name : 'Система'
-  const destinationName = destination === 'system' ? 'Система' : planets[destination].name
+  const isStar = activeView === 'star'
+  const body = activeView === 'system' ? null : bodies[activeView]
+  const currentName = body ? body.name : 'Система'
+  const destinationName = destination === 'system'
+    ? 'Система'
+    : bodies[destination].name
   const handleReady = useCallback(() => setReady(true), [])
   const handleArrive = useCallback((arrived: SceneView) => setActiveView(arrived), [])
   const travelTo = (next: SceneView) => {
-    if (!ready || travelling || next === activeView) return
+    if (!ready) return
+    setTour(false)
+    if (travelling || next === activeView) return
     setDestination(next)
   }
-  const handleQualityChange = useCallback(({ factor }: { factor: number }) => {
-    const nextDpr = MIN_DPR + (getMaxDpr() - MIN_DPR) * factor
-    setDpr(Math.round(nextDpr * 20) / 20)
-  }, [])
+  const [paused, setPaused] = useState(false)
+  const [speed, setSpeed] = useState(1)
+  const [tour, setTour] = useState(false)
+  const [tabVisible, setTabVisible] = useState(() => !document.hidden)
+  const timeScale = paused ? 0 : speed
   const resetView = () => window.dispatchEvent(new Event('aether:reset'))
 
-  return (
-    <main className={`experience ${ready ? 'is-ready' : ''} ${travelling ? 'is-travelling' : ''} ${overview ? 'is-system' : ''}`} data-view={activeView}>
-      <div className="scene">
-        <Canvas
-          aria-label={travelling
-            ? `Перелёт: ${currentName} — ${destinationName}`
-            : planet
-              ? `Интерактивная сцена планеты ${planet.label}. Перетаскивайте для вращения и используйте колесо для масштабирования.`
-              : 'Обзор системы. Выберите Aurelia или Cinder нажатием на планету или её подпись.'}
-          camera={{ position: [0, 0, 11.4], fov: 36, near: 0.1, far: 160 }}
-          dpr={dpr}
-          gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
-          onCreated={({ gl }) => {
-            gl.domElement.tabIndex = 0
-            gl.toneMapping = ACESFilmicToneMapping
-            gl.toneMappingExposure = 1.1
-            gl.outputColorSpace = SRGBColorSpace
-          }}
-        >
-          <Suspense fallback={null}>
-            <PerformanceMonitor
-              factor={1}
-              step={0.2}
-              iterations={8}
-              ms={250}
-              threshold={0.75}
-              bounds={(refreshRate) => (refreshRate > 100 ? [50, 100] : [42, 56])}
-              onChange={handleQualityChange}
-            >
-              <SpaceScene activeView={activeView} destination={destination} onReady={handleReady} onArrive={handleArrive} onSelect={travelTo} />
-            </PerformanceMonitor>
-          </Suspense>
-        </Canvas>
-      </div>
+  useEffect(() => {
+    const onVisibilityChange = () => setTabVisible(!document.hidden)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
+  }, [])
 
-      <div className="interface">
+  useEffect(() => {
+    if (!tour || !ready || travelling || !tabVisible) return
+    const timer = window.setTimeout(() => {
+      const index = TOUR_STOPS.indexOf(activeView)
+      setDestination(TOUR_STOPS[(index + 1) % TOUR_STOPS.length])
+    }, TOUR_DWELL_MS)
+    return () => window.clearTimeout(timer)
+  }, [tour, ready, travelling, activeView, tabVisible])
+
+  return (
+    <main
+      className={`experience ${ready ? 'is-ready' : ''} ${travelling ? 'is-travelling' : ''} ${overview ? 'is-system' : ''}`}
+      data-view={activeView}
+      data-reduced-motion={reducedMotion || undefined}
+    >
+      {webglSupported && (
+        <div className="scene">
+          <Suspense fallback={null}>
+            <SceneCanvas
+              label={travelling
+                ? `Перелёт: ${currentName} — ${destinationName}`
+                : body
+                  ? `${isStar ? 'Интерактивная сцена звезды' : 'Интерактивная сцена планеты'} ${body.label}. Перетаскивайте для вращения и используйте колесо для масштабирования.`
+                  : 'Обзор системы. Выберите мир или звезду нажатием на сферу или подпись.'}
+              activeView={activeView}
+              destination={destination}
+              timeScale={timeScale}
+              reducedMotion={reducedMotion}
+              onReady={handleReady}
+              onArrive={handleArrive}
+              onSelect={travelTo}
+            />
+          </Suspense>
+        </div>
+      )}
+
+      <div className="interface" inert={!webglSupported || undefined}>
         <header className="topbar reveal">
           <div className="brand">
             <OrbitMark className="brand-mark" />
@@ -89,7 +129,7 @@ function App() {
           <div className="scene-status">
             <span className="status-dot" />
             <span>{travelling ? 'Межорбитальный перелёт' : overview ? 'Обзор системы' : 'Симуляция активна'}</span>
-            <span className="status-code">{planet ? `SC—${planet.code}` : 'SYS—01'}</span>
+            <span className="status-code">{body ? `SC—${body.code}` : 'SYS—01'}</span>
           </div>
         </header>
 
@@ -105,22 +145,81 @@ function App() {
             <OrbitMark className="system-icon" />
             Обзор
           </button>
-          {(['aurelia', 'cinder'] as const).map((id) => (
+          <button
+            type="button"
+            className="planet-link tour-link"
+            aria-pressed={tour}
+            aria-label={tour ? 'Остановить тур по системе' : 'Автоматический тур по системе'}
+            disabled={!ready}
+            onClick={() => setTour((value) => !value)}
+          >
+            Тур
+          </button>
+          <button
+            type="button"
+            className="planet-link planet-link--star"
+            aria-pressed={isStar}
+            aria-label={`Перелёт к звезде ${bodies.star.name}`}
+            disabled={!ready || travelling}
+            onClick={() => travelTo('star')}
+          >
+            <span className="planet-dot" aria-hidden="true" />
+            <span className="planet-number">{bodies.star.code}</span>
+            {bodies.star.name}
+          </button>
+          {planetIds.map((id) => (
             <button
               key={id}
               type="button"
               className={`planet-link planet-link--${id}`}
               aria-pressed={activeView === id}
-              aria-label={`Перелёт к планете ${planets[id].name}`}
+              aria-label={`Перелёт к планете ${bodies[id].name}`}
               disabled={!ready || travelling}
               onClick={() => travelTo(id)}
             >
               <span className="planet-dot" aria-hidden="true" />
-              <span className="planet-number">{planets[id].code}</span>
-              {planets[id].name}
+              <span className="planet-number">{bodies[id].code}</span>
+              {bodies[id].name}
             </button>
           ))}
         </nav>
+
+        <div className="time-controls reveal" role="group" aria-label="Управление временем">
+          <button
+            type="button"
+            className="time-button"
+            aria-pressed={paused}
+            aria-label={paused ? 'Возобновить время' : 'Остановить время'}
+            disabled={!ready}
+            onClick={() => setPaused((value) => !value)}
+          >
+            {paused ? (
+              <svg viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                <path d="M3 1.4v9.2L10.2 6z" fill="currentColor" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                <rect x="2.4" y="1.8" width="2.4" height="8.4" fill="currentColor" />
+                <rect x="7.2" y="1.8" width="2.4" height="8.4" fill="currentColor" />
+              </svg>
+            )}
+          </button>
+          <div className="speed-group" role="group" aria-label="Скорость времени">
+            {SPEED_OPTIONS.map((option) => (
+              <button
+                key={option}
+                type="button"
+                className="time-button speed-option"
+                aria-pressed={speed === option}
+                aria-label={`Скорость времени ×${formatSpeed(option)}`}
+                disabled={!ready}
+                onClick={() => setSpeed(option)}
+              >
+                <strong>×{formatSpeed(option)}</strong>
+              </button>
+            ))}
+          </div>
+        </div>
 
         <div className="flight-status" role="status" aria-live="polite" aria-atomic="true">
           {travelling ? (
@@ -130,29 +229,29 @@ function App() {
           )}
         </div>
 
-        {planet ? (
+        {body ? (
           <>
             <section className="intro reveal" aria-labelledby="scene-title" aria-hidden={travelling}>
-              <p className="eyebrow"><span />{planet.name} / {activeView === 'cinder' ? 'Пустынный мир' : 'Экзопланета'}</p>
+              <p className="eyebrow"><span />{body.name} / {activeView === 'star' ? 'Звезда системы' : activeView === 'cinder' ? 'Пустынный мир' : activeView === 'vesper' ? 'Газовый гигант' : 'Экзопланета'}</p>
               <h1 id="scene-title">
-                <span>{planet.title[0]}</span>
-                <em>{planet.title[1]}</em>
+                <span>{body.title[0]}</span>
+                <em>{body.title[1]}</em>
               </h1>
               <p className="intro-copy">
-                {planet.description[0]}<br />
-                {planet.description[1]}
+                {body.description[0]}<br />
+                {body.description[1]}
               </p>
             </section>
 
-            <aside className="telemetry reveal" aria-label="Параметры планеты" aria-hidden={travelling}>
+            <aside className="telemetry reveal" aria-label="Параметры небесного тела" aria-hidden={travelling}>
               <div className="telemetry-item">
                 <span className="telemetry-label">Радиус</span>
-                <strong>{planet.radius} <small>R⊕</small></strong>
+                <strong>{body.radius} <small>{isStar ? 'R☉' : 'R⊕'}</small></strong>
               </div>
               <span className="telemetry-divider" />
               <div className="telemetry-item">
-                <span className="telemetry-label">{planet.metric[0]}</span>
-                <strong>{planet.metric[1]} <small>{planet.metric[2]}</small></strong>
+                <span className="telemetry-label">{body.metric[0]}</span>
+                <strong>{body.metric[1]} <small>{body.metric[2]}</small></strong>
               </div>
             </aside>
 
@@ -178,11 +277,11 @@ function App() {
         ) : (
           <>
             <section className="system-intro reveal" aria-labelledby="scene-title" aria-hidden={travelling}>
-              <p className="eyebrow">Aether / Два мира</p>
+              <p className="eyebrow">Aether / Три мира</p>
               <h1 id="scene-title">Обзор системы</h1>
               <p>Выберите планету, чтобы выйти на орбиту.</p>
             </section>
-            <p className="system-note reveal" aria-hidden={travelling}>Локальные орбиты · Масштаб условный</p>
+            <p className="system-note reveal" aria-hidden={travelling}>Орбиты вокруг звезды · Масштаб условный</p>
           </>
         )}
 
@@ -195,7 +294,7 @@ function App() {
           <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">
             CC BY 4.0
           </a>
-          <span>{planet ? `${planet.code} / ${planet.name}` : 'SYS / Aether'}</span>
+          <span>{body ? `${body.code} / ${body.name}` : 'SYS / Aether'}</span>
         </footer>
       </div>
 
@@ -206,6 +305,19 @@ function App() {
           <div className="loader-track"><span /></div>
         </div>
       </div>
+
+      {!webglSupported && (
+        <div className="webgl-fallback" role="alert">
+          <div className="webgl-fallback-inner">
+            <OrbitMark className="loader-mark" />
+            <h2>WebGL недоступен</h2>
+            <p>Сцена считается на вашем устройстве в реальном времени — для неё нужен WebGL2 или WebGL.</p>
+            <p className="webgl-fallback-hint">
+              Включите аппаратное ускорение в настройках браузера, обновите видеодрайвер и перезагрузите страницу.
+            </p>
+          </div>
+        </div>
+      )}
     </main>
   )
 }

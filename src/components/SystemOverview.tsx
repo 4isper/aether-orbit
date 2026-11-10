@@ -1,77 +1,70 @@
-import { useMemo } from 'react'
-import { useThree } from '@react-three/fiber'
-import { Html, Line } from '@react-three/drei'
-import { planets, type PlanetId } from '../planets'
-
-const planetIds: PlanetId[] = ['aurelia', 'cinder']
+import { useMemo, useRef } from 'react'
+import { useFrame } from '@react-three/fiber'
+import { Html } from '@react-three/drei'
+import { Vector3, type Group } from 'three'
+import { planetIds, planets, type PlanetId } from '../planets'
+import { orbitPoint, planetPosition } from '../orbits'
 
 const guideColors: Record<PlanetId, string> = {
   aurelia: '#8197aa',
   cinder: '#a59688',
+  vesper: '#9fb8b4',
 }
 
 type SystemOverviewProps = {
   onSelect: (id: PlanetId) => void
+  timeRef: { current: number }
 }
 
-export function SystemOverview({ onSelect }: SystemOverviewProps) {
-  const compact = useThree(({ size }) => size.width < 700 || size.width / size.height < 0.9)
-  const radius = compact ? 2.6 : 3.2
-  const centers = useMemo(
-    () => planetIds.map((id): [number, number, number] => {
-      const [x, y, z] = planets[id].anchor
-      return [x + (compact ? 0.45 : 1.8), y + (compact ? -1.3 : -0.5), z]
+export function SystemOverview({ onSelect, timeRef }: SystemOverviewProps) {
+  const labelRefs = useRef<Record<PlanetId, Group | null>>({ aurelia: null, cinder: null, vesper: null })
+  const scratch = useMemo(() => new Vector3(), [])
+  const orbits = useMemo(
+    () => planetIds.map((id) => {
+      const points = new Float32Array(160 * 3)
+      const scratch = new Vector3()
+      for (let i = 0; i < 160; i++) {
+        orbitPoint(id, (i / 160) * Math.PI * 2, scratch)
+        points[i * 3] = scratch.x
+        points[i * 3 + 1] = scratch.y
+        points[i * 3 + 2] = scratch.z
+      }
+      return points
     }),
-    [compact],
+    [],
+  )
+  const initialPositions = useMemo(
+    () => planetIds.map((id) => planetPosition(id, 0, new Vector3()).toArray() as [number, number, number]),
+    [],
   )
 
-  const positions = useMemo(() => {
-    const points = new Float32Array(128 * 3)
-    for (let i = 0; i < 128; i++) {
-      const angle = (i / 128) * Math.PI * 2
-      points[i * 3] = Math.cos(angle) * radius
-      points[i * 3 + 2] = Math.sin(angle) * radius
+  useFrame(() => {
+    for (const id of planetIds) {
+      labelRefs.current[id]?.position.copy(planetPosition(id, timeRef.current, scratch))
     }
-    return points
-  }, [radius])
-
-  const connector = useMemo(() => {
-    const [start, end] = centers
-    const dx = end[0] - start[0]
-    const dz = end[2] - start[2]
-    const fraction = radius / Math.hypot(dx, dz)
-    return [
-      [start[0] + dx * fraction, start[1], start[2] + dz * fraction],
-      [end[0] - dx * fraction, end[1], end[2] - dz * fraction],
-    ] as [number, number, number][]
-  }, [centers, radius])
+  })
 
   return (
     <>
-      <Line
-        points={connector}
-        color="#87919d"
-        lineWidth={0.6}
-        dashed
-        dashSize={0.18}
-        gapSize={0.28}
-        transparent
-        opacity={0.12}
-        depthWrite={false}
-      />
       {planetIds.map((id, index) => (
-        <group key={id} position={centers[index]}>
-          <lineLoop>
-            <bufferGeometry>
-              <bufferAttribute attach="attributes-position" args={[positions, 3]} />
-            </bufferGeometry>
-            <lineBasicMaterial
-              color={guideColors[id]}
-              transparent
-              opacity={0.3}
-              depthWrite={false}
-            />
-          </lineLoop>
+        <lineLoop key={id}>
+          <bufferGeometry>
+            <bufferAttribute attach="attributes-position" args={[orbits[index], 3]} />
+          </bufferGeometry>
+          <lineBasicMaterial
+            color={guideColors[id]}
+            transparent
+            opacity={0.3}
+            depthWrite={false}
+          />
+        </lineLoop>
+      ))}
+      {planetIds.map((id, index) => (
+        <group
+          key={id}
+          ref={(node) => { labelRefs.current[id] = node }}
+          position={initialPositions[index]}
+        >
           <Html center zIndexRange={[1, 1]} style={{ pointerEvents: 'none' }}>
             <button
               type="button"
