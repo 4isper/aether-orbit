@@ -10,14 +10,17 @@ import { useSunDirection } from '../hooks/useSunDirection'
 /**
  * Ring density as a function of the normalized radius t = (r - 2.5) / 1.5,
  * shared by the ring shader and the planet's ring-shadow term so the shadow
- * carries the same bands and Cassini gap the rings themselves show.
+ * carries the same bands and Cassini gap the rings themselves show. The band
+ * pattern is exposed separately: the ring color grades by it directly.
  */
 const ringDensityGLSL = /* glsl */ `
+float vesperRingBand(float t) {
+  return smoothstep(0.25, 0.75, fbm4(vec3(t * 70.0, 3.0, 9.0)) * 0.5 + 0.5);
+}
 float vesperRingDensity(float t) {
-  float band = smoothstep(0.25, 0.75, fbm4(vec3(t * 70.0, 3.0, 9.0)) * 0.5 + 0.5);
   float stripes = 0.035 * sin(t * 420.0);
   float cassini = smoothstep(0.60, 0.64, t) * (1.0 - smoothstep(0.70, 0.74, t));
-  return (0.35 + 0.65 * band + stripes) * (1.0 - 0.85 * cassini);
+  return (0.35 + 0.65 * vesperRingBand(t) + stripes) * (1.0 - 0.85 * cassini);
 }
 float vesperRingEdge(float t) {
   return smoothstep(0.0, 0.05, t) * (1.0 - smoothstep(0.93, 1.0, t));
@@ -115,6 +118,7 @@ ${ringDensityGLSL}
 void main() {
   float radius = length(vLocalPosition.xy);
   float t = (radius - 2.5) / 1.5;
+  float band = vesperRingBand(t);
   float density = vesperRingDensity(t);
   float edge = vesperRingEdge(t);
 
