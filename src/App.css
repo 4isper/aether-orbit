@@ -37,6 +37,12 @@
   inset: 0;
   z-index: 2;
   pointer-events: none;
+  transition: opacity 0.5s ease;
+}
+
+.is-cinema .interface {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .reveal {

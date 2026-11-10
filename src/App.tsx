@@ -90,6 +90,7 @@ function App() {
   const [paused, setPaused] = useState(false)
   const [speed, setSpeed] = useState(1)
   const [tour, setTour] = useState(false)
+  const [cinema, setCinema] = useState(false)
   const [tabVisible, setTabVisible] = useState(() => !document.hidden)
   const timeScale = paused ? 0 : speed
   const resetView = () => window.dispatchEvent(new Event('aether:reset'))
@@ -109,6 +110,17 @@ function App() {
   }, [])
 
   useEffect(() => {
+    // H works on both layouts: latin H and Cyrillic Р sit on the same key.
+    const onKey = (event: KeyboardEvent) => {
+      const key = event.key.toLowerCase()
+      if (key === 'h' || key === 'р') setCinema((value) => !value)
+      if (event.key === 'Escape') setCinema(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  useEffect(() => {
     if (!tour || !ready || travelling || !tabVisible) return
     const timer = window.setTimeout(() => {
       const index = TOUR_STOPS.indexOf(activeView)
@@ -119,7 +131,7 @@ function App() {
 
   return (
     <main
-      className={`experience ${ready ? 'is-ready' : ''} ${travelling ? 'is-travelling' : ''} ${overview ? 'is-system' : ''}`}
+      className={`experience ${ready ? 'is-ready' : ''} ${travelling ? 'is-travelling' : ''} ${overview ? 'is-system' : ''} ${cinema ? 'is-cinema' : ''}`}
       data-view={activeView}
       data-reduced-motion={reducedMotion || undefined}
     >
@@ -147,7 +159,7 @@ function App() {
         </div>
       )}
 
-      <div className="interface" inert={!webglSupported || undefined}>
+      <div className="interface" inert={(!webglSupported || cinema) || undefined}>
         <header className="topbar reveal">
           <div className="brand">
             <OrbitMark className="brand-mark" />
