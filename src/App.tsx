@@ -3,11 +3,12 @@ import { Canvas } from '@react-three/fiber'
 import { PerformanceMonitor } from '@react-three/drei'
 import { ACESFilmicToneMapping, SRGBColorSpace } from 'three'
 import { SpaceScene } from './components/SpaceScene'
-import { planetIds, planets, type SceneView } from './planets'
+import { planetIds, planets, starInfo, type SceneView } from './planets'
 import './App.css'
 
 const MIN_DPR = 0.85
 const MAX_DPR = 1.75
+const SPEEDS = [1, 2, 4, 0.5]
 
 function getMaxDpr() {
   return Math.max(MIN_DPR, Math.min(window.devicePixelRatio, MAX_DPR))
@@ -30,9 +31,12 @@ function App() {
   const [destination, setDestination] = useState<SceneView>('aurelia')
   const travelling = activeView !== destination
   const overview = activeView === 'system'
-  const planet = overview ? null : planets[activeView]
-  const currentName = planet ? planet.name : 'Система'
-  const destinationName = destination === 'system' ? 'Система' : planets[destination].name
+  const isStar = activeView === 'star'
+  const body = overview ? null : isStar ? starInfo : planets[activeView]
+  const currentName = body ? body.name : 'Система'
+  const destinationName = destination === 'system'
+    ? 'Система'
+    : destination === 'star' ? starInfo.name : planets[destination].name
   const handleReady = useCallback(() => setReady(true), [])
   const handleArrive = useCallback((arrived: SceneView) => setActiveView(arrived), [])
   const travelTo = (next: SceneView) => {
@@ -43,6 +47,10 @@ function App() {
     const nextDpr = MIN_DPR + (getMaxDpr() - MIN_DPR) * factor
     setDpr(Math.round(nextDpr * 20) / 20)
   }, [])
+  const [paused, setPaused] = useState(false)
+  const [speed, setSpeed] = useState(1)
+  const timeScale = paused ? 0 : speed
+  const cycleSpeed = () => setSpeed((s) => SPEEDS[(SPEEDS.indexOf(s) + 1) % SPEEDS.length])
   const resetView = () => window.dispatchEvent(new Event('aether:reset'))
 
   return (
@@ -51,9 +59,9 @@ function App() {
         <Canvas
           aria-label={travelling
             ? `Перелёт: ${currentName} — ${destinationName}`
-            : planet
-              ? `Интерактивная сцена планеты ${planet.label}. Перетаскивайте для вращения и используйте колесо для масштабирования.`
-              : 'Обзор системы. Выберите Aurelia или Cinder нажатием на планету или её подпись.'}
+            : body
+              ? `${isStar ? 'Интерактивная сцена звезды' : 'Интерактивная сцена планеты'} ${body.label}. Перетаскивайте для вращения и используйте колесо для масштабирования.`
+              : 'Обзор системы. Выберите мир или звезду нажатием на сферу или подпись.'}
           camera={{ position: [0, 0, 11.4], fov: 36, near: 0.1, far: 160 }}
           dpr={dpr}
           gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
@@ -74,7 +82,7 @@ function App() {
               bounds={(refreshRate) => (refreshRate > 100 ? [50, 100] : [42, 56])}
               onChange={handleQualityChange}
             >
-              <SpaceScene activeView={activeView} destination={destination} onReady={handleReady} onArrive={handleArrive} onSelect={travelTo} />
+              <SpaceScene activeView={activeView} destination={destination} timeScale={timeScale} onReady={handleReady} onArrive={handleArrive} onSelect={travelTo} />
             </PerformanceMonitor>
           </Suspense>
         </Canvas>
@@ -89,7 +97,7 @@ function App() {
           <div className="scene-status">
             <span className="status-dot" />
             <span>{travelling ? 'Межорбитальный перелёт' : overview ? 'Обзор системы' : 'Симуляция активна'}</span>
-            <span className="status-code">{planet ? `SC—${planet.code}` : 'SYS—01'}</span>
+            <span className="status-code">{body ? `SC—${body.code}` : 'SYS—01'}</span>
           </div>
         </header>
 
@@ -104,6 +112,18 @@ function App() {
           >
             <OrbitMark className="system-icon" />
             Обзор
+          </button>
+          <button
+            type="button"
+            className="planet-link planet-link--star"
+            aria-pressed={isStar}
+            aria-label={`Перелёт к звезде ${starInfo.name}`}
+            disabled={!ready || travelling}
+            onClick={() => travelTo('star')}
+          >
+            <span className="planet-dot" aria-hidden="true" />
+            <span className="planet-number">{starInfo.code}</span>
+            {starInfo.name}
           </button>
           {planetIds.map((id) => (
             <button
@@ -122,6 +142,38 @@ function App() {
           ))}
         </nav>
 
+        <div className="time-controls reveal" role="group" aria-label="Управление временем">
+          <button
+            type="button"
+            className="time-button"
+            aria-pressed={paused}
+            aria-label={paused ? 'Возобновить время' : 'Остановить время'}
+            disabled={!ready}
+            onClick={() => setPaused((value) => !value)}
+          >
+            {paused ? (
+              <svg viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                <path d="M3 1.4v9.2L10.2 6z" fill="currentColor" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                <rect x="2.4" y="1.8" width="2.4" height="8.4" fill="currentColor" />
+                <rect x="7.2" y="1.8" width="2.4" height="8.4" fill="currentColor" />
+              </svg>
+            )}
+          </button>
+          <button
+            type="button"
+            className="time-button time-button--speed"
+            aria-label={`Скорость времени ×${speed}`}
+            disabled={!ready}
+            onClick={cycleSpeed}
+          >
+            <span>Время</span>
+            <strong>×{speed === 0.5 ? '½' : speed}</strong>
+          </button>
+        </div>
+
         <div className="flight-status" role="status" aria-live="polite" aria-atomic="true">
           {travelling ? (
             <><span>Межорбитальный перелёт</span><strong>{currentName} <span aria-hidden="true">→</span> {destinationName}</strong></>
@@ -130,29 +182,29 @@ function App() {
           )}
         </div>
 
-        {planet ? (
+        {body ? (
           <>
             <section className="intro reveal" aria-labelledby="scene-title" aria-hidden={travelling}>
-              <p className="eyebrow"><span />{planet.name} / {activeView === 'cinder' ? 'Пустынный мир' : activeView === 'vesper' ? 'Газовый гигант' : 'Экзопланета'}</p>
+              <p className="eyebrow"><span />{body.name} / {activeView === 'star' ? 'Звезда системы' : activeView === 'cinder' ? 'Пустынный мир' : activeView === 'vesper' ? 'Газовый гигант' : 'Экзопланета'}</p>
               <h1 id="scene-title">
-                <span>{planet.title[0]}</span>
-                <em>{planet.title[1]}</em>
+                <span>{body.title[0]}</span>
+                <em>{body.title[1]}</em>
               </h1>
               <p className="intro-copy">
-                {planet.description[0]}<br />
-                {planet.description[1]}
+                {body.description[0]}<br />
+                {body.description[1]}
               </p>
             </section>
 
-            <aside className="telemetry reveal" aria-label="Параметры планеты" aria-hidden={travelling}>
+            <aside className="telemetry reveal" aria-label="Параметры небесного тела" aria-hidden={travelling}>
               <div className="telemetry-item">
                 <span className="telemetry-label">Радиус</span>
-                <strong>{planet.radius} <small>R⊕</small></strong>
+                <strong>{body.radius} <small>{isStar ? 'R☉' : 'R⊕'}</small></strong>
               </div>
               <span className="telemetry-divider" />
               <div className="telemetry-item">
-                <span className="telemetry-label">{planet.metric[0]}</span>
-                <strong>{planet.metric[1]} <small>{planet.metric[2]}</small></strong>
+                <span className="telemetry-label">{body.metric[0]}</span>
+                <strong>{body.metric[1]} <small>{body.metric[2]}</small></strong>
               </div>
             </aside>
 
@@ -195,7 +247,7 @@ function App() {
           <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">
             CC BY 4.0
           </a>
-          <span>{planet ? `${planet.code} / ${planet.name}` : 'SYS / Aether'}</span>
+          <span>{body ? `${body.code} / ${body.name}` : 'SYS / Aether'}</span>
         </footer>
       </div>
 

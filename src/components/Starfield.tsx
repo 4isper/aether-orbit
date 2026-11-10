@@ -53,9 +53,10 @@ function createRandom(seed: number) {
 
 type StarfieldProps = {
   reducedMotion: boolean
+  timeScale: number
 }
 
-export function Starfield({ reducedMotion }: StarfieldProps) {
+export function Starfield({ reducedMotion, timeScale }: StarfieldProps) {
   const materialRef = useRef<ShaderMaterial>(null)
   const compact = useThree((state) => state.size.width < 700)
   const count = compact ? 2800 : 5400
@@ -99,7 +100,7 @@ export function Starfield({ reducedMotion }: StarfieldProps) {
   useFrame((state, delta) => {
     if (!materialRef.current) return
     materialRef.current.uniforms.uPixelRatio.value = state.gl.getPixelRatio()
-    if (!reducedMotion) materialRef.current.uniforms.uTime.value += delta
+    if (!reducedMotion) materialRef.current.uniforms.uTime.value += delta * timeScale
   })
 
   return (

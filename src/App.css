@@ -471,12 +471,86 @@ h1 > em {
   box-shadow: 0 0 9px rgba(159, 184, 180, 0.16);
 }
 
+.planet-link--star .planet-dot {
+  background: radial-gradient(circle at 30% 30%, #ffe0b0, #df8a3a 48%, #4a1d08 75%);
+  box-shadow: 0 0 9px rgba(224, 152, 78, 0.18);
+}
+
+.experience[data-view="star"] h1 > em {
+  color: #e2b98a;
+}
+
 .experience[data-view="cinder"] h1 > em {
   color: #d0ab8b;
 }
 
 .experience[data-view="vesper"] h1 > em {
   color: #b9d2cf;
+}
+
+.time-controls {
+  position: absolute;
+  top: 86px;
+  right: 44px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  transform: translateY(-8px);
+  transition-delay: 0.55s;
+}
+
+.is-ready .time-controls {
+  transform: translateY(0);
+}
+
+.time-button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 0;
+  background: transparent;
+  color: rgba(211, 225, 233, 0.36);
+  font: inherit;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: color 0.25s ease, opacity 1.2s ease;
+  transition-delay: 0.55s;
+}
+
+.time-button:hover,
+.time-button:focus-visible {
+  color: rgba(232, 240, 245, 0.85);
+}
+
+.time-button:focus-visible {
+  outline: 1px solid rgba(174, 205, 224, 0.45);
+  outline-offset: 5px;
+}
+
+.time-button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.time-button svg {
+  width: 11px;
+  height: 11px;
+}
+
+.time-button--speed span {
+  font-size: 8px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.time-button--speed strong {
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  min-width: 24px;
+  text-align: left;
 }
 
 .flight-status {
@@ -522,6 +596,7 @@ h1 > em {
 .is-travelling .telemetry,
 .is-travelling .control-hint,
 .is-travelling .reset-view,
+.is-travelling .time-controls,
 .is-travelling .system-intro,
 .is-travelling .system-note {
   opacity: 0;
@@ -715,6 +790,11 @@ h1 > em {
     gap: 14px;
   }
 
+  .time-controls {
+    top: 60px;
+    right: 12px;
+  }
+
   .planet-link {
     font-size: 9px;
     gap: 7px;
@@ -862,5 +942,9 @@ h1 > em {
   .loader-mark,
   .loader-track > span {
     animation: none;
+  }
+
+  .time-controls {
+    display: none;
   }
 }

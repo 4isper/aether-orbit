@@ -179,9 +179,10 @@ void main() {
 
 type PlanetProps = {
   reducedMotion: boolean
+  timeScale: number
 }
 
-export function Planet({ reducedMotion }: PlanetProps) {
+export function Planet({ reducedMotion, timeScale }: PlanetProps) {
   const groupRef = useRef<Group>(null)
   const surfaceRef = useRef<Mesh>(null)
   const cloudsRef = useRef<Mesh>(null)
@@ -244,8 +245,8 @@ export function Planet({ reducedMotion }: PlanetProps) {
     const clouds = cloudsRef.current
 
     if (!reducedMotion) {
-      if (surface) surface.rotation.y += delta * 0.006
-      if (clouds) clouds.rotation.y += delta * 0.009
+      if (surface) surface.rotation.y += delta * 0.006 * timeScale
+      if (clouds) clouds.rotation.y += delta * 0.009 * timeScale
     }
 
     if (surfaceMaterialRef.current && surface && clouds) {

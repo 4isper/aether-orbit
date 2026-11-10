@@ -129,9 +129,10 @@ void main() {
 
 type VesperProps = {
   reducedMotion: boolean
+  timeScale: number
 }
 
-export function Vesper({ reducedMotion }: VesperProps) {
+export function Vesper({ reducedMotion, timeScale }: VesperProps) {
   const groupRef = useRef<Group>(null)
   const surfaceRef = useRef<Mesh>(null)
   const { width, height } = useThree((state) => state.viewport)
@@ -159,7 +160,7 @@ export function Vesper({ reducedMotion }: VesperProps) {
     }
 
     if (!reducedMotion && surfaceRef.current) {
-      surfaceRef.current.rotation.y += delta * 0.005
+      surfaceRef.current.rotation.y += delta * 0.005 * timeScale
     }
   })
 

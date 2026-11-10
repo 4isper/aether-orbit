@@ -65,9 +65,10 @@ void main() {
 
 type CinderProps = {
   reducedMotion: boolean
+  timeScale: number
 }
 
-export function Cinder({ reducedMotion }: CinderProps) {
+export function Cinder({ reducedMotion, timeScale }: CinderProps) {
   const groupRef = useRef<Group>(null)
   const surfaceRef = useRef<Mesh>(null)
   const { width, height } = useThree((state) => state.viewport)
@@ -101,7 +102,7 @@ export function Cinder({ reducedMotion }: CinderProps) {
     }
 
     if (!reducedMotion && surfaceRef.current) {
-      surfaceRef.current.rotation.y += delta * 0.004
+      surfaceRef.current.rotation.y += delta * 0.004 * timeScale
     }
   })
 

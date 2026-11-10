@@ -1,8 +1,8 @@
 export type PlanetId = 'aurelia' | 'cinder' | 'vesper'
-export type SceneView = PlanetId | 'system'
+export type SceneView = PlanetId | 'system' | 'star'
 export const planetIds: PlanetId[] = ['aurelia', 'cinder', 'vesper']
 
-type PlanetInfo = {
+export type BodyInfo = {
   name: string
   label: string
   code: string
@@ -12,7 +12,7 @@ type PlanetInfo = {
   metric: [string, string, string]
 }
 
-export const planets: Record<PlanetId, PlanetInfo> = {
+export const planets: Record<PlanetId, BodyInfo> = {
   aurelia: {
     name: 'Aurelia',
     label: 'Аурелия',
@@ -40,4 +40,14 @@ export const planets: Record<PlanetId, PlanetInfo> = {
     radius: '9.1',
     metric: ['Ветер', '1 800', 'км/ч'],
   },
+}
+
+export const starInfo: BodyInfo = {
+  name: 'Solis',
+  label: 'Солис',
+  code: '000',
+  title: ['Сердце', 'системы'],
+  description: ['Отсюда расходится весь свет.', 'Источник каждой орбиты.'],
+  radius: '8.4',
+  metric: ['Температура', '5 800', 'K'],
 }

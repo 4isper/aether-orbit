@@ -107,7 +107,7 @@ export function CameraRig({ reducedMotion, destination, onArrive, timeRef }: Cam
     const onWheel = (event: WheelEvent) => {
       event.preventDefault()
       if (flight.current.active || currentView.current === 'system') return
-      target.current.zoom = MathUtils.clamp(target.current.zoom + event.deltaY * 0.003, 7.6, 10.6)
+      target.current.zoom = MathUtils.clamp(target.current.zoom + event.deltaY * 0.003, 7.6, 12.6)
     }
 
     const onKeyDown = (event: KeyboardEvent) => {
@@ -124,7 +124,7 @@ export function CameraRig({ reducedMotion, destination, onArrive, timeRef }: Cam
       if (event.key === '-') target.current.zoom += 0.25
       target.current.yaw = MathUtils.clamp(target.current.yaw, -0.32, 0.32)
       target.current.pitch = MathUtils.clamp(target.current.pitch, -0.18, 0.18)
-      target.current.zoom = MathUtils.clamp(target.current.zoom, 7.6, 10.6)
+      target.current.zoom = MathUtils.clamp(target.current.zoom, 7.6, 12.6)
     }
 
     element.addEventListener('pointerdown', onPointerDown)
@@ -160,8 +160,9 @@ export function CameraRig({ reducedMotion, destination, onArrive, timeRef }: Cam
       journey.startPosition.copy(camera.position)
       journey.startLook.copy(lookAt.current)
       journey.startUp.copy(camera.up)
-      target.current = { yaw: 0, pitch: 0, zoom: 9 }
-      current.current = { yaw: 0, pitch: 0, zoom: 9 }
+      const initialZoom = destination === 'star' ? 11.5 : 9
+      target.current = { yaw: 0, pitch: 0, zoom: initialZoom }
+      current.current = { yaw: 0, pitch: 0, zoom: initialZoom }
       pointer.current = { x: 0, y: 0 }
       drag.current.active = false
       intro.current = 1
@@ -177,6 +178,12 @@ export function CameraRig({ reducedMotion, destination, onArrive, timeRef }: Cam
         journey.endLook.copy(overviewPose.target)
         journey.endPosition.copy(overviewPose.position)
         journey.endUp.copy(overviewPose.up)
+      } else if (destination === 'star') {
+        journey.endLook.copy(compOffset)
+        journey.endPosition.copy(compOffset)
+        journey.endPosition.y += 0.4
+        journey.endPosition.z += 11.5 + (compact ? 0.55 : 0)
+        journey.endUp.set(0, 1, 0)
       } else {
         planetPosition(destination, time, journey.endLook).add(compOffset)
         journey.endPosition.copy(journey.endLook)
@@ -225,7 +232,12 @@ export function CameraRig({ reducedMotion, destination, onArrive, timeRef }: Cam
     const distance = current.current.zoom + (compact ? 0.55 : 0) + (1 - introEase) * 2.4
     const yaw = current.current.yaw + parallaxX * 0.018 + idleX
     const pitch = current.current.pitch - parallaxY * 0.012 + idleY
-    planetPosition(currentView.current, time, scratch).add(compOffset)
+    if (currentView.current === 'star') {
+      scratch.set(0, 0, 0)
+    } else {
+      planetPosition(currentView.current, time, scratch)
+    }
+    scratch.add(compOffset)
     camera.position.set(
       scratch.x + Math.sin(yaw) * distance + parallaxX * 0.06,
       scratch.y + Math.sin(pitch) * distance + parallaxY * 0.04,

@@ -4,8 +4,10 @@ import { useCursor } from '@react-three/drei'
 import { Bloom, EffectComposer, Vignette } from '@react-three/postprocessing'
 import { Vector3, type Group } from 'three'
 import { Backdrop } from './Backdrop'
+import { Belt } from './Belt'
 import { CameraRig } from './CameraRig'
 import { Planet } from './Planet'
+import { Star } from './Star'
 import { Cinder } from './Cinder'
 import { Vesper } from './Vesper'
 import { Starfield } from './Starfield'
@@ -42,12 +44,13 @@ function SceneReady({ onReady }: { onReady: () => void }) {
 type SpaceSceneProps = {
   activeView: SceneView
   destination: SceneView
+  timeScale: number
   onReady: () => void
   onArrive: (view: SceneView) => void
-  onSelect: (planet: PlanetId) => void
+  onSelect: (view: SceneView) => void
 }
 
-export function SpaceScene({ activeView, destination, onReady, onArrive, onSelect }: SpaceSceneProps) {
+export function SpaceScene({ activeView, destination, timeScale, onReady, onArrive, onSelect }: SpaceSceneProps) {
   const reducedMotion = useReducedMotion()
   const gl = useThree((state) => state.gl)
   const [hovered, setHovered] = useState(false)
@@ -64,7 +67,7 @@ export function SpaceScene({ activeView, destination, onReady, onArrive, onSelec
   )
 
   useFrame((_, delta) => {
-    if (!reducedMotion) orbitTime.current += delta
+    if (!reducedMotion) orbitTime.current += delta * timeScale
     for (const id of planetIds) {
       groupRefs.current[id]?.position.copy(planetPosition(id, orbitTime.current, scratch))
     }
@@ -85,20 +88,38 @@ export function SpaceScene({ activeView, destination, onReady, onArrive, onSelec
     },
     onPointerOut: () => setHovered(false),
   } : {}
+  const starEvents = overview ? {
+    onClick: (event: ThreeEvent<MouseEvent>) => {
+      event.stopPropagation()
+      if (event.delta <= 5) {
+        setHovered(false)
+        onSelect('star')
+      }
+    },
+    onPointerOver: (event: ThreeEvent<PointerEvent>) => {
+      event.stopPropagation()
+      setHovered(true)
+    },
+    onPointerOut: () => setHovered(false),
+  } : {}
 
   return (
     <>
       <color attach="background" args={['#010205']} />
       <Backdrop />
-      <Starfield reducedMotion={reducedMotion} />
+      <Starfield reducedMotion={reducedMotion} timeScale={timeScale} />
+      <Belt timeRef={orbitTime} />
+      <group {...starEvents}>
+        <Star reducedMotion={reducedMotion} timeScale={timeScale} />
+      </group>
       <group ref={(node) => { groupRefs.current.aurelia = node }} position={initialPositions[0]} {...planetEvents('aurelia')}>
-        <Planet reducedMotion={reducedMotion} />
+        <Planet reducedMotion={reducedMotion} timeScale={timeScale} />
       </group>
       <group ref={(node) => { groupRefs.current.cinder = node }} position={initialPositions[1]} {...planetEvents('cinder')}>
-        <Cinder reducedMotion={reducedMotion} />
+        <Cinder reducedMotion={reducedMotion} timeScale={timeScale} />
       </group>
       <group ref={(node) => { groupRefs.current.vesper = node }} position={initialPositions[2]} {...planetEvents('vesper')}>
-        <Vesper reducedMotion={reducedMotion} />
+        <Vesper reducedMotion={reducedMotion} timeScale={timeScale} />
       </group>
       <CameraRig reducedMotion={reducedMotion} destination={destination} onArrive={onArrive} timeRef={orbitTime} />
       {overview && <SystemOverview onSelect={selectPlanet} timeRef={orbitTime} />}
