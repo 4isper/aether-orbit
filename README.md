@@ -61,11 +61,18 @@ npm run build
 npm run preview
 ```
 
-Линтер и тесты математики (орбиты, уравнение Кеплера, камера, петли протуберанцев):
+Линтер и тесты математики (орбиты, уравнение Кеплера, камера, петли протуберанцев, тени колец):
 
 ```bash
 npm run lint
 npm test
+```
+
+Headless smoke-прогон собранной сцены: открывает все виды в браузере с программным WebGL (SwiftShader) и падает, если в консоли появляются ошибки — так CI ловит ошибки компиляции GLSL до публикации. Нужен установленный Chrome/Edge/Chromium:
+
+```bash
+npm run build
+npm run test:smoke
 ```
 
 ## Управление
@@ -99,7 +106,7 @@ Canvas доступен с клавиатуры: фокус, стрелки и �
 - Three.js через React Three Fiber и Drei
 - Собственные GLSL-шейдеры: поверхность и облака, атмосфера, живая звезда, комета, астероиды, звёздное небо, фон
 - `@react-three/postprocessing`: Bloom и Vignette, тонмаппинг ACES Filmic
-- Oxlint и `node:test` для проверок, CI на GitHub Actions
+- Oxlint и `node:test` для проверок математики, headless smoke-тест шейдеров и CI на GitHub Actions
 
 ## Структура
 
