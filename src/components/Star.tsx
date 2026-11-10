@@ -6,6 +6,7 @@ import { bodyVertexGLSL } from '../shaders/common'
 
 const surfaceFragment = /* glsl */ `
 uniform float uTime;
+uniform float uSpotTime;
 varying vec3 vObjectPosition;
 varying vec3 vWorldPosition;
 varying vec3 vWorldNormal;
@@ -22,20 +23,30 @@ void main() {
   float heat = granules * 0.62 + filaments * 0.46 - 0.14;
   heat = pow(max(heat, 0.0), 1.35);
 
-  float spots = smoothstep(0.66, 0.8, fbm3(p * 2.6 + vec3(4.8, -2.2, 7.1)));
-  heat *= 1.0 - spots * 0.72;
+  // Spots live on their own slow clock: real umbrae outlast thousands of
+  // granule lifetimes, so their field drifts ~30x slower and carries a
+  // fibrous penumbra around the dark core.
+  vec3 spotDrift = vec3(uSpotTime * 0.12, -uSpotTime * 0.09, uSpotTime * 0.14);
+  float spotField = fbm3(p * 2.6 + vec3(4.8, -2.2, 7.1) + spotDrift);
+  // fbm3 tops out around 0.55 (sigma ~0.16): the thresholds below actually
+  // fire, giving a few percent of umbra plus its penumbra fringe.
+  float umbra = smoothstep(0.32, 0.42, spotField);
+  float penumbra = smoothstep(0.2, 0.34, spotField) * (1.0 - umbra);
+  float penumbraFibers = penumbra * (0.55 + 0.45 * ridgedFbm3(p * 20.0 + spotDrift * 3.0));
+  heat *= 1.0 - umbra * 0.72 - penumbraFibers * 0.3;
 
   float mu = max(dot(normalize(vWorldNormal), V), 0.0);
   float limb = 0.32 + 0.68 * pow(mu, 0.65);
 
   // 5800 K photosphere: near-white, granulation varies brightness only —
-  // deep intergranular lanes keep the mottling visible where the cells clip.
+  // deep intergranular lanes keep the mottling legible where the cells clip.
   float cells = 0.62 + 0.5 * heat;
   vec3 color = mix(vec3(1.0, 0.88, 0.74), vec3(1.0, 0.99, 0.96), clamp(cells, 0.0, 1.0));
   color *= cells;
-  // Spots: explicitly darker and slightly cooler-red, like a real umbra.
-  color *= 1.0 - spots * 0.45;
-  color = mix(color, color * vec3(1.22, 0.88, 0.74), spots);
+  // Umbrae are explicitly darker and slightly cooler-red; the fibrous
+  // penumbra grades outward from them.
+  color *= 1.0 - umbra * 0.5 - penumbraFibers * 0.28;
+  color = mix(color, color * vec3(1.25, 0.85, 0.7), umbra);
   color *= limb * 1.45;
   color += vec3(1.0, 0.32, 0.05) * pow(1.0 - mu, 2.4) * 0.55;
 
@@ -104,7 +115,7 @@ export function Star({ reducedMotion, timeScale }: StarProps) {
   const glowRef = useRef<Mesh>(null)
   const surfaceMaterialRef = useRef<ShaderMaterial>(null)
   const glowMaterialRef = useRef<ShaderMaterial>(null)
-  const surfaceUniforms = useMemo(() => ({ uTime: { value: 0 } }), [])
+  const surfaceUniforms = useMemo(() => ({ uTime: { value: 0 }, uSpotTime: { value: 0 } }), [])
   const glowUniforms = useMemo(() => ({ uTime: { value: 0 } }), [])
 
   useFrame((state, rawDelta) => {
@@ -116,7 +127,11 @@ export function Star({ reducedMotion, timeScale }: StarProps) {
     }
     if (reducedMotion) return
     if (surfaceRef.current) surfaceRef.current.rotation.y += delta * 0.004 * timeScale
-    if (surfaceMaterialRef.current) surfaceMaterialRef.current.uniforms.uTime.value += delta * timeScale
+    if (surfaceMaterialRef.current) {
+      // Granulation churns every few scene-minutes; spot groups drift for days.
+      surfaceMaterialRef.current.uniforms.uTime.value += delta * timeScale
+      surfaceMaterialRef.current.uniforms.uSpotTime.value += delta * timeScale * 0.03
+    }
     if (glowMaterialRef.current) glowMaterialRef.current.uniforms.uTime.value += delta * timeScale
   })
 
