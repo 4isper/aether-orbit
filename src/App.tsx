@@ -1,4 +1,4 @@
-import { Suspense, useCallback, useState } from 'react'
+import { Suspense, useCallback, useEffect, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { PerformanceMonitor } from '@react-three/drei'
 import { ACESFilmicToneMapping, SRGBColorSpace } from 'three'
@@ -9,6 +9,8 @@ import './App.css'
 const MIN_DPR = 0.85
 const MAX_DPR = 1.75
 const SPEEDS = [1, 2, 4, 0.5]
+const TOUR_STOPS: SceneView[] = ['aurelia', 'cinder', 'vesper', 'star', 'system']
+const TOUR_DWELL_MS = 7000
 
 function getMaxDpr() {
   return Math.max(MIN_DPR, Math.min(window.devicePixelRatio, MAX_DPR))
@@ -40,7 +42,9 @@ function App() {
   const handleReady = useCallback(() => setReady(true), [])
   const handleArrive = useCallback((arrived: SceneView) => setActiveView(arrived), [])
   const travelTo = (next: SceneView) => {
-    if (!ready || travelling || next === activeView) return
+    if (!ready) return
+    setTour(false)
+    if (travelling || next === activeView) return
     setDestination(next)
   }
   const handleQualityChange = useCallback(({ factor }: { factor: number }) => {
@@ -49,9 +53,19 @@ function App() {
   }, [])
   const [paused, setPaused] = useState(false)
   const [speed, setSpeed] = useState(1)
+  const [tour, setTour] = useState(false)
   const timeScale = paused ? 0 : speed
   const cycleSpeed = () => setSpeed((s) => SPEEDS[(SPEEDS.indexOf(s) + 1) % SPEEDS.length])
   const resetView = () => window.dispatchEvent(new Event('aether:reset'))
+
+  useEffect(() => {
+    if (!tour || !ready || travelling) return
+    const timer = window.setTimeout(() => {
+      const index = TOUR_STOPS.indexOf(activeView)
+      setDestination(TOUR_STOPS[(index + 1) % TOUR_STOPS.length])
+    }, TOUR_DWELL_MS)
+    return () => window.clearTimeout(timer)
+  }, [tour, ready, travelling, activeView])
 
   return (
     <main className={`experience ${ready ? 'is-ready' : ''} ${travelling ? 'is-travelling' : ''} ${overview ? 'is-system' : ''}`} data-view={activeView}>
@@ -112,6 +126,16 @@ function App() {
           >
             <OrbitMark className="system-icon" />
             Обзор
+          </button>
+          <button
+            type="button"
+            className="planet-link tour-link"
+            aria-pressed={tour}
+            aria-label={tour ? 'Остановить тур по системе' : 'Автоматический тур по системе'}
+            disabled={!ready}
+            onClick={() => setTour((value) => !value)}
+          >
+            Тур
           </button>
           <button
             type="button"

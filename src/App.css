@@ -944,7 +944,8 @@ h1 > em {
     animation: none;
   }
 
-  .time-controls {
+  .time-controls,
+  .tour-link {
     display: none;
   }
 }
