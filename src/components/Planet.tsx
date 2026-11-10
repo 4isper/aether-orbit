@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Html, useTexture, type MappedTextureType } from '@react-three/drei'
 import {
+  AdditiveBlending,
   FrontSide,
   NoColorSpace,
   RepeatWrapping,
@@ -182,6 +183,55 @@ void main() {
 }
 `
 
+const auroraVertex = /* glsl */ `
+varying vec3 vObjectPosition;
+varying vec3 vWorldPosition;
+varying vec3 vWorldNormal;
+void main() {
+  vObjectPosition = position;
+  vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+  vWorldPosition = worldPosition.xyz;
+  vWorldNormal = normalize(mat3(modelMatrix) * normal);
+  gl_Position = projectionMatrix * viewMatrix * worldPosition;
+}
+`
+
+const auroraFragment = /* glsl */ `
+uniform vec3 uSunDirection;
+uniform float uTime;
+uniform float uStarFlux;
+varying vec3 vObjectPosition;
+varying vec3 vWorldPosition;
+varying vec3 vWorldNormal;
+${noiseGLSL}
+
+void main() {
+  vec3 p = normalize(vObjectPosition);
+  vec3 N = normalize(vWorldNormal);
+  vec3 L = normalize(uSunDirection);
+
+  // Auroras wash out in daylight. The mask tracks local daylight, not the
+  // disk's night half: at the poles the sun grazes the horizon and the ovals
+  // still show through the twilight.
+  float night = 1.0 - smoothstep(-0.05, 0.3, dot(N, L));
+
+  // The magnetic oval wraps each pole around +-72 deg latitude with a wavy
+  // edge; curtains shimmer along it on their own clock.
+  float oval = exp(-pow((abs(p.y) - 0.92) * 9.0, 2.0));
+  float angle = atan(p.z, p.x);
+  float curtain = fbm3(vec3(cos(angle) * 2.6, sin(angle) * 2.6, uTime * 0.3)) * 0.5 + 0.5;
+  float streaks = smoothstep(0.3, 0.85, curtain);
+
+  float energy = night * oval * (0.3 + 0.7 * streaks) * uStarFlux;
+  vec3 color = mix(vec3(0.25, 1.0, 0.55), vec3(0.5, 0.3, 1.0), streaks * 0.8);
+  float alpha = energy * 0.55;
+
+  gl_FragColor = vec4(color * alpha, alpha);
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
+}
+`
+
 type PlanetProps = {
   reducedMotion: boolean
   timeScale: number
@@ -250,6 +300,16 @@ export function Planet({ reducedMotion, timeScale, showMoonLabel }: PlanetProps)
     }),
     [sunDirection, cloudMap],
   )
+  const auroraMaterialRef = useRef<ShaderMaterial>(null)
+  const auroraUniforms = useMemo(
+    () => ({
+      uSunDirection: { value: sunDirection },
+      uTime: { value: 0 },
+      uStarFlux: { value: 1 },
+    }),
+    [sunDirection],
+  )
+  const auroraTime = useRef(0)
 
   useFrame((_, rawDelta) => {
     const delta = Math.min(rawDelta, 0.1)
@@ -272,6 +332,11 @@ export function Planet({ reducedMotion, timeScale, showMoonLabel }: PlanetProps)
     }
     if (cloudMaterialRef.current) {
       cloudMaterialRef.current.uniforms.uStarFlux.value = flux
+    }
+    if (!reducedMotion) auroraTime.current += delta * timeScale
+    if (auroraMaterialRef.current) {
+      auroraMaterialRef.current.uniforms.uTime.value = auroraTime.current
+      auroraMaterialRef.current.uniforms.uStarFlux.value = flux
     }
 
     const moon = moonRef.current
@@ -328,6 +393,19 @@ export function Planet({ reducedMotion, timeScale, showMoonLabel }: PlanetProps)
           side={FrontSide}
           transparent
           depthWrite={false}
+        />
+      </mesh>
+
+      <mesh renderOrder={2} raycast={() => null}>
+        <sphereGeometry args={[2.04, 96, 96]} />
+        <shaderMaterial
+          ref={auroraMaterialRef}
+          vertexShader={auroraVertex}
+          fragmentShader={auroraFragment}
+          uniforms={auroraUniforms}
+          transparent
+          depthWrite={false}
+          blending={AdditiveBlending}
         />
       </mesh>
 
