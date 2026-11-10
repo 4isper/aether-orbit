@@ -1,6 +1,7 @@
 import { useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Euler, Matrix4, Quaternion, ShaderMaterial, Vector3, type InstancedMesh } from 'three'
+import { createRandom } from '../random'
 
 const rockVertex = /* glsl */ `
 varying vec3 vWorldPosition;
@@ -32,14 +33,6 @@ void main() {
   #include <colorspace_fragment>
 }
 `
-
-function createRandom(seed: number) {
-  let value = seed
-  return () => {
-    value = (value * 16807) % 2147483647
-    return (value - 1) / 2147483646
-  }
-}
 
 type RingConfig = {
   inner: number

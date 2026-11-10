@@ -1,6 +1,7 @@
 import { useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { AdditiveBlending, type ShaderMaterial } from 'three'
+import { createRandom } from '../random'
 
 const starVertex = /* glsl */ `
 attribute float aSize;
@@ -42,14 +43,6 @@ void main() {
   gl_FragColor = vec4(vColor * (0.72 + vBrightness * 0.7), alpha);
 }
 `
-
-function createRandom(seed: number) {
-  let value = seed
-  return () => {
-    value = (value * 16807) % 2147483647
-    return (value - 1) / 2147483646
-  }
-}
 
 type StarfieldProps = {
   reducedMotion: boolean
