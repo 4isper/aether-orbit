@@ -4,6 +4,8 @@
 
 **Живая версия: [aether-orbit-three.vercel.app](https://aether-orbit-three.vercel.app)**
 
+[![CI](https://github.com/4isper/aether-orbit/actions/workflows/ci.yml/badge.svg)](https://github.com/4isper/aether-orbit/actions/workflows/ci.yml)
+
 ![Обзор системы Aether](docs/screenshots/overview.png)
 
 ## Что внутри
