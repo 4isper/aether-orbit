@@ -956,24 +956,22 @@ h1 > em {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .scene,
-  .reveal,
-  .loader,
-  .planet-link,
-  .flight-status,
-  .system-label {
-    transition-duration: 0.01ms;
-    transition-delay: 0s;
-  }
+.experience[data-reduced-motion="true"] .scene,
+.experience[data-reduced-motion="true"] .reveal,
+.experience[data-reduced-motion="true"] .loader,
+.experience[data-reduced-motion="true"] .planet-link,
+.experience[data-reduced-motion="true"] .flight-status,
+.experience[data-reduced-motion="true"] .system-label {
+  transition-duration: 0.01ms;
+  transition-delay: 0s;
+}
 
-  .loader-mark,
-  .loader-track > span {
-    animation: none;
-  }
+.experience[data-reduced-motion="true"] .loader-mark,
+.experience[data-reduced-motion="true"] .loader-track > span {
+  animation: none;
+}
 
-  .time-controls,
-  .tour-link {
-    display: none;
-  }
+.experience[data-reduced-motion="true"] .time-controls,
+.experience[data-reduced-motion="true"] .tour-link {
+  display: none;
 }

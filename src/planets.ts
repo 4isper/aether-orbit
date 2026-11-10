@@ -51,3 +51,9 @@ export const starInfo: BodyInfo = {
   radius: '8.4',
   metric: ['Температура', '5 800', 'K'],
 }
+
+/** Telemetry for every flyable destination except the system overview. */
+export const bodies: Record<Exclude<SceneView, 'system'>, BodyInfo> = {
+  ...planets,
+  star: starInfo,
+}

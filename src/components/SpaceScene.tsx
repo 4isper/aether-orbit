@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { useCursor } from '@react-three/drei'
 import { Bloom, EffectComposer, Vignette } from '@react-three/postprocessing'
@@ -16,21 +16,6 @@ import { SystemOverview } from './SystemOverview'
 import { planetIds, type PlanetId, type SceneView } from '../planets'
 import { planetPosition } from '../orbits'
 
-function useReducedMotion() {
-  const [reduced, setReduced] = useState(
-    () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
-  )
-
-  useEffect(() => {
-    const query = window.matchMedia('(prefers-reduced-motion: reduce)')
-    const update = () => setReduced(query.matches)
-    query.addEventListener('change', update)
-    return () => query.removeEventListener('change', update)
-  }, [])
-
-  return reduced
-}
-
 function SceneReady({ onReady }: { onReady: () => void }) {
   const frames = useRef(0)
 
@@ -46,13 +31,13 @@ type SpaceSceneProps = {
   activeView: SceneView
   destination: SceneView
   timeScale: number
+  reducedMotion: boolean
   onReady: () => void
   onArrive: (view: SceneView) => void
   onSelect: (view: SceneView) => void
 }
 
-export function SpaceScene({ activeView, destination, timeScale, onReady, onArrive, onSelect }: SpaceSceneProps) {
-  const reducedMotion = useReducedMotion()
+export function SpaceScene({ activeView, destination, timeScale, reducedMotion, onReady, onArrive, onSelect }: SpaceSceneProps) {
   const gl = useThree((state) => state.gl)
   const [hovered, setHovered] = useState(false)
   const travelling = activeView !== destination

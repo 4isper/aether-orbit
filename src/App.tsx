@@ -3,7 +3,7 @@ import { Canvas } from '@react-three/fiber'
 import { PerformanceMonitor } from '@react-three/drei'
 import { ACESFilmicToneMapping, SRGBColorSpace } from 'three'
 import { SpaceScene } from './components/SpaceScene'
-import { planetIds, planets, starInfo, type SceneView } from './planets'
+import { bodies, planetIds, type SceneView } from './planets'
 import './App.css'
 
 const MIN_DPR = 0.85
@@ -30,19 +30,35 @@ function OrbitMark({ className = '' }: { className?: string }) {
   )
 }
 
+function useReducedMotion() {
+  const [reduced, setReduced] = useState(
+    () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+  )
+
+  useEffect(() => {
+    const query = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const update = () => setReduced(query.matches)
+    query.addEventListener('change', update)
+    return () => query.removeEventListener('change', update)
+  }, [])
+
+  return reduced
+}
+
 function App() {
   const [ready, setReady] = useState(false)
   const [dpr, setDpr] = useState(getMaxDpr)
   const [activeView, setActiveView] = useState<SceneView>('aurelia')
   const [destination, setDestination] = useState<SceneView>('aurelia')
+  const reducedMotion = useReducedMotion()
   const travelling = activeView !== destination
   const overview = activeView === 'system'
   const isStar = activeView === 'star'
-  const body = overview ? null : isStar ? starInfo : planets[activeView]
+  const body = activeView === 'system' ? null : bodies[activeView]
   const currentName = body ? body.name : 'Система'
   const destinationName = destination === 'system'
     ? 'Система'
-    : destination === 'star' ? starInfo.name : planets[destination].name
+    : bodies[destination].name
   const handleReady = useCallback(() => setReady(true), [])
   const handleArrive = useCallback((arrived: SceneView) => setActiveView(arrived), [])
   const travelTo = (next: SceneView) => {
@@ -78,7 +94,11 @@ function App() {
   }, [tour, ready, travelling, activeView, tabVisible])
 
   return (
-    <main className={`experience ${ready ? 'is-ready' : ''} ${travelling ? 'is-travelling' : ''} ${overview ? 'is-system' : ''}`} data-view={activeView}>
+    <main
+      className={`experience ${ready ? 'is-ready' : ''} ${travelling ? 'is-travelling' : ''} ${overview ? 'is-system' : ''}`}
+      data-view={activeView}
+      data-reduced-motion={reducedMotion || undefined}
+    >
       <div className="scene">
         <Canvas
           aria-label={travelling
@@ -106,7 +126,7 @@ function App() {
               bounds={(refreshRate) => (refreshRate > 100 ? [50, 100] : [42, 56])}
               onChange={handleQualityChange}
             >
-              <SpaceScene activeView={activeView} destination={destination} timeScale={timeScale} onReady={handleReady} onArrive={handleArrive} onSelect={travelTo} />
+              <SpaceScene activeView={activeView} destination={destination} timeScale={timeScale} reducedMotion={reducedMotion} onReady={handleReady} onArrive={handleArrive} onSelect={travelTo} />
             </PerformanceMonitor>
           </Suspense>
         </Canvas>
@@ -151,13 +171,13 @@ function App() {
             type="button"
             className="planet-link planet-link--star"
             aria-pressed={isStar}
-            aria-label={`Перелёт к звезде ${starInfo.name}`}
+            aria-label={`Перелёт к звезде ${bodies.star.name}`}
             disabled={!ready || travelling}
             onClick={() => travelTo('star')}
           >
             <span className="planet-dot" aria-hidden="true" />
-            <span className="planet-number">{starInfo.code}</span>
-            {starInfo.name}
+            <span className="planet-number">{bodies.star.code}</span>
+            {bodies.star.name}
           </button>
           {planetIds.map((id) => (
             <button
@@ -165,13 +185,13 @@ function App() {
               type="button"
               className={`planet-link planet-link--${id}`}
               aria-pressed={activeView === id}
-              aria-label={`Перелёт к планете ${planets[id].name}`}
+              aria-label={`Перелёт к планете ${bodies[id].name}`}
               disabled={!ready || travelling}
               onClick={() => travelTo(id)}
             >
               <span className="planet-dot" aria-hidden="true" />
-              <span className="planet-number">{planets[id].code}</span>
-              {planets[id].name}
+              <span className="planet-number">{bodies[id].code}</span>
+              {bodies[id].name}
             </button>
           ))}
         </nav>
