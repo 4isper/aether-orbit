@@ -28,9 +28,15 @@ void main() {
   float mu = max(dot(normalize(vWorldNormal), V), 0.0);
   float limb = 0.32 + 0.68 * pow(mu, 0.65);
 
-  vec3 color = mix(vec3(0.52, 0.13, 0.02), vec3(1.0, 0.45, 0.09), smoothstep(0.04, 0.52, heat));
-  color = mix(color, vec3(1.0, 0.88, 0.58), smoothstep(0.52, 0.94, heat));
-  color *= limb * 2.5;
+  // 5800 K photosphere: near-white, granulation varies brightness only —
+  // deep intergranular lanes keep the mottling visible where the cells clip.
+  float cells = 0.62 + 0.5 * heat;
+  vec3 color = mix(vec3(1.0, 0.88, 0.74), vec3(1.0, 0.99, 0.96), clamp(cells, 0.0, 1.0));
+  color *= cells;
+  // Spots: explicitly darker and slightly cooler-red, like a real umbra.
+  color *= 1.0 - spots * 0.45;
+  color = mix(color, color * vec3(1.22, 0.88, 0.74), spots);
+  color *= limb * 1.45;
   color += vec3(1.0, 0.32, 0.05) * pow(1.0 - mu, 2.4) * 0.55;
 
   gl_FragColor = vec4(color, 1.0);
@@ -61,7 +67,7 @@ void main() {
   float core = exp(-d * 18.0) * 1.35;
   float streak = exp(-abs(p.y) * 44.0) * exp(-abs(p.x) * 3.1) * 0.14;
   float alpha = halo + core + streak;
-  vec3 color = mix(vec3(1.0, 0.5, 0.16), vec3(1.0, 0.93, 0.78), core);
+  vec3 color = mix(vec3(1.0, 0.76, 0.52), vec3(1.0, 0.97, 0.93), core);
   gl_FragColor = vec4(color * alpha, alpha);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
