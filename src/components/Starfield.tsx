@@ -1,7 +1,8 @@
 import { useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { AdditiveBlending, type ShaderMaterial } from 'three'
+import { AdditiveBlending, Vector3, type ShaderMaterial } from 'three'
 import { createRandom } from '../random'
+import { galacticBandDirection } from '../galactic'
 
 const starVertex = /* glsl */ `
 attribute float aSize;
@@ -49,6 +50,14 @@ type StarfieldProps = {
   timeScale: number
 }
 
+// The Milky Way: most stars gather along a great circle whose plane is
+// chosen so the band projects onto the backdrop nebula's ribbon (y = -0.18x)
+// from the system's home direction; the rest stay spread uniformly.
+const GALACTIC_NORMAL = new Vector3(0.177, 0.984, 0).normalize()
+const BAND_SHARE = 0.62
+const BAND_LATITUDE_SIGMA = 0.16
+const bandDirection = new Vector3()
+
 export function Starfield({ reducedMotion, timeScale }: StarfieldProps) {
   const materialRef = useRef<ShaderMaterial>(null)
   const compact = useThree((state) => state.size.width < 700)
@@ -63,11 +72,18 @@ export function Starfield({ reducedMotion, timeScale }: StarfieldProps) {
 
     for (let i = 0; i < count; i++) {
       const radius = 30 + random() * 62
-      const theta = random() * Math.PI * 2
-      const phi = Math.acos(2 * random() - 1)
-      positions[i * 3] = radius * Math.sin(phi) * Math.cos(theta)
-      positions[i * 3 + 1] = radius * Math.cos(phi)
-      positions[i * 3 + 2] = radius * Math.sin(phi) * Math.sin(theta)
+      if (random() < BAND_SHARE) {
+        galacticBandDirection(random, GALACTIC_NORMAL, BAND_LATITUDE_SIGMA, bandDirection)
+        positions[i * 3] = bandDirection.x * radius
+        positions[i * 3 + 1] = bandDirection.y * radius
+        positions[i * 3 + 2] = bandDirection.z * radius
+      } else {
+        const theta = random() * Math.PI * 2
+        const phi = Math.acos(2 * random() - 1)
+        positions[i * 3] = radius * Math.sin(phi) * Math.cos(theta)
+        positions[i * 3 + 1] = radius * Math.cos(phi)
+        positions[i * 3 + 2] = radius * Math.sin(phi) * Math.sin(theta)
+      }
 
       const brightness = Math.pow(random(), 3)
       sizes[i] = 0.6 + brightness * 2.8
