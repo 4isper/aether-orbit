@@ -2,20 +2,7 @@ import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { AdditiveBlending, BackSide, type Mesh, type ShaderMaterial } from 'three'
 import { noiseGLSL } from '../shaders/noise'
-
-const bodyVertex = /* glsl */ `
-varying vec3 vObjectPosition;
-varying vec3 vWorldPosition;
-varying vec3 vWorldNormal;
-
-void main() {
-  vObjectPosition = normalize(position);
-  vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-  vWorldPosition = worldPosition.xyz;
-  vWorldNormal = normalize(mat3(modelMatrix) * normal);
-  gl_Position = projectionMatrix * viewMatrix * worldPosition;
-}
-`
+import { bodyVertexGLSL } from '../shaders/common'
 
 const surfaceFragment = /* glsl */ `
 uniform float uTime;
@@ -145,7 +132,7 @@ export function Star({ reducedMotion, timeScale }: StarProps) {
         <sphereGeometry args={[2.35, 96, 96]} />
         <shaderMaterial
           ref={surfaceMaterialRef}
-          vertexShader={bodyVertex}
+          vertexShader={bodyVertexGLSL(false)}
           fragmentShader={surfaceFragment}
           uniforms={surfaceUniforms}
         />

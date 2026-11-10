@@ -2,24 +2,11 @@ import { useMemo, type ReactNode } from 'react'
 import type { Ref } from 'react'
 import { Vector3, type Mesh, type ShaderMaterial } from 'three'
 import { noiseGLSL } from '../shaders/noise'
+import { bodyVertexGLSL, perturbNormalGLSL } from '../shaders/common'
 
 export const MOON_RADIUS = 0.34
 export const MOON_ORBIT_RADIUS = 3.6
 export const MOON_ANGULAR_SPEED = 0.35
-
-const moonVertex = /* glsl */ `
-varying vec3 vObjectPosition;
-varying vec3 vWorldPosition;
-varying vec3 vWorldNormal;
-
-void main() {
-  vObjectPosition = normalize(position);
-  vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-  vWorldPosition = worldPosition.xyz;
-  vWorldNormal = normalize(mat3(modelMatrix) * normal);
-  gl_Position = projectionMatrix * viewMatrix * worldPosition;
-}
-`
 
 const moonFragment = /* glsl */ `
 uniform vec3 uPlanetPosition;
@@ -28,18 +15,7 @@ varying vec3 vObjectPosition;
 varying vec3 vWorldPosition;
 varying vec3 vWorldNormal;
 ${noiseGLSL}
-
-vec3 perturbNormal(vec3 surfacePosition, vec3 surfaceNormal, float height) {
-  vec3 sigmaX = normalize(dFdx(surfacePosition));
-  vec3 sigmaY = normalize(dFdy(surfacePosition));
-  vec3 R1 = cross(sigmaY, surfaceNormal);
-  vec3 R2 = cross(surfaceNormal, sigmaX);
-  float det = dot(sigmaX, R1);
-  vec3 gradient = sign(det) * (
-    dFdx(height) * R1 + dFdy(height) * R2
-  );
-  return normalize(abs(det) * surfaceNormal - gradient);
-}
+${perturbNormalGLSL}
 
 void main() {
   vec3 p = normalize(vObjectPosition);
@@ -99,7 +75,7 @@ export function Moon({ radius = MOON_RADIUS, ref, materialRef, children }: MoonP
       <sphereGeometry args={[1, 48, 48]} />
       <shaderMaterial
         ref={materialRef}
-        vertexShader={moonVertex}
+        vertexShader={bodyVertexGLSL(false)}
         fragmentShader={moonFragment}
         uniforms={uniforms}
       />

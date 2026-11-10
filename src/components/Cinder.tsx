@@ -3,23 +3,8 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useTexture } from '@react-three/drei'
 import { RepeatWrapping, SRGBColorSpace, Vector3, type Group, type Mesh, type Texture } from 'three'
 import { noiseGLSL } from '../shaders/noise'
+import { bodyVertexGLSL, perturbNormalGLSL } from '../shaders/common'
 import { Atmosphere } from './Atmosphere'
-
-const vertexShader = /* glsl */ `
-varying vec2 vUv;
-varying vec3 vObjectPosition;
-varying vec3 vWorldPosition;
-varying vec3 vWorldNormal;
-
-void main() {
-  vUv = uv;
-  vObjectPosition = normalize(position);
-  vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-  vWorldPosition = worldPosition.xyz;
-  vWorldNormal = normalize(mat3(modelMatrix) * normal);
-  gl_Position = projectionMatrix * viewMatrix * worldPosition;
-}
-`
 
 const surfaceFragment = /* glsl */ `
 uniform sampler2D uDayMap;
@@ -29,18 +14,7 @@ varying vec3 vObjectPosition;
 varying vec3 vWorldPosition;
 varying vec3 vWorldNormal;
 ${noiseGLSL}
-
-vec3 perturbNormal(vec3 surfacePosition, vec3 surfaceNormal, float height) {
-  vec3 sigmaX = normalize(dFdx(surfacePosition));
-  vec3 sigmaY = normalize(dFdy(surfacePosition));
-  vec3 R1 = cross(sigmaY, surfaceNormal);
-  vec3 R2 = cross(surfaceNormal, sigmaX);
-  float det = dot(sigmaX, R1);
-  vec3 gradient = sign(det) * (
-    dFdx(height) * R1 + dFdy(height) * R2
-  );
-  return normalize(abs(det) * surfaceNormal - gradient);
-}
+${perturbNormalGLSL}
 
 void main() {
   vec3 p = normalize(vObjectPosition);
@@ -116,7 +90,7 @@ export function Cinder({ reducedMotion, timeScale }: CinderProps) {
       <mesh ref={surfaceRef}>
         <sphereGeometry args={[2, 128, 128]} />
         <shaderMaterial
-          vertexShader={vertexShader}
+          vertexShader={bodyVertexGLSL(true)}
           fragmentShader={surfaceFragment}
           uniforms={surfaceUniforms}
         />

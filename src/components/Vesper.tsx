@@ -2,21 +2,8 @@ import { useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { DoubleSide, Vector3, type Group, type Mesh } from 'three'
 import { noiseGLSL } from '../shaders/noise'
+import { bodyVertexGLSL, perturbNormalGLSL } from '../shaders/common'
 import { Atmosphere } from './Atmosphere'
-
-const surfaceVertexShader = /* glsl */ `
-varying vec3 vObjectPosition;
-varying vec3 vWorldPosition;
-varying vec3 vWorldNormal;
-
-void main() {
-  vObjectPosition = normalize(position);
-  vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-  vWorldPosition = worldPosition.xyz;
-  vWorldNormal = normalize(mat3(modelMatrix) * normal);
-  gl_Position = projectionMatrix * viewMatrix * worldPosition;
-}
-`
 
 const surfaceFragment = /* glsl */ `
 uniform vec3 uSunDirection;
@@ -24,18 +11,7 @@ varying vec3 vObjectPosition;
 varying vec3 vWorldPosition;
 varying vec3 vWorldNormal;
 ${noiseGLSL}
-
-vec3 perturbNormal(vec3 surfacePosition, vec3 surfaceNormal, float height) {
-  vec3 sigmaX = normalize(dFdx(surfacePosition));
-  vec3 sigmaY = normalize(dFdy(surfacePosition));
-  vec3 R1 = cross(sigmaY, surfaceNormal);
-  vec3 R2 = cross(surfaceNormal, sigmaX);
-  float det = dot(sigmaX, R1);
-  vec3 gradient = sign(det) * (
-    dFdx(height) * R1 + dFdy(height) * R2
-  );
-  return normalize(abs(det) * surfaceNormal - gradient);
-}
+${perturbNormalGLSL}
 
 void main() {
   vec3 p = normalize(vObjectPosition);
@@ -174,7 +150,7 @@ export function Vesper({ reducedMotion, timeScale }: VesperProps) {
       <mesh ref={surfaceRef}>
         <sphereGeometry args={[2, 128, 128]} />
         <shaderMaterial
-          vertexShader={surfaceVertexShader}
+          vertexShader={bodyVertexGLSL(false)}
           fragmentShader={surfaceFragment}
           uniforms={surfaceUniforms}
         />

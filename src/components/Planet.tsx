@@ -12,6 +12,7 @@ import {
   type ShaderMaterial,
 } from 'three'
 import { noiseGLSL } from '../shaders/noise'
+import { bodyVertexGLSL, perturbNormalGLSL } from '../shaders/common'
 import { Atmosphere } from './Atmosphere'
 import { Moon, MOON_ORBIT_RADIUS, MOON_ANGULAR_SPEED, MOON_RADIUS } from './Moon'
 
@@ -22,22 +23,6 @@ const textureUrls = [
   '/textures/earth-specular.webp',
   '/textures/earth-clouds.webp',
 ]
-
-const vertexShader = /* glsl */ `
-varying vec2 vUv;
-varying vec3 vObjectPosition;
-varying vec3 vWorldPosition;
-varying vec3 vWorldNormal;
-
-void main() {
-  vUv = uv;
-  vObjectPosition = normalize(position);
-  vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-  vWorldPosition = worldPosition.xyz;
-  vWorldNormal = normalize(mat3(modelMatrix) * normal);
-  gl_Position = projectionMatrix * viewMatrix * worldPosition;
-}
-`
 
 const surfaceFragment = /* glsl */ `
 uniform sampler2D uDayMap;
@@ -54,6 +39,7 @@ varying vec3 vObjectPosition;
 varying vec3 vWorldPosition;
 varying vec3 vWorldNormal;
 ${noiseGLSL}
+${perturbNormalGLSL}
 
 mat3 getTangentFrame(vec3 surfacePosition, vec3 surfaceNormal, vec2 uv) {
   vec3 q0 = dFdx(surfacePosition);
@@ -67,18 +53,6 @@ mat3 getTangentFrame(vec3 surfacePosition, vec3 surfaceNormal, vec2 uv) {
   float det = max(dot(T, T), dot(B, B));
   float frameScale = det == 0.0 ? 0.0 : inversesqrt(det);
   return mat3(T * frameScale, B * frameScale, surfaceNormal);
-}
-
-vec3 perturbNormal(vec3 surfacePosition, vec3 surfaceNormal, float height) {
-  vec3 sigmaX = normalize(dFdx(surfacePosition));
-  vec3 sigmaY = normalize(dFdy(surfacePosition));
-  vec3 R1 = cross(sigmaY, surfaceNormal);
-  vec3 R2 = cross(surfaceNormal, sigmaX);
-  float det = dot(sigmaX, R1);
-  vec3 gradient = sign(det) * (
-    dFdx(height) * R1 + dFdy(height) * R2
-  );
-  return normalize(abs(det) * surfaceNormal - gradient);
 }
 
 float distributionGGX(float NoH, float roughness) {
@@ -326,7 +300,7 @@ export function Planet({ reducedMotion, timeScale, showMoonLabel }: PlanetProps)
         <sphereGeometry args={[2, 160, 160]} />
         <shaderMaterial
           ref={surfaceMaterialRef}
-          vertexShader={vertexShader}
+          vertexShader={bodyVertexGLSL(true)}
           fragmentShader={surfaceFragment}
           uniforms={surfaceUniforms}
         />
@@ -336,7 +310,7 @@ export function Planet({ reducedMotion, timeScale, showMoonLabel }: PlanetProps)
         <sphereGeometry args={[2.025, 128, 128]} />
         <shaderMaterial
           ref={cloudMaterialRef}
-          vertexShader={vertexShader}
+          vertexShader={bodyVertexGLSL(true)}
           fragmentShader={cloudFragment}
           uniforms={cloudUniforms}
           side={FrontSide}
