@@ -95,6 +95,30 @@ float fbm4(vec3 p) {
   return value;
 }
 
+float fbm3(vec3 p) {
+  float value = 0.0;
+  float amplitude = 0.5;
+  for (int i = 0; i < 3; i++) {
+    value += amplitude * snoise(p);
+    p = p * 2.03 + vec3(13.7, 9.2, 7.5);
+    amplitude *= 0.5;
+  }
+  return value;
+}
+
+float ridgedFbm3(vec3 p) {
+  float value = 0.0;
+  float amplitude = 0.5;
+  for (int i = 0; i < 3; i++) {
+    float ridge = 1.0 - abs(snoise(p));
+    ridge *= ridge;
+    value += ridge * amplitude;
+    p = p * 2.08 + vec3(9.2, 14.6, 5.3);
+    amplitude *= 0.5;
+  }
+  return value;
+}
+
 float ridgedFbm(vec3 p) {
   float value = 0.0;
   float amplitude = 0.5;

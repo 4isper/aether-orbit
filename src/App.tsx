@@ -1,23 +1,15 @@
-import { Suspense, useCallback, useEffect, useState } from 'react'
-import { Canvas } from '@react-three/fiber'
-import { PerformanceMonitor } from '@react-three/drei'
-import { ACESFilmicToneMapping, SRGBColorSpace } from 'three'
-import { SpaceScene } from './components/SpaceScene'
+import { Suspense, lazy, useCallback, useEffect, useState } from 'react'
 import { bodies, planetIds, type SceneView } from './planets'
 import './App.css'
 
-const MIN_DPR = 0.85
-const MAX_DPR = 1.75
+const SceneCanvas = lazy(() => import('./SceneCanvas'))
+
 const SPEED_OPTIONS = [0.5, 1, 2, 4]
 const TOUR_STOPS: SceneView[] = ['aurelia', 'cinder', 'vesper', 'star', 'system']
 const TOUR_DWELL_MS = 7000
 
 function formatSpeed(speed: number) {
   return speed === 0.5 ? '½' : String(speed)
-}
-
-function getMaxDpr() {
-  return Math.max(MIN_DPR, Math.min(window.devicePixelRatio, MAX_DPR))
 }
 
 function OrbitMark({ className = '' }: { className?: string }) {
@@ -47,7 +39,6 @@ function useReducedMotion() {
 
 function App() {
   const [ready, setReady] = useState(false)
-  const [dpr, setDpr] = useState(getMaxDpr)
   const [activeView, setActiveView] = useState<SceneView>('aurelia')
   const [destination, setDestination] = useState<SceneView>('aurelia')
   const reducedMotion = useReducedMotion()
@@ -67,10 +58,6 @@ function App() {
     if (travelling || next === activeView) return
     setDestination(next)
   }
-  const handleQualityChange = useCallback(({ factor }: { factor: number }) => {
-    const nextDpr = MIN_DPR + (getMaxDpr() - MIN_DPR) * factor
-    setDpr(Math.round(nextDpr * 20) / 20)
-  }, [])
   const [paused, setPaused] = useState(false)
   const [speed, setSpeed] = useState(1)
   const [tour, setTour] = useState(false)
@@ -100,36 +87,22 @@ function App() {
       data-reduced-motion={reducedMotion || undefined}
     >
       <div className="scene">
-        <Canvas
-          aria-label={travelling
-            ? `Перелёт: ${currentName} — ${destinationName}`
-            : body
-              ? `${isStar ? 'Интерактивная сцена звезды' : 'Интерактивная сцена планеты'} ${body.label}. Перетаскивайте для вращения и используйте колесо для масштабирования.`
-              : 'Обзор системы. Выберите мир или звезду нажатием на сферу или подпись.'}
-          camera={{ position: [0, 0, 11.4], fov: 36, near: 0.1, far: 160 }}
-          dpr={dpr}
-          gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
-          onCreated={({ gl }) => {
-            gl.domElement.tabIndex = 0
-            gl.toneMapping = ACESFilmicToneMapping
-            gl.toneMappingExposure = 1.1
-            gl.outputColorSpace = SRGBColorSpace
-          }}
-        >
-          <Suspense fallback={null}>
-            <PerformanceMonitor
-              factor={1}
-              step={0.2}
-              iterations={8}
-              ms={250}
-              threshold={0.75}
-              bounds={(refreshRate) => (refreshRate > 100 ? [50, 100] : [42, 56])}
-              onChange={handleQualityChange}
-            >
-              <SpaceScene activeView={activeView} destination={destination} timeScale={timeScale} reducedMotion={reducedMotion} onReady={handleReady} onArrive={handleArrive} onSelect={travelTo} />
-            </PerformanceMonitor>
-          </Suspense>
-        </Canvas>
+        <Suspense fallback={null}>
+          <SceneCanvas
+            label={travelling
+              ? `Перелёт: ${currentName} — ${destinationName}`
+              : body
+                ? `${isStar ? 'Интерактивная сцена звезды' : 'Интерактивная сцена планеты'} ${body.label}. Перетаскивайте для вращения и используйте колесо для масштабирования.`
+                : 'Обзор системы. Выберите мир или звезду нажатием на сферу или подпись.'}
+            activeView={activeView}
+            destination={destination}
+            timeScale={timeScale}
+            reducedMotion={reducedMotion}
+            onReady={handleReady}
+            onArrive={handleArrive}
+            onSelect={travelTo}
+          />
+        </Suspense>
       </div>
 
       <div className="interface">

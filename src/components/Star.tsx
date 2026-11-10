@@ -31,11 +31,11 @@ void main() {
   float t = uTime * 0.045;
   vec3 drift = vec3(t, t * 1.31, -t * 0.73);
   float granules = fbm4(p * 6.5 + drift) * 0.5 + 0.5;
-  float filaments = ridgedFbm(p * 3.6 + vec3(-t * 0.6, t * 0.8, t * 0.5));
+  float filaments = ridgedFbm3(p * 3.6 + vec3(-t * 0.6, t * 0.8, t * 0.5));
   float heat = granules * 0.62 + filaments * 0.46 - 0.14;
   heat = pow(max(heat, 0.0), 1.35);
 
-  float spots = smoothstep(0.66, 0.8, fbm(p * 2.6 + vec3(4.8, -2.2, 7.1)));
+  float spots = smoothstep(0.66, 0.8, fbm3(p * 2.6 + vec3(4.8, -2.2, 7.1)));
   heat *= 1.0 - spots * 0.72;
 
   float mu = max(dot(normalize(vWorldNormal), V), 0.0);
@@ -69,7 +69,7 @@ void main() {
   vec2 p = (vUv - 0.5) * 2.0;
   float d = length(p);
   float t = uTime * 0.32;
-  float wisp = fbm(vec3(p * 2.4, t)) * 0.5 + 0.5;
+  float wisp = fbm3(vec3(p * 2.4, t)) * 0.5 + 0.5;
   float halo = exp(-d * 3.4) * (0.30 + wisp * 0.20);
   float core = exp(-d * 18.0) * 1.35;
   float streak = exp(-abs(p.y) * 44.0) * exp(-abs(p.x) * 3.1) * 0.14;
@@ -130,7 +130,7 @@ export function Star({ reducedMotion, timeScale }: StarProps) {
   return (
     <>
       <mesh ref={glowRef} renderOrder={-1} raycast={() => null}>
-        <planeGeometry args={[11, 11]} />
+        <planeGeometry args={[9, 9]} />
         <shaderMaterial
           ref={glowMaterialRef}
           vertexShader={glowVertex}
