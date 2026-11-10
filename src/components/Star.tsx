@@ -1,8 +1,19 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { AdditiveBlending, BackSide, type Mesh, type ShaderMaterial } from 'three'
+import {
+  AdditiveBlending,
+  BackSide,
+  CatmullRomCurve3,
+  DoubleSide,
+  TubeGeometry,
+  Vector3,
+  type Group,
+  type Mesh,
+  type ShaderMaterial,
+} from 'three'
 import { noiseGLSL } from '../shaders/noise'
 import { bodyVertexGLSL } from '../shaders/common'
+import { arcPoint, prominenceEnvelope } from '../prominences'
 
 const surfaceFragment = /* glsl */ `
 uniform float uTime;
@@ -123,28 +134,151 @@ void main() {
 }
 `
 
+const prominenceVertex = /* glsl */ `
+varying vec2 vUv;
+varying vec3 vViewNormal;
+varying vec3 vWorldPosition;
+void main() {
+  vUv = uv;
+  vViewNormal = normalize(normalMatrix * normal);
+  vec4 world = modelMatrix * vec4(position, 1.0);
+  vWorldPosition = world.xyz;
+  gl_Position = projectionMatrix * viewMatrix * world;
+}
+`
+
+const prominenceFragment = /* glsl */ `
+uniform float uTime;
+uniform float uEnergy;
+uniform float uBrightness;
+varying vec2 vUv;
+varying vec3 vViewNormal;
+varying vec3 vWorldPosition;
+${noiseGLSL}
+
+void main() {
+  // The star sits at the world origin, so the radial direction of a loop
+  // point is its bearing on the photosphere.
+  vec3 anchor = normalize(vWorldPosition);
+  vec3 view = normalize(cameraPosition - vWorldPosition);
+  // Seen head-on a prominence is a dark filament against the disk, so it
+  // shows only near the limb and fades out over the bright face.
+  float facing = abs(dot(anchor, view));
+  float limb = 1.0 - smoothstep(0.42, 0.8, facing);
+  // Cylindrical falloff across the tube: glowing gas, not solid geometry.
+  float soft = smoothstep(0.0, 0.55, abs(dot(normalize(vViewNormal), vec3(0.0, 0.0, 1.0))));
+
+  // Footpoints carry more emission than the thin arch between them.
+  float body = 0.55 + 0.45 * pow(1.0 - sin(3.14159 * vUv.x), 1.5);
+  float flow = fbm3(vec3(vUv.x * 4.0, vUv.y * 1.5, uTime * 0.22)) * 0.5 + 0.5;
+
+  float alpha = uEnergy * limb * soft * body * (0.5 + 0.5 * flow) * uBrightness;
+  vec3 color = mix(vec3(1.0, 0.16, 0.06), vec3(1.0, 0.55, 0.3), clamp(flow * 0.7 + uEnergy * 0.3, 0.0, 1.0));
+  gl_FragColor = vec4(color * alpha, alpha);
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
+}
+`
+
+const PROMINENCE_RADIUS = 2.35
+
+function buildLoopGeometry(spec: ProminenceSpec) {
+  const a = new Vector3(...spec.a).normalize()
+  const b = new Vector3(...spec.b).normalize()
+  const points: Vector3[] = []
+  for (let i = 0; i <= 20; i++) {
+    points.push(arcPoint(a, b, spec.apex, i / 20, new Vector3()).multiplyScalar(PROMINENCE_RADIUS))
+  }
+  return new TubeGeometry(new CatmullRomCurve3(points), 48, spec.tube, 6, false)
+}
+
+type ProminenceSpec = {
+  a: [number, number, number]
+  b: [number, number, number]
+  apex: number
+  tube: number
+  period: number
+  offset: number
+  brightness: number
+}
+
+/**
+ * Loops spread across longitudes (~51° apart) so any camera azimuth keeps one
+ * or two of them near the visible limb; latitudes and apex heights vary so the
+ * limb line never reads as a fence. Periods and offsets are staggered so about
+ * half the set is alive at once.
+ */
+const PROMINENCES: ProminenceSpec[] = [
+  { a: [0.98, 0.14, 0.14], b: [0.93, 0.28, 0.26], apex: 0.34, tube: 0.042, period: 34, offset: 0.05, brightness: 2.6 },
+  { a: [0.53, 0.78, 0.33], b: [0.62, 0.76, 0.19], apex: 0.24, tube: 0.034, period: 41, offset: 0.35, brightness: 2.0 },
+  { a: [-0.28, -0.87, 0.4], b: [-0.12, -0.93, 0.36], apex: 0.4, tube: 0.048, period: 47, offset: 0.6, brightness: 2.8 },
+  { a: [-0.83, 0.32, -0.45], b: [-0.68, 0.45, -0.58], apex: 0.26, tube: 0.038, period: 30, offset: 0.8, brightness: 2.2 },
+  { a: [-0.12, 0.55, -0.83], b: [0.05, 0.62, -0.78], apex: 0.36, tube: 0.04, period: 44, offset: 0.5, brightness: 2.4 },
+  { a: [0.42, -0.72, -0.55], b: [0.56, -0.66, -0.5], apex: 0.3, tube: 0.044, period: 38, offset: 0.72, brightness: 2.9 },
+  { a: [-0.96, -0.1, 0.26], b: [-0.9, -0.22, 0.37], apex: 0.22, tube: 0.034, period: 52, offset: 0.22, brightness: 2.1 },
+]
+
+function ProminenceLoop({ spec, reducedMotion, timeScale }: {
+  spec: ProminenceSpec
+  reducedMotion: boolean
+  timeScale: number
+}) {
+  const materialRef = useRef<ShaderMaterial>(null)
+  const geometry = useMemo(() => buildLoopGeometry(spec), [spec])
+  const uniforms = useMemo(() => ({
+    uEnergy: { value: 0 },
+    uTime: { value: 0 },
+    uBrightness: { value: spec.brightness },
+  }), [spec])
+  const time = useRef(0)
+
+  useFrame((_, rawDelta) => {
+    const material = materialRef.current
+    if (!material || reducedMotion) return
+    time.current += Math.min(rawDelta, 0.1) * timeScale
+    material.uniforms.uEnergy.value = prominenceEnvelope(time.current / spec.period - spec.offset)
+    material.uniforms.uTime.value = time.current
+  })
+
+  return (
+    <mesh geometry={geometry} raycast={() => null}>
+      <shaderMaterial
+        ref={materialRef}
+        vertexShader={prominenceVertex}
+        fragmentShader={prominenceFragment}
+        uniforms={uniforms}
+        transparent
+        depthWrite={false}
+        side={DoubleSide}
+        blending={AdditiveBlending}
+      />
+    </mesh>
+  )
+}
+
 type StarProps = {
   reducedMotion: boolean
   timeScale: number
 }
 
 export function Star({ reducedMotion, timeScale }: StarProps) {
-  const surfaceRef = useRef<Mesh>(null)
+  const rotationRef = useRef<Group>(null)
   const glowRef = useRef<Mesh>(null)
   const surfaceMaterialRef = useRef<ShaderMaterial>(null)
   const glowMaterialRef = useRef<ShaderMaterial>(null)
   const surfaceUniforms = useMemo(() => ({ uTime: { value: 0 }, uSpotTime: { value: 0 } }), [])
   const glowUniforms = useMemo(() => ({ uTime: { value: 0 } }), [])
-
   useFrame((state, rawDelta) => {
     const delta = Math.min(rawDelta, 0.1)
+    // The photosphere and its prominences rotate together: the loops are
+    // anchored to the surface, so one clock drives the whole group.
+    if (rotationRef.current) rotationRef.current.rotation.y += delta * 0.004 * timeScale
     const glow = glowRef.current
     if (glow) {
       glow.quaternion.copy(state.camera.quaternion)
       glow.position.copy(state.camera.position).normalize().multiplyScalar(2.42)
     }
     if (reducedMotion) return
-    if (surfaceRef.current) surfaceRef.current.rotation.y += delta * 0.004 * timeScale
     if (surfaceMaterialRef.current) {
       // Granulation churns every few scene-minutes; spot groups drift for days.
       surfaceMaterialRef.current.uniforms.uTime.value += delta * timeScale
@@ -167,15 +301,20 @@ export function Star({ reducedMotion, timeScale }: StarProps) {
           blending={AdditiveBlending}
         />
       </mesh>
-      <mesh ref={surfaceRef} rotation={[0, 0.6, 0]}>
-        <sphereGeometry args={[2.35, 96, 96]} />
-        <shaderMaterial
-          ref={surfaceMaterialRef}
-          vertexShader={bodyVertexGLSL(false)}
-          fragmentShader={surfaceFragment}
-          uniforms={surfaceUniforms}
-        />
-      </mesh>
+      <group ref={rotationRef}>
+        <mesh rotation={[0, 0.6, 0]}>
+          <sphereGeometry args={[2.35, 96, 96]} />
+          <shaderMaterial
+            ref={surfaceMaterialRef}
+            vertexShader={bodyVertexGLSL(false)}
+            fragmentShader={surfaceFragment}
+            uniforms={surfaceUniforms}
+          />
+        </mesh>
+        {PROMINENCES.map((spec, index) => (
+          <ProminenceLoop key={index} spec={spec} reducedMotion={reducedMotion} timeScale={timeScale} />
+        ))}
+      </group>
       <mesh raycast={() => null}>
         <sphereGeometry args={[2.75, 64, 64]} />
         <shaderMaterial
