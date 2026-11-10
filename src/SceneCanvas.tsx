@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { PerformanceMonitor } from '@react-three/drei'
-import { ACESFilmicToneMapping, SRGBColorSpace } from 'three'
+import { ACESFilmicToneMapping, SRGBColorSpace, type WebGLRenderer } from 'three'
 import { SpaceScene } from './components/SpaceScene'
 import type { SceneView } from './planets'
 
@@ -34,24 +34,32 @@ export default function SceneCanvas({
   onSelect,
 }: SceneCanvasProps) {
   const [dpr, setDpr] = useState(getMaxDpr)
+  const [contextLost, setContextLost] = useState(false)
   const handleQualityChange = useCallback(({ factor }: { factor: number }) => {
     const nextDpr = MIN_DPR + (getMaxDpr() - MIN_DPR) * factor
     setDpr(Math.round(nextDpr * 20) / 20)
   }, [])
+  const handleCreated = useCallback(({ gl }: { gl: WebGLRenderer }) => {
+    gl.domElement.tabIndex = 0
+    gl.toneMapping = ACESFilmicToneMapping
+    gl.toneMappingExposure = 1.1
+    gl.outputColorSpace = SRGBColorSpace
+    gl.domElement.addEventListener('webglcontextlost', (event) => {
+      event.preventDefault()
+      setContextLost(true)
+    })
+    gl.domElement.addEventListener('webglcontextrestored', () => setContextLost(false))
+  }, [])
 
   return (
-    <Canvas
-      aria-label={label}
-      camera={{ position: [0, 0, 11.4], fov: 36, near: 0.1, far: 160 }}
-      dpr={dpr}
-      gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
-      onCreated={({ gl }) => {
-        gl.domElement.tabIndex = 0
-        gl.toneMapping = ACESFilmicToneMapping
-        gl.toneMappingExposure = 1.1
-        gl.outputColorSpace = SRGBColorSpace
-      }}
-    >
+    <>
+      <Canvas
+        aria-label={label}
+        camera={{ position: [0, 0, 11.4], fov: 36, near: 0.1, far: 160 }}
+        dpr={dpr}
+        gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
+        onCreated={handleCreated}
+      >
       <PerformanceMonitor
         factor={1}
         step={0.2}
@@ -71,6 +79,15 @@ export default function SceneCanvas({
           onSelect={onSelect}
         />
       </PerformanceMonitor>
-    </Canvas>
+      </Canvas>
+      {contextLost && (
+        <div className="webgl-fallback webgl-fallback--overlay" role="alert">
+          <div className="webgl-fallback-inner">
+            <h2>Контекст WebGL потерян</h2>
+            <p>Перезагрузите страницу, чтобы вернуть сцену. Если проблема повторяется — обновите видеодрайвер.</p>
+          </div>
+        </div>
+      )}
+    </>
   )
 }

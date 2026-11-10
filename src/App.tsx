@@ -12,6 +12,18 @@ function formatSpeed(speed: number) {
   return speed === 0.5 ? '½' : String(speed)
 }
 
+function detectWebGLSupport() {
+  try {
+    const canvas = document.createElement('canvas')
+    return Boolean(
+      window.WebGLRenderingContext
+        && (canvas.getContext('webgl2') || canvas.getContext('webgl')),
+    )
+  } catch {
+    return false
+  }
+}
+
 function OrbitMark({ className = '' }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 40 40" fill="none" aria-hidden="true">
@@ -39,6 +51,7 @@ function useReducedMotion() {
 
 function App() {
   const [ready, setReady] = useState(false)
+  const [webglSupported] = useState(detectWebGLSupport)
   const [activeView, setActiveView] = useState<SceneView>('aurelia')
   const [destination, setDestination] = useState<SceneView>('aurelia')
   const reducedMotion = useReducedMotion()
@@ -86,26 +99,28 @@ function App() {
       data-view={activeView}
       data-reduced-motion={reducedMotion || undefined}
     >
-      <div className="scene">
-        <Suspense fallback={null}>
-          <SceneCanvas
-            label={travelling
-              ? `Перелёт: ${currentName} — ${destinationName}`
-              : body
-                ? `${isStar ? 'Интерактивная сцена звезды' : 'Интерактивная сцена планеты'} ${body.label}. Перетаскивайте для вращения и используйте колесо для масштабирования.`
-                : 'Обзор системы. Выберите мир или звезду нажатием на сферу или подпись.'}
-            activeView={activeView}
-            destination={destination}
-            timeScale={timeScale}
-            reducedMotion={reducedMotion}
-            onReady={handleReady}
-            onArrive={handleArrive}
-            onSelect={travelTo}
-          />
-        </Suspense>
-      </div>
+      {webglSupported && (
+        <div className="scene">
+          <Suspense fallback={null}>
+            <SceneCanvas
+              label={travelling
+                ? `Перелёт: ${currentName} — ${destinationName}`
+                : body
+                  ? `${isStar ? 'Интерактивная сцена звезды' : 'Интерактивная сцена планеты'} ${body.label}. Перетаскивайте для вращения и используйте колесо для масштабирования.`
+                  : 'Обзор системы. Выберите мир или звезду нажатием на сферу или подпись.'}
+              activeView={activeView}
+              destination={destination}
+              timeScale={timeScale}
+              reducedMotion={reducedMotion}
+              onReady={handleReady}
+              onArrive={handleArrive}
+              onSelect={travelTo}
+            />
+          </Suspense>
+        </div>
+      )}
 
-      <div className="interface">
+      <div className="interface" inert={!webglSupported || undefined}>
         <header className="topbar reveal">
           <div className="brand">
             <OrbitMark className="brand-mark" />
@@ -290,6 +305,19 @@ function App() {
           <div className="loader-track"><span /></div>
         </div>
       </div>
+
+      {!webglSupported && (
+        <div className="webgl-fallback" role="alert">
+          <div className="webgl-fallback-inner">
+            <OrbitMark className="loader-mark" />
+            <h2>WebGL недоступен</h2>
+            <p>Сцена считается на вашем устройстве в реальном времени — для неё нужен WebGL2 или WebGL.</p>
+            <p className="webgl-fallback-hint">
+              Включите аппаратное ускорение в настройках браузера, обновите видеодрайвер и перезагрузите страницу.
+            </p>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
