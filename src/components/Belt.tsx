@@ -20,7 +20,13 @@ varying vec3 vWorldPosition;
 varying vec3 vInstanceOffset;
 
 void main() {
-  vec3 N = normalize(cross(dFdx(vWorldPosition), dFdy(vWorldPosition)));
+  // The derivative-based face normal degenerates on silhouette quads; the
+  // radial fallback keeps a single NaN pixel out of the bloom chain, where
+  // the blur would otherwise spread it over the whole frame.
+  vec3 flatNormal = cross(dFdx(vWorldPosition), dFdy(vWorldPosition));
+  vec3 N = length(flatNormal) > 1e-8
+    ? normalize(flatNormal)
+    : normalize(vWorldPosition - vInstanceOffset);
   vec3 L = normalize(-vWorldPosition);
   float ndl = max(dot(N, L), 0.0);
 

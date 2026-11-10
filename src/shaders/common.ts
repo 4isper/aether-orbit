@@ -25,14 +25,20 @@ ${withUv ? '  vUv = uv;' : ''}
 /** Tangent-space normal perturbation for micro-relief shading. */
 export const perturbNormalGLSL = /* glsl */ `
 vec3 perturbNormal(vec3 surfacePosition, vec3 surfaceNormal, float height) {
-  vec3 sigmaX = normalize(dFdx(surfacePosition));
-  vec3 sigmaY = normalize(dFdy(surfacePosition));
+  // Derivatives collapse on degenerate silhouette quads; falling back to the
+  // geometric normal there keeps a single NaN pixel out of the bloom chain,
+  // where the blur would otherwise spread it over the whole frame.
+  vec3 dx = dFdx(surfacePosition);
+  vec3 dy = dFdy(surfacePosition);
+  vec3 sigmaX = length(dx) > 1e-7 ? dx / length(dx) : surfaceNormal;
+  vec3 sigmaY = length(dy) > 1e-7 ? dy / length(dy) : surfaceNormal;
   vec3 R1 = cross(sigmaY, surfaceNormal);
   vec3 R2 = cross(surfaceNormal, sigmaX);
   float det = dot(sigmaX, R1);
   vec3 gradient = sign(det) * (
     dFdx(height) * R1 + dFdy(height) * R2
   );
-  return normalize(abs(det) * surfaceNormal - gradient);
+  vec3 bent = abs(det) * surfaceNormal - gradient;
+  return length(bent) > 1e-9 ? bent / length(bent) : surfaceNormal;
 }
 `
