@@ -18,6 +18,7 @@ import { Atmosphere } from './Atmosphere'
 import { Moon, MOON_RADIUS } from './Moon'
 import { aureliaClock, starFlux } from '../orbits'
 import { useSunDirection } from '../hooks/useSunDirection'
+import { t, type Locale } from '../strings'
 
 const textureUrls = [
   '/textures/earth-day.webp',
@@ -236,9 +237,10 @@ type PlanetProps = {
   reducedMotion: boolean
   timeScale: number
   showMoonLabel?: boolean
+  locale: Locale
 }
 
-export function Planet({ reducedMotion, timeScale, showMoonLabel }: PlanetProps) {
+export function Planet({ reducedMotion, timeScale, showMoonLabel, locale }: PlanetProps) {
   const groupRef = useRef<Group>(null)
   const surfaceRef = useRef<Mesh>(null)
   const cloudsRef = useRef<Mesh>(null)
@@ -413,7 +415,7 @@ export function Planet({ reducedMotion, timeScale, showMoonLabel }: PlanetProps)
         <Moon ref={moonRef} materialRef={moonMaterialRef}>
           {showMoonLabel && (
             <Html center position={[0, 2.4, 0]} zIndexRange={[1, 1]} style={{ pointerEvents: 'none' }}>
-              <span className="moon-label" aria-hidden="true">Луна</span>
+              <span className="moon-label" aria-hidden="true">{t(locale, 'moon')}</span>
             </Html>
           )}
         </Moon>

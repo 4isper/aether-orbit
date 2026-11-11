@@ -1,7 +1,8 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { t, type Locale } from './strings'
 
-type SceneErrorBoundaryProps = { children: ReactNode }
+type SceneErrorBoundaryProps = { children: ReactNode; locale: Locale }
 type SceneErrorBoundaryState = { failed: boolean }
 
 /**
@@ -27,8 +28,8 @@ export class SceneErrorBoundary extends Component<SceneErrorBoundaryProps, Scene
       return createPortal(
         <div className="webgl-fallback" role="alert">
           <div className="webgl-fallback-inner">
-            <h2>Сцена не запустилась</h2>
-            <p>Произошла ошибка во время инициализации сцены. Перезагрузите страницу — если не поможет, проверьте поддержку WebGL и видеодрайвер.</p>
+            <h2>{t(this.props.locale, 'errorTitle')}</h2>
+            <p>{t(this.props.locale, 'errorBody')}</p>
           </div>
         </div>,
         document.body,

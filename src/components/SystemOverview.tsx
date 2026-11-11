@@ -5,6 +5,7 @@ import { Vector3, type Group } from 'three'
 import { bodies, planetIds, planets, type PlanetId } from '../planets'
 import { orbitPoint, planetPosition } from '../orbits'
 import { cometOrbitPoint, cometPosition } from '../comet'
+import { t, type Locale } from '../strings'
 
 const guideColors: Record<PlanetId, string> = {
   aurelia: '#8197aa',
@@ -15,9 +16,10 @@ const guideColors: Record<PlanetId, string> = {
 type SystemOverviewProps = {
   onSelect: (id: PlanetId | 'comet') => void
   timeRef: { current: number }
+  locale: Locale
 }
 
-export function SystemOverview({ onSelect, timeRef }: SystemOverviewProps) {
+export function SystemOverview({ onSelect, timeRef, locale }: SystemOverviewProps) {
   const labelRefs = useRef<Record<PlanetId, Group | null>>({ aurelia: null, cinder: null, vesper: null })
   const cometLabelRef = useRef<Group | null>(null)
   const scratch = useMemo(() => new Vector3(), [])
@@ -100,12 +102,12 @@ export function SystemOverview({ onSelect, timeRef }: SystemOverviewProps) {
             <button
               type="button"
               className={`system-label system-label--${id}`}
-              aria-label={`Исследовать ${planets[id].name}`}
+              aria-label={t(locale, 'explorePlanet', { name: planets[id].name })}
               onClick={() => onSelect(id)}
             >
               <small>{planets[id].code}</small>
               <span>{planets[id].name}</span>
-              <small>Выйти на орбиту</small>
+              <small>{t(locale, 'toOrbit')}</small>
             </button>
           </Html>
         </group>
@@ -115,12 +117,12 @@ export function SystemOverview({ onSelect, timeRef }: SystemOverviewProps) {
           <button
             type="button"
             className="system-label system-label--comet"
-            aria-label={`Исследовать ${bodies.comet.name}`}
+            aria-label={t(locale, 'explorePlanet', { name: bodies.comet.name })}
             onClick={() => onSelect('comet')}
           >
             <small>{bodies.comet.code}</small>
             <span>{bodies.comet.name}</span>
-            <small>К комете</small>
+            <small>{t(locale, 'toComet')}</small>
           </button>
         </Html>
       </group>

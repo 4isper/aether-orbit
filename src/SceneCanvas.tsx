@@ -6,6 +6,7 @@ import { SceneErrorBoundary } from './SceneErrorBoundary'
 import { SpaceScene } from './components/SpaceScene'
 import type { SceneView } from './planets'
 import type { CameraPose } from './camera-math'
+import type { Locale } from './strings'
 
 const MIN_DPR = 0.85
 const MAX_DPR = 1.75
@@ -21,6 +22,7 @@ type SceneCanvasProps = {
   initialView: SceneView
   initialPose?: CameraPose | null
   timeScale: number
+  locale: Locale
   reducedMotion: boolean
   onReady: () => void
   onArrive: (view: SceneView) => void
@@ -35,6 +37,7 @@ export default function SceneCanvas({
   initialView,
   initialPose,
   timeScale,
+  locale,
   reducedMotion,
   onReady,
   onArrive,
@@ -72,7 +75,7 @@ export default function SceneCanvas({
         gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
         onCreated={handleCreated}
       >
-      <SceneErrorBoundary>
+      <SceneErrorBoundary locale={locale}>
         <PerformanceMonitor
           factor={1}
           step={0.2}
@@ -88,6 +91,7 @@ export default function SceneCanvas({
             initialView={initialView}
             initialPose={initialPose}
             timeScale={timeScale}
+            locale={locale}
             reducedMotion={reducedMotion}
             lowEnd={lowEnd}
             onReady={onReady}

@@ -16,6 +16,7 @@ import { SystemOverview } from './SystemOverview'
 import { planetIds, type PlanetId, type SceneView } from '../planets'
 import { planetPosition } from '../orbits'
 import type { CameraPose } from '../camera-math'
+import type { Locale } from '../strings'
 
 function SceneReady({ onReady }: { onReady: () => void }) {
   const frames = useRef(0)
@@ -60,6 +61,7 @@ type SpaceSceneProps = {
   initialView: SceneView
   initialPose?: CameraPose | null
   timeScale: number
+  locale: Locale
   reducedMotion: boolean
   lowEnd?: boolean
   onReady: () => void
@@ -68,7 +70,7 @@ type SpaceSceneProps = {
   onSelect: (view: SceneView) => void
 }
 
-export function SpaceScene({ activeView, destination, initialView, initialPose, timeScale, reducedMotion, lowEnd = false, onReady, onArrive, onSharePose, onSelect }: SpaceSceneProps) {
+export function SpaceScene({ activeView, destination, initialView, initialPose, timeScale, locale, reducedMotion, lowEnd = false, onReady, onArrive, onSharePose, onSelect }: SpaceSceneProps) {
   const gl = useThree((state) => state.gl)
   const [hovered, setHovered] = useState(false)
   const travelling = activeView !== destination
@@ -132,7 +134,7 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
         <Star reducedMotion={reducedMotion} timeScale={timeScale} />
       </group>
       <group ref={(node) => { groupRefs.current.aurelia = node }} position={initialPositions[0]} {...planetEvents('aurelia')}>
-        <Planet reducedMotion={reducedMotion} timeScale={timeScale} showMoonLabel={overview} />
+        <Planet reducedMotion={reducedMotion} timeScale={timeScale} showMoonLabel={overview} locale={locale} />
       </group>
       <group ref={(node) => { groupRefs.current.cinder = node }} position={initialPositions[1]} {...planetEvents('cinder')}>
         <Cinder reducedMotion={reducedMotion} timeScale={timeScale} />
@@ -149,7 +151,7 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
         sharePose={onSharePose}
         timeRef={orbitTime}
       />
-      {overview && <SystemOverview onSelect={selectBody} timeRef={orbitTime} />}
+      {overview && <SystemOverview onSelect={selectBody} timeRef={orbitTime} locale={locale} />}
       <SceneReady onReady={onReady} />
       <EffectComposer multisampling={0} enabled={!lowEnd}>
         <ComposerCapture />

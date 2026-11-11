@@ -112,6 +112,33 @@
   color: rgba(211, 224, 232, 0.34);
 }
 
+.locale-toggle {
+  margin-left: 14px;
+  padding: 4px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.locale-toggle span {
+  color: rgba(211, 224, 232, 0.32);
+  transition: color 0.3s ease;
+}
+
+.locale-toggle span.is-active {
+  color: rgba(229, 238, 243, 0.85);
+}
+
+.locale-toggle:hover span {
+  color: rgba(229, 238, 243, 0.65);
+}
+
+.locale-toggle:hover span.is-active {
+  color: rgba(243, 248, 251, 0.95);
+}
+
 .intro {
   position: absolute;
   top: 49%;
