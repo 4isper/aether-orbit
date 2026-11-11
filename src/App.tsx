@@ -1,6 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect, useState } from 'react'
 import { SceneErrorBoundary } from './SceneErrorBoundary'
 import { bodies, planetIds, type SceneView } from './planets'
+import { parsePose, poseParams, type CameraPose } from './camera-math'
 import './App.css'
 
 const SceneCanvas = lazy(() => import('./SceneCanvas'))
@@ -16,8 +17,15 @@ function readInitialView(): SceneView {
   return SCENE_VIEWS.includes(param as SceneView) ? (param as SceneView) : 'aurelia'
 }
 
-function urlFor(view: SceneView) {
-  return view === 'aurelia' ? '/' : `/?view=${view}`
+/** Deep link support: ?yaw=…&pitch=…&zoom=… restores the saved camera pose. */
+function readInitialPose(): CameraPose | null {
+  return parsePose(new URLSearchParams(window.location.search))
+}
+
+function urlFor(view: SceneView, pose?: CameraPose) {
+  const suffix = pose ? `?${poseParams(pose)}` : ''
+  if (view === 'aurelia') return suffix ? `/${suffix}` : '/'
+  return pose ? `/?view=${view}&${poseParams(pose)}` : `/?view=${view}`
 }
 
 function formatSpeed(speed: number) {
@@ -63,6 +71,7 @@ function useReducedMotion() {
 
 function App() {
   const [initialView] = useState(readInitialView)
+  const [initialPose] = useState(readInitialPose)
   const [ready, setReady] = useState(false)
   const [webglSupported] = useState(detectWebGLSupport)
   const [activeView, setActiveView] = useState<SceneView>(initialView)
@@ -80,6 +89,9 @@ function App() {
   const handleArrive = useCallback((arrived: SceneView) => {
     setActiveView(arrived)
     window.history.replaceState(null, '', urlFor(arrived))
+  }, [])
+  const handleSharePose = useCallback((view: SceneView, pose: CameraPose) => {
+    window.history.replaceState(null, '', urlFor(view, pose))
   }, [])
   const travelTo = (next: SceneView) => {
     if (!ready) return
@@ -148,10 +160,12 @@ function App() {
               activeView={activeView}
               destination={destination}
               initialView={initialView}
+              initialPose={initialPose}
               timeScale={timeScale}
                 reducedMotion={reducedMotion}
                 onReady={handleReady}
                 onArrive={handleArrive}
+                onSharePose={handleSharePose}
                 onSelect={travelTo}
               />
             </Suspense>

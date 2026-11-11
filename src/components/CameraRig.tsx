@@ -5,6 +5,7 @@ import { type SceneView } from '../planets'
 import { planetPosition } from '../orbits'
 import { cometPosition } from '../comet'
 import {
+  clampPose,
   computeOverviewPose,
   FLIGHT_DURATION,
   INTRO_DURATION,
@@ -14,27 +15,43 @@ import {
   pinchZoom,
   rotateOverviewPose,
   viewZoomBounds,
+  type CameraPose,
 } from '../camera-math'
 
 type CameraRigProps = {
   initialView: SceneView
+  initialPose?: CameraPose | null
   reducedMotion: boolean
   destination: SceneView
   onArrive: (view: SceneView) => void
+  sharePose?: (view: SceneView, pose: CameraPose) => void
   timeRef: { current: number }
 }
 
 const MAX_STEP = 0.1
+const SHARE_INTERVAL = 1.5
 
-export function CameraRig({ initialView, reducedMotion, destination, onArrive, timeRef }: CameraRigProps) {
+export function CameraRig({ initialView, initialPose, reducedMotion, destination, onArrive, sharePose, timeRef }: CameraRigProps) {
   const gl = useThree((state) => state.gl)
   const size = useThree((state) => state.size)
   const overviewPose = useMemo(
     () => computeOverviewPose(size.width, size.height),
     [size.width, size.height],
   )
-  const target = useRef({ yaw: 0, pitch: 0, zoom: viewZoomBounds(initialView).distance })
-  const current = useRef({ yaw: 0, pitch: 0, zoom: viewZoomBounds(initialView).distance })
+  const restored = useMemo(
+    () => (initialPose ? clampPose(initialPose, initialView) : null),
+    [initialPose, initialView],
+  )
+  const initial = useMemo(
+    () => ({
+      yaw: restored?.yaw ?? 0,
+      pitch: restored?.pitch ?? 0,
+      zoom: restored?.zoom ?? viewZoomBounds(initialView).distance,
+    }),
+    [restored, initialView],
+  )
+  const target = useRef({ ...initial })
+  const current = useRef({ ...initial })
   const pointer = useRef({ x: 0, y: 0 })
   const drag = useRef({ active: false, x: 0, y: 0 })
   const pointers = useRef(new Map<number, { x: number; y: number }>())
@@ -49,6 +66,8 @@ export function CameraRig({ initialView, reducedMotion, destination, onArrive, t
   const overviewTarget = useRef({ yaw: 0, pitch: 0, zoom: 1 })
   const overviewCurrent = useRef({ yaw: 0, pitch: 0, zoom: 1 })
   const compOffset = useMemo(() => new Vector3(), [])
+  const shareTimer = useRef(0)
+  const sharedPose = useRef({ yaw: NaN, pitch: NaN, zoom: NaN })
   const flight = useRef({
     active: false,
     elapsed: 0,
@@ -239,6 +258,7 @@ export function CameraRig({ initialView, reducedMotion, destination, onArrive, t
       drag.current.active = false
       intro.current = 1
       orbitTime.current = 0
+      shareTimer.current = SHARE_INTERVAL
     }
 
     if (journey.active) {
@@ -295,6 +315,23 @@ export function CameraRig({ initialView, reducedMotion, destination, onArrive, t
 
     intro.current = Math.min(1, intro.current + delta / INTRO_DURATION)
     orbitTime.current += delta
+    // Share the settled orbit pose into the URL every so often so the address
+    // bar can always be copied as a deep link to this exact framing. Parallax
+    // and idle drift are intentionally not shared: they are transient.
+    shareTimer.current += delta
+    if (sharePose && shareTimer.current >= SHARE_INTERVAL) {
+      shareTimer.current = 0
+      const pose = { yaw: current.current.yaw, pitch: current.current.pitch, zoom: current.current.zoom }
+      const last = sharedPose.current
+      if (
+        Math.abs(pose.yaw - last.yaw) > 0.004
+        || Math.abs(pose.pitch - last.pitch) > 0.004
+        || Math.abs(pose.zoom - last.zoom) > 0.05
+      ) {
+        sharedPose.current = { ...pose }
+        sharePose(currentView.current, pose)
+      }
+    }
     const introEase = 1 - Math.pow(1 - intro.current, 3)
     const drift = Math.min(orbitTime.current, 1)
     const clock = state.clock.elapsedTime

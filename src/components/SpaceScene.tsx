@@ -15,6 +15,7 @@ import { Starfield } from './Starfield'
 import { SystemOverview } from './SystemOverview'
 import { planetIds, type PlanetId, type SceneView } from '../planets'
 import { planetPosition } from '../orbits'
+import type { CameraPose } from '../camera-math'
 
 function SceneReady({ onReady }: { onReady: () => void }) {
   const frames = useRef(0)
@@ -57,15 +58,17 @@ type SpaceSceneProps = {
   activeView: SceneView
   destination: SceneView
   initialView: SceneView
+  initialPose?: CameraPose | null
   timeScale: number
   reducedMotion: boolean
   lowEnd?: boolean
   onReady: () => void
   onArrive: (view: SceneView) => void
+  onSharePose: (view: SceneView, pose: CameraPose) => void
   onSelect: (view: SceneView) => void
 }
 
-export function SpaceScene({ activeView, destination, initialView, timeScale, reducedMotion, lowEnd = false, onReady, onArrive, onSelect }: SpaceSceneProps) {
+export function SpaceScene({ activeView, destination, initialView, initialPose, timeScale, reducedMotion, lowEnd = false, onReady, onArrive, onSharePose, onSelect }: SpaceSceneProps) {
   const gl = useThree((state) => state.gl)
   const [hovered, setHovered] = useState(false)
   const travelling = activeView !== destination
@@ -137,7 +140,15 @@ export function SpaceScene({ activeView, destination, initialView, timeScale, re
       <group ref={(node) => { groupRefs.current.vesper = node }} position={initialPositions[2]} {...planetEvents('vesper')}>
         <Vesper reducedMotion={reducedMotion} timeScale={timeScale} />
       </group>
-      <CameraRig initialView={initialView} reducedMotion={reducedMotion} destination={destination} onArrive={onArrive} timeRef={orbitTime} />
+      <CameraRig
+        initialView={initialView}
+        initialPose={initialPose}
+        reducedMotion={reducedMotion}
+        destination={destination}
+        onArrive={onArrive}
+        sharePose={onSharePose}
+        timeRef={orbitTime}
+      />
       {overview && <SystemOverview onSelect={selectBody} timeRef={orbitTime} />}
       <SceneReady onReady={onReady} />
       <EffectComposer multisampling={0} enabled={!lowEnd}>

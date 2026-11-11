@@ -5,6 +5,7 @@ import { ACESFilmicToneMapping, SRGBColorSpace, type WebGLRenderer } from 'three
 import { SceneErrorBoundary } from './SceneErrorBoundary'
 import { SpaceScene } from './components/SpaceScene'
 import type { SceneView } from './planets'
+import type { CameraPose } from './camera-math'
 
 const MIN_DPR = 0.85
 const MAX_DPR = 1.75
@@ -18,10 +19,12 @@ type SceneCanvasProps = {
   activeView: SceneView
   destination: SceneView
   initialView: SceneView
+  initialPose?: CameraPose | null
   timeScale: number
   reducedMotion: boolean
   onReady: () => void
   onArrive: (view: SceneView) => void
+  onSharePose: (view: SceneView, pose: CameraPose) => void
   onSelect: (view: SceneView) => void
 }
 
@@ -30,10 +33,12 @@ export default function SceneCanvas({
   activeView,
   destination,
   initialView,
+  initialPose,
   timeScale,
   reducedMotion,
   onReady,
   onArrive,
+  onSharePose,
   onSelect,
 }: SceneCanvasProps) {
   const [dpr, setDpr] = useState(getMaxDpr)
@@ -81,11 +86,13 @@ export default function SceneCanvas({
             activeView={activeView}
             destination={destination}
             initialView={initialView}
+            initialPose={initialPose}
             timeScale={timeScale}
             reducedMotion={reducedMotion}
             lowEnd={lowEnd}
             onReady={onReady}
             onArrive={onArrive}
+            onSharePose={onSharePose}
             onSelect={onSelect}
           />
         </PerformanceMonitor>

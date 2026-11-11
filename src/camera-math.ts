@@ -67,6 +67,48 @@ export function viewZoomBounds(view: SceneView) {
   return { distance: PLANET_VIEW_DISTANCE, min: MIN_ZOOM, max: MAX_ZOOM }
 }
 
+/**
+ * A shareable camera pose: the orbit angle around a body and the framing
+ * distance, as kept by CameraRig for every non-overview view.
+ */
+export type CameraPose = {
+  yaw: number
+  pitch: number
+  zoom: number
+}
+
+const YAW_LIMIT = 0.32
+const PITCH_LIMIT = 0.18
+
+/** Clamp a pose to what the orbit controls can actually reach for this view. */
+export function clampPose(pose: CameraPose, view: SceneView): CameraPose {
+  const bounds = viewZoomBounds(view)
+  return {
+    yaw: MathUtils.clamp(pose.yaw, -YAW_LIMIT, YAW_LIMIT),
+    pitch: MathUtils.clamp(pose.pitch, -PITCH_LIMIT, PITCH_LIMIT),
+    zoom: MathUtils.clamp(pose.zoom, bounds.min, bounds.max),
+  }
+}
+
+const POSE_FORMAT = { minimumFractionDigits: 0, maximumFractionDigits: 3 } as const
+
+/** Query-string fragment for a pose, e.g. "yaw=0.21&pitch=-0.05&zoom=9.4". */
+export function poseParams(pose: CameraPose): string {
+  const number = (value: number) => value.toLocaleString('en-US', POSE_FORMAT)
+  return `yaw=${number(pose.yaw)}&pitch=${number(pose.pitch)}&zoom=${number(pose.zoom)}`
+}
+
+/** Parse a pose from URL params; null when any part is missing or malformed. */
+export function parsePose(params: URLSearchParams): CameraPose | null {
+  const yaw = params.get('yaw')
+  const pitch = params.get('pitch')
+  const zoom = params.get('zoom')
+  if (!yaw || !pitch || !zoom) return null
+  const pose = { yaw: Number(yaw), pitch: Number(pitch), zoom: Number(zoom) }
+  if (!Number.isFinite(pose.yaw) || !Number.isFinite(pose.pitch) || !Number.isFinite(pose.zoom)) return null
+  return pose
+}
+
 export type OverviewPose = {
   target: Vector3
   position: Vector3

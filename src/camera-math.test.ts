@@ -2,8 +2,11 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { Vector3 } from 'three'
 import {
+  clampPose,
   orbitOffset,
   computeOverviewPose,
+  parsePose,
+  poseParams,
   rotateOverviewPose,
   pinchZoom,
   viewZoomBounds,
@@ -18,6 +21,29 @@ import { planetPosition } from './orbits.ts'
 
 const center = new Vector3(-1.8, 0.5, 0)
 const out = new Vector3()
+
+test('pose params round-trip through parse', () => {
+  const pose = { yaw: 0.21, pitch: -0.05, zoom: 9.4 }
+  const parsed = parsePose(new URLSearchParams(poseParams(pose)))
+  assert.ok(parsed, 'parsed a pose')
+  assert.ok(Math.abs(parsed.yaw - pose.yaw) < 1e-3)
+  assert.ok(Math.abs(parsed.pitch - pose.pitch) < 1e-3)
+  assert.ok(Math.abs(parsed.zoom - pose.zoom) < 1e-3)
+})
+
+test('parse returns null for missing or malformed params', () => {
+  assert.equal(parsePose(new URLSearchParams()), null)
+  assert.equal(parsePose(new URLSearchParams('yaw=abc&pitch=0&zoom=9')), null)
+  assert.equal(parsePose(new URLSearchParams('yaw=0.2&pitch=0')), null)
+})
+
+test('clampPose holds every component inside the view bounds', () => {
+  const clamped = clampPose({ yaw: 5, pitch: -3, zoom: 100 }, 'vesper')
+  const bounds = viewZoomBounds('vesper')
+  assert.ok(Math.abs(clamped.yaw) <= 0.32, `yaw ${clamped.yaw}`)
+  assert.ok(Math.abs(clamped.pitch) <= 0.18, `pitch ${clamped.pitch}`)
+  assert.ok(clamped.zoom <= bounds.max && clamped.zoom >= bounds.min)
+})
 
 test('orbitOffset keeps the requested distance from the center', () => {
   for (const yaw of [-0.32, 0, 0.32]) {
