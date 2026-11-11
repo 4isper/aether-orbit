@@ -10,6 +10,8 @@ export type BodyInfo = {
   description: [string, string]
   radius: string
   metric: [string, string, string]
+  /** What to look for from this orbit, shown in the telemetry card. */
+  facts: [string, string]
 }
 
 export const planets: Record<PlanetId, BodyInfo> = {
@@ -21,6 +23,7 @@ export const planets: Record<PlanetId, BodyInfo> = {
     description: ['На границе света и тени.', 'Новый мир — на расстоянии взгляда.'],
     radius: '1.12',
     metric: ['Дистанция', '384', 'св. года'],
+    facts: ['Авроры у ночных полюсов', 'Транзиты луны по диску Solis'],
   },
   cinder: {
     name: 'Cinder',
@@ -30,6 +33,7 @@ export const planets: Record<PlanetId, BodyInfo> = {
     description: ['Там, где ветер хранит тишину.', 'Следующая остановка — за горизонтом.'],
     radius: '1.03',
     metric: ['Температура', '−42', '°C'],
+    facts: ['Дымка на терминаторе', 'Процедурный микрорельеф'],
   },
   vesper: {
     name: 'Vesper',
@@ -39,6 +43,7 @@ export const planets: Record<PlanetId, BodyInfo> = {
     description: ['Там, где лёд хранит свет.', 'Третий мир — за пределами ветра.'],
     radius: '1.21',
     metric: ['Ветер', '1 800', 'км/ч'],
+    facts: ['Тень колец на поверхности', 'Щель Кассини в ободах'],
   },
 }
 
@@ -50,6 +55,7 @@ export const starInfo: BodyInfo = {
   description: ['Отсюда расходится весь свет.', 'Источник каждой орбиты.'],
   radius: '8.4',
   metric: ['Температура', '5 800', 'K'],
+  facts: ['Протуберанцы у лимба', 'Пятна дрейфуют днями'],
 }
 
 export const cometInfo: BodyInfo = {
@@ -57,9 +63,10 @@ export const cometInfo: BodyInfo = {
   label: 'Борея',
   code: '004',
   title: ['Ледяной', 'гость'],
-  description: ['Хвост тянется строго от звезды.', 'Разгоняется у перицентра — внутри орбиты Aurelia.'],
+  description: ['Ионный хвост — строго от звезды.', 'Пылевой изогнут следом орбиты.'],
   radius: '0.002',
   metric: ['Эксцентриситет', '0.70', 'e'],
+  facts: ['Два хвоста: ион и пыль', 'Разгар у перицентра'],
 }
 
 /** Telemetry for every flyable destination except the system overview. */

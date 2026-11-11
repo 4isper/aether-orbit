@@ -331,6 +331,13 @@ function App() {
                 <span className="telemetry-label">{body.metric[0]}</span>
                 <strong>{body.metric[1]} <small>{body.metric[2]}</small></strong>
               </div>
+              <span className="telemetry-divider" />
+              <div className="telemetry-item telemetry-item--facts">
+                <span className="telemetry-label">Наблюдения</span>
+                {body.facts.map((fact) => (
+                  <span className="telemetry-fact" key={fact}>{fact}</span>
+                ))}
+              </div>
             </aside>
 
             <div className="control-hint reveal" aria-hidden="true">

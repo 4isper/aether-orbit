@@ -229,6 +229,17 @@ h1 > em {
   background: rgba(255, 255, 255, 0.1);
 }
 
+.telemetry-item--facts {
+  gap: 4px;
+}
+
+.telemetry-fact {
+  color: rgba(199, 214, 223, 0.44);
+  font-size: 9.5px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+}
+
 .control-hint {
   position: absolute;
   bottom: 35px;
@@ -966,6 +977,10 @@ h1 > em {
 
   .telemetry-item strong {
     font-size: 18px;
+  }
+
+  .telemetry-item--facts {
+    display: none;
   }
 
   .control-hint {
