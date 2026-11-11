@@ -138,6 +138,7 @@ src/
   App.tsx / App.css    # интерфейс, навигация, loader
 public/textures/       # WebP-карты и ATTRIBUTION.txt
 docs/screenshots/      # кадры для этого README
+docs/rendering.md      # карта рендер-решений: атмосферы, звезда, кольца, хвосты
 ```
 
 ## Производительность
