@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { Vector3 } from 'three'
-import { orbitPoint, planetPosition } from './orbits.ts'
+import { aureliaClock, orbitPoint, planetPeriod, planetPosition, starFlux } from './orbits.ts'
 import { planetIds } from './planets.ts'
 
 const scratch = new Vector3()
@@ -49,4 +49,59 @@ test('planet positions move continuously', () => {
       previous.copy(next)
     }
   }
+})
+
+test('the moon orbits outside the synchronous orbit', () => {
+  // Below the synchronous orbit the tide keeps pulling the moon in: no
+  // stable satellite can orbit faster than its planet spins.
+  const day = (Math.PI * 2) / aureliaClock.spin
+  const month = (Math.PI * 2) / aureliaClock.moonAngularSpeed
+  assert.ok(month > day, `moon period ${month.toFixed(1)} is not above the ${day.toFixed(1)} day`)
+})
+
+test('the moon makes a handful of orbits per year, Earth-scale', () => {
+  const year = planetPeriod('aurelia')
+  const month = (Math.PI * 2) / aureliaClock.moonAngularSpeed
+  const monthsPerYear = year / month
+  assert.ok(
+    monthsPerYear > 2 && monthsPerYear < 7,
+    `${monthsPerYear.toFixed(1)} months per year is outside the plausible band`,
+  )
+})
+
+test('a year of Aurelia holds several day-night cycles', () => {
+  const year = planetPeriod('aurelia')
+  const day = (Math.PI * 2) / aureliaClock.spin
+  const daysPerYear = year / day
+  assert.ok(
+    daysPerYear > 2 && daysPerYear < 60,
+    `${daysPerYear.toFixed(1)} days per year is outside the plausible band`,
+  )
+})
+
+test('planet speeds follow Kepler-3 relative to Aurelia', () => {
+  // T ∝ a^1.5, so the mean motion must fall off as a^-1.5 across the system.
+  const aurelia = {
+    radius: orbitPoint('aurelia', 0, new Vector3()).length(),
+    speed: (Math.PI * 2) / planetPeriod('aurelia'),
+  }
+  for (const id of ['cinder', 'vesper'] as const) {
+    const radius = orbitPoint(id, 0, new Vector3()).length()
+    const speed = (Math.PI * 2) / planetPeriod(id)
+    const expected = aurelia.speed * Math.pow(aurelia.radius / radius, 1.5)
+    const deviation = Math.abs(speed / expected - 1)
+    assert.ok(
+      deviation < 0.01,
+      `${id} speed deviates ${(deviation * 100).toFixed(1)}% from Kepler-3`,
+    )
+  }
+})
+
+test('starlight falls off with distance, unity at Aurelia', () => {
+  assert.ok(Math.abs(starFlux(new Vector3(9, 0, 0)) - 1) < 1e-9)
+  const cinder = starFlux(new Vector3(14, 0, 0))
+  const vesper = starFlux(new Vector3(20, 0, 0))
+  assert.ok(Math.abs(cinder - (9 / 14) ** 1.5) < 1e-9, `Cinder flux ${cinder}`)
+  assert.ok(Math.abs(vesper - (9 / 20) ** 1.5) < 1e-9, `Vesper flux ${vesper}`)
+  assert.ok(cinder > vesper, 'inner worlds must receive more light')
 })

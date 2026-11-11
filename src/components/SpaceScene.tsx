@@ -1,7 +1,7 @@
-import { useMemo, useRef, useState } from 'react'
+import { useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { useCursor } from '@react-three/drei'
-import { Bloom, EffectComposer, Vignette } from '@react-three/postprocessing'
+import { Bloom, EffectComposer, EffectComposerContext, Vignette } from '@react-three/postprocessing'
 import { Vector3, type Group } from 'three'
 import { Backdrop } from './Backdrop'
 import { Belt } from './Belt'
@@ -15,6 +15,8 @@ import { Starfield } from './Starfield'
 import { SystemOverview } from './SystemOverview'
 import { planetIds, type PlanetId, type SceneView } from '../planets'
 import { planetPosition } from '../orbits'
+import type { CameraPose } from '../camera-math'
+import type { Locale } from '../strings'
 
 function SceneReady({ onReady }: { onReady: () => void }) {
   const frames = useRef(0)
@@ -27,17 +29,48 @@ function SceneReady({ onReady }: { onReady: () => void }) {
   return null
 }
 
+/**
+ * Lives inside the EffectComposer so it can re-render the effect chain on
+ * demand: without preserveDrawingBuffer the canvas may only be read in the
+ * same task that drew it.
+ */
+function ComposerCapture() {
+  const { composer } = useContext(EffectComposerContext)
+  const gl = useThree((state) => state.gl)
+
+  useEffect(() => {
+    const capture = (event: Event) => {
+      const name = (event as CustomEvent<{ name?: string }>).detail?.name
+      if (!name) return
+      composer.render()
+      const link = document.createElement('a')
+      link.download = name
+      link.href = gl.domElement.toDataURL('image/png')
+      link.click()
+    }
+    window.addEventListener('aether:screenshot', capture)
+    return () => window.removeEventListener('aether:screenshot', capture)
+  }, [composer, gl])
+
+  return null
+}
+
 type SpaceSceneProps = {
   activeView: SceneView
   destination: SceneView
+  initialView: SceneView
+  initialPose?: CameraPose | null
   timeScale: number
+  locale: Locale
   reducedMotion: boolean
+  lowEnd?: boolean
   onReady: () => void
   onArrive: (view: SceneView) => void
+  onSharePose: (view: SceneView, pose: CameraPose) => void
   onSelect: (view: SceneView) => void
 }
 
-export function SpaceScene({ activeView, destination, timeScale, reducedMotion, onReady, onArrive, onSelect }: SpaceSceneProps) {
+export function SpaceScene({ activeView, destination, initialView, initialPose, timeScale, locale, reducedMotion, lowEnd = false, onReady, onArrive, onSharePose, onSelect }: SpaceSceneProps) {
   const gl = useThree((state) => state.gl)
   const [hovered, setHovered] = useState(false)
   const travelling = activeView !== destination
@@ -60,14 +93,14 @@ export function SpaceScene({ activeView, destination, timeScale, reducedMotion, 
     }
   })
 
-  const selectPlanet = (id: PlanetId) => {
+  const selectBody = (view: SceneView) => {
     setHovered(false)
-    onSelect(id)
+    onSelect(view)
   }
   const planetEvents = (id: PlanetId) => overview ? {
     onClick: (event: ThreeEvent<MouseEvent>) => {
       event.stopPropagation()
-      if (event.delta <= 5) selectPlanet(id)
+      if (event.delta <= 5) selectBody(id)
     },
     onPointerOver: (event: ThreeEvent<PointerEvent>) => {
       event.stopPropagation()
@@ -80,7 +113,7 @@ export function SpaceScene({ activeView, destination, timeScale, reducedMotion, 
       event.stopPropagation()
       if (event.delta <= 5) {
         setHovered(false)
-        onSelect('star')
+        selectBody('star')
       }
     },
     onPointerOver: (event: ThreeEvent<PointerEvent>) => {
@@ -101,7 +134,7 @@ export function SpaceScene({ activeView, destination, timeScale, reducedMotion, 
         <Star reducedMotion={reducedMotion} timeScale={timeScale} />
       </group>
       <group ref={(node) => { groupRefs.current.aurelia = node }} position={initialPositions[0]} {...planetEvents('aurelia')}>
-        <Planet reducedMotion={reducedMotion} timeScale={timeScale} showMoonLabel={overview} />
+        <Planet reducedMotion={reducedMotion} timeScale={timeScale} showMoonLabel={overview} locale={locale} />
       </group>
       <group ref={(node) => { groupRefs.current.cinder = node }} position={initialPositions[1]} {...planetEvents('cinder')}>
         <Cinder reducedMotion={reducedMotion} timeScale={timeScale} />
@@ -109,17 +142,30 @@ export function SpaceScene({ activeView, destination, timeScale, reducedMotion, 
       <group ref={(node) => { groupRefs.current.vesper = node }} position={initialPositions[2]} {...planetEvents('vesper')}>
         <Vesper reducedMotion={reducedMotion} timeScale={timeScale} />
       </group>
-      <CameraRig reducedMotion={reducedMotion} destination={destination} onArrive={onArrive} timeRef={orbitTime} />
-      {overview && <SystemOverview onSelect={selectPlanet} timeRef={orbitTime} />}
+      <CameraRig
+        initialView={initialView}
+        initialPose={initialPose}
+        reducedMotion={reducedMotion}
+        destination={destination}
+        onArrive={onArrive}
+        sharePose={onSharePose}
+        timeRef={orbitTime}
+      />
+      {overview && <SystemOverview onSelect={selectBody} timeRef={orbitTime} locale={locale} />}
       <SceneReady onReady={onReady} />
-      <EffectComposer multisampling={0}>
-        <Bloom
-          mipmapBlur
-          intensity={0.7}
-          luminanceThreshold={0.72}
-          luminanceSmoothing={0.32}
-        />
-        <Vignette offset={0.2} darkness={0.58} />
+      <EffectComposer multisampling={0} enabled={!lowEnd}>
+        <ComposerCapture />
+        {lowEnd ? null : (
+          <>
+            <Bloom
+              mipmapBlur
+              intensity={0.7}
+              luminanceThreshold={0.72}
+              luminanceSmoothing={0.32}
+            />
+            <Vignette offset={0.2} darkness={0.58} />
+          </>
+        )}
       </EffectComposer>
     </>
   )

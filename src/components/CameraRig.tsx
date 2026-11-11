@@ -3,44 +3,71 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { MathUtils, Vector3, type PerspectiveCamera } from 'three'
 import { type SceneView } from '../planets'
 import { planetPosition } from '../orbits'
+import { cometPosition } from '../comet'
 import {
+  clampPose,
   computeOverviewPose,
-  MAX_ZOOM,
-  MIN_ZOOM,
   FLIGHT_DURATION,
   INTRO_DURATION,
   orbitOffset,
-  PLANET_VIEW_DISTANCE,
-  STAR_VIEW_DISTANCE,
+  OVERVIEW_MAX_ZOOM,
+  OVERVIEW_MIN_ZOOM,
+  pinchZoom,
+  rotateOverviewPose,
+  viewZoomBounds,
+  type CameraPose,
 } from '../camera-math'
 
 type CameraRigProps = {
+  initialView: SceneView
+  initialPose?: CameraPose | null
   reducedMotion: boolean
   destination: SceneView
   onArrive: (view: SceneView) => void
+  sharePose?: (view: SceneView, pose: CameraPose) => void
   timeRef: { current: number }
 }
 
 const MAX_STEP = 0.1
+const SHARE_INTERVAL = 1.5
 
-export function CameraRig({ reducedMotion, destination, onArrive, timeRef }: CameraRigProps) {
+export function CameraRig({ initialView, initialPose, reducedMotion, destination, onArrive, sharePose, timeRef }: CameraRigProps) {
   const gl = useThree((state) => state.gl)
   const size = useThree((state) => state.size)
   const overviewPose = useMemo(
     () => computeOverviewPose(size.width, size.height),
     [size.width, size.height],
   )
-  const target = useRef({ yaw: 0, pitch: 0, zoom: PLANET_VIEW_DISTANCE })
-  const current = useRef({ yaw: 0, pitch: 0, zoom: PLANET_VIEW_DISTANCE })
+  const restored = useMemo(
+    () => (initialPose ? clampPose(initialPose, initialView) : null),
+    [initialPose, initialView],
+  )
+  const initial = useMemo(
+    () => ({
+      yaw: restored?.yaw ?? 0,
+      pitch: restored?.pitch ?? 0,
+      zoom: restored?.zoom ?? viewZoomBounds(initialView).distance,
+    }),
+    [restored, initialView],
+  )
+  const target = useRef({ ...initial })
+  const current = useRef({ ...initial })
   const pointer = useRef({ x: 0, y: 0 })
   const drag = useRef({ active: false, x: 0, y: 0 })
+  const pointers = useRef(new Map<number, { x: number; y: number }>())
+  const pinch = useRef<{ startDistance: number; startZoom: number } | null>(null)
   const intro = useRef(reducedMotion ? 1 : 0)
   const orbitTime = useRef(0)
-  const currentView = useRef<SceneView>('aurelia')
-  const requestedView = useRef<SceneView>('aurelia')
+  const currentView = useRef<SceneView>(initialView)
+  const requestedView = useRef<SceneView>(initialView)
   const lookAt = useRef(new Vector3())
   const scratch = useMemo(() => new Vector3(), [])
+  const overviewRotated = useMemo(() => ({ position: new Vector3(), up: new Vector3() }), [])
+  const overviewTarget = useRef({ yaw: 0, pitch: 0, zoom: 1 })
+  const overviewCurrent = useRef({ yaw: 0, pitch: 0, zoom: 1 })
   const compOffset = useMemo(() => new Vector3(), [])
+  const shareTimer = useRef(0)
+  const sharedPose = useRef({ yaw: NaN, pitch: NaN, zoom: NaN })
   const flight = useRef({
     active: false,
     elapsed: 0,
@@ -56,33 +83,85 @@ export function CameraRig({ reducedMotion, destination, onArrive, timeRef }: Cam
     const element = gl.domElement
 
     const reset = () => {
-      if (flight.current.active || currentView.current === 'system') return
-      target.current = { yaw: 0, pitch: 0, zoom: PLANET_VIEW_DISTANCE }
+      if (flight.current.active) return
+      if (currentView.current === 'system') {
+        overviewTarget.current = { yaw: 0, pitch: 0, zoom: 1 }
+        return
+      }
+      target.current = { yaw: 0, pitch: 0, zoom: viewZoomBounds(currentView.current).distance }
     }
 
     const onPointerDown = (event: PointerEvent) => {
-      if (flight.current.active || currentView.current === 'system' || (event.pointerType === 'mouse' && event.button !== 0)) return
+      if (flight.current.active || (event.pointerType === 'mouse' && event.button !== 0)) return
+      pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
+      if (pointers.current.size >= 2) {
+        drag.current.active = false
+        const [first, second] = [...pointers.current.values()]
+        pinch.current = {
+          startDistance: Math.hypot(first.x - second.x, first.y - second.y),
+          startZoom: currentView.current === 'system'
+            ? overviewTarget.current.zoom
+            : target.current.zoom,
+        }
+        return
+      }
       drag.current = { active: true, x: event.clientX, y: event.clientY }
       element.setPointerCapture(event.pointerId)
       element.focus({ preventScroll: true })
     }
 
     const onPointerMove = (event: PointerEvent) => {
-      if (flight.current.active || currentView.current === 'system') return
+      if (flight.current.active) return
       pointer.current.x = (event.clientX / window.innerWidth) * 2 - 1
       pointer.current.y = (event.clientY / window.innerHeight) * 2 - 1
+      const tracked = pointers.current.get(event.pointerId)
+      if (tracked) {
+        tracked.x = event.clientX
+        tracked.y = event.clientY
+      }
+
+      if (pointers.current.size >= 2 && pinch.current) {
+        const [first, second] = [...pointers.current.values()]
+        const distance = Math.hypot(first.x - second.x, first.y - second.y)
+        if (currentView.current === 'system') {
+          overviewTarget.current.zoom = pinchZoom(
+            pinch.current.startZoom, pinch.current.startDistance, distance,
+            OVERVIEW_MIN_ZOOM, OVERVIEW_MAX_ZOOM,
+          )
+        } else {
+          const bounds = viewZoomBounds(currentView.current)
+          target.current.zoom = pinchZoom(
+            pinch.current.startZoom, pinch.current.startDistance, distance,
+            bounds.min, bounds.max,
+          )
+        }
+        return
+      }
       if (!drag.current.active) return
 
       const dx = event.clientX - drag.current.x
       const dy = event.clientY - drag.current.y
-      target.current.yaw = MathUtils.clamp(target.current.yaw - dx * 0.0028, -0.32, 0.32)
-      target.current.pitch = MathUtils.clamp(target.current.pitch + dy * 0.0022, -0.18, 0.18)
+      if (currentView.current === 'system') {
+        overviewTarget.current.yaw = MathUtils.clamp(overviewTarget.current.yaw - dx * 0.0035, -Math.PI, Math.PI)
+        overviewTarget.current.pitch = MathUtils.clamp(overviewTarget.current.pitch + dy * 0.0022, -0.6, 0.6)
+      } else {
+        target.current.yaw = MathUtils.clamp(target.current.yaw - dx * 0.0028, -0.32, 0.32)
+        target.current.pitch = MathUtils.clamp(target.current.pitch + dy * 0.0022, -0.18, 0.18)
+      }
       drag.current.x = event.clientX
       drag.current.y = event.clientY
     }
 
     const onPointerUp = (event: PointerEvent) => {
-      drag.current.active = false
+      pointers.current.delete(event.pointerId)
+      if (pointers.current.size < 2) pinch.current = null
+      if (pointers.current.size === 1) {
+        // resume rotating from the remaining finger instead of jumping
+        const [rest] = pointers.current.values()
+        drag.current = { active: true, x: rest.x, y: rest.y }
+      } else {
+        drag.current.active = false
+      }
       if (element.hasPointerCapture(event.pointerId)) {
         element.releasePointerCapture(event.pointerId)
       }
@@ -90,16 +169,32 @@ export function CameraRig({ reducedMotion, destination, onArrive, timeRef }: Cam
 
     const onWheel = (event: WheelEvent) => {
       event.preventDefault()
-      if (flight.current.active || currentView.current === 'system') return
-      target.current.zoom = MathUtils.clamp(target.current.zoom + event.deltaY * 0.003, MIN_ZOOM, MAX_ZOOM)
+      if (flight.current.active) return
+      if (currentView.current === 'system') {
+        overviewTarget.current.zoom = MathUtils.clamp(overviewTarget.current.zoom + event.deltaY * 0.0012, 0.7, 1.35)
+        return
+      }
+      const bounds = viewZoomBounds(currentView.current)
+      target.current.zoom = MathUtils.clamp(target.current.zoom + event.deltaY * 0.003, bounds.min, bounds.max)
     }
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (flight.current.active || currentView.current === 'system') return
+      if (flight.current.active) return
       if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', '+', '=', '-'].includes(event.key)) {
         event.preventDefault()
       }
       if (event.key.toLowerCase() === 'r') reset()
+      if (currentView.current === 'system') {
+        if (event.key === 'ArrowLeft') overviewTarget.current.yaw += 0.12
+        if (event.key === 'ArrowRight') overviewTarget.current.yaw -= 0.12
+        if (event.key === 'ArrowUp') overviewTarget.current.pitch += 0.08
+        if (event.key === 'ArrowDown') overviewTarget.current.pitch -= 0.08
+        if (event.key === '+' || event.key === '=') overviewTarget.current.zoom += 0.08
+        if (event.key === '-') overviewTarget.current.zoom -= 0.08
+        overviewTarget.current.pitch = MathUtils.clamp(overviewTarget.current.pitch, -0.6, 0.6)
+        overviewTarget.current.zoom = MathUtils.clamp(overviewTarget.current.zoom, 0.7, 1.35)
+        return
+      }
       if (event.key === 'ArrowLeft') target.current.yaw += 0.035
       if (event.key === 'ArrowRight') target.current.yaw -= 0.035
       if (event.key === 'ArrowUp') target.current.pitch -= 0.025
@@ -108,7 +203,8 @@ export function CameraRig({ reducedMotion, destination, onArrive, timeRef }: Cam
       if (event.key === '-') target.current.zoom += 0.25
       target.current.yaw = MathUtils.clamp(target.current.yaw, -0.32, 0.32)
       target.current.pitch = MathUtils.clamp(target.current.pitch, -0.18, 0.18)
-      target.current.zoom = MathUtils.clamp(target.current.zoom, MIN_ZOOM, MAX_ZOOM)
+      const bounds = viewZoomBounds(currentView.current)
+      target.current.zoom = MathUtils.clamp(target.current.zoom, bounds.min, bounds.max)
     }
 
     element.addEventListener('pointerdown', onPointerDown)
@@ -136,7 +232,13 @@ export function CameraRig({ reducedMotion, destination, onArrive, timeRef }: Cam
     const compact = state.size.width < 700
     const journey = flight.current
     const time = timeRef.current
-    compOffset.set(compact ? -0.45 : -1.8, compact ? 1.3 : 0.5, 0)
+    // The comet is ten times smaller than the planets: its framing offset is
+    // proportionally smaller so it stays inside the frame.
+    if ((journey.active ? destination : currentView.current) === 'comet') {
+      compOffset.set(compact ? -0.3 : -0.6, compact ? 0.9 : 0.3, 0)
+    } else {
+      compOffset.set(compact ? -0.45 : -1.8, compact ? 1.3 : 0.5, 0)
+    }
 
     if (destination !== requestedView.current) {
       requestedView.current = destination
@@ -145,13 +247,18 @@ export function CameraRig({ reducedMotion, destination, onArrive, timeRef }: Cam
       journey.startPosition.copy(camera.position)
       journey.startLook.copy(lookAt.current)
       journey.startUp.copy(camera.up)
-      const initialZoom = destination === 'star' ? STAR_VIEW_DISTANCE : PLANET_VIEW_DISTANCE
+      const initialZoom = viewZoomBounds(destination).distance
       target.current = { yaw: 0, pitch: 0, zoom: initialZoom }
       current.current = { yaw: 0, pitch: 0, zoom: initialZoom }
+      overviewTarget.current = { yaw: 0, pitch: 0, zoom: 1 }
+      overviewCurrent.current = { yaw: 0, pitch: 0, zoom: 1 }
       pointer.current = { x: 0, y: 0 }
+      pointers.current.clear()
+      pinch.current = null
       drag.current.active = false
       intro.current = 1
       orbitTime.current = 0
+      shareTimer.current = SHARE_INTERVAL
     }
 
     if (journey.active) {
@@ -165,11 +272,16 @@ export function CameraRig({ reducedMotion, destination, onArrive, timeRef }: Cam
         journey.endUp.copy(overviewPose.up)
       } else if (destination === 'star') {
         journey.endLook.copy(compOffset)
-        orbitOffset(journey.endLook, 0, 0, STAR_VIEW_DISTANCE + (compact ? 0.55 : 0), journey.endPosition)
+        orbitOffset(journey.endLook, 0, 0, viewZoomBounds(destination).distance + (compact ? 0.55 : 0), journey.endPosition)
         journey.endUp.set(0, 1, 0)
       } else {
-        planetPosition(destination, time, journey.endLook).add(compOffset)
-        orbitOffset(journey.endLook, 0, 0, PLANET_VIEW_DISTANCE + (compact ? 0.55 : 0), journey.endPosition)
+        if (destination === 'comet') {
+          cometPosition(time, journey.endLook)
+        } else {
+          planetPosition(destination, time, journey.endLook)
+        }
+        journey.endLook.add(compOffset)
+        orbitOffset(journey.endLook, 0, 0, viewZoomBounds(destination).distance + (compact ? 0.55 : 0), journey.endPosition)
         journey.endUp.set(0, 1, 0)
       }
       camera.position.lerpVectors(journey.startPosition, journey.endPosition, eased)
@@ -190,8 +302,12 @@ export function CameraRig({ reducedMotion, destination, onArrive, timeRef }: Cam
     }
 
     if (currentView.current === 'system') {
-      camera.position.copy(overviewPose.position)
-      camera.up.copy(overviewPose.up)
+      overviewCurrent.current.yaw = MathUtils.damp(overviewCurrent.current.yaw, overviewTarget.current.yaw, 4, delta)
+      overviewCurrent.current.pitch = MathUtils.damp(overviewCurrent.current.pitch, overviewTarget.current.pitch, 4, delta)
+      overviewCurrent.current.zoom = MathUtils.damp(overviewCurrent.current.zoom, overviewTarget.current.zoom, 3, delta)
+      rotateOverviewPose(overviewPose, overviewCurrent.current.yaw, overviewCurrent.current.pitch, overviewCurrent.current.zoom, overviewRotated)
+      camera.position.copy(overviewRotated.position)
+      camera.up.copy(overviewRotated.up)
       lookAt.current.copy(overviewPose.target)
       camera.lookAt(lookAt.current)
       return
@@ -199,6 +315,23 @@ export function CameraRig({ reducedMotion, destination, onArrive, timeRef }: Cam
 
     intro.current = Math.min(1, intro.current + delta / INTRO_DURATION)
     orbitTime.current += delta
+    // Share the settled orbit pose into the URL every so often so the address
+    // bar can always be copied as a deep link to this exact framing. Parallax
+    // and idle drift are intentionally not shared: they are transient.
+    shareTimer.current += delta
+    if (sharePose && shareTimer.current >= SHARE_INTERVAL) {
+      shareTimer.current = 0
+      const pose = { yaw: current.current.yaw, pitch: current.current.pitch, zoom: current.current.zoom }
+      const last = sharedPose.current
+      if (
+        Math.abs(pose.yaw - last.yaw) > 0.004
+        || Math.abs(pose.pitch - last.pitch) > 0.004
+        || Math.abs(pose.zoom - last.zoom) > 0.05
+      ) {
+        sharedPose.current = { ...pose }
+        sharePose(currentView.current, pose)
+      }
+    }
     const introEase = 1 - Math.pow(1 - intro.current, 3)
     const drift = Math.min(orbitTime.current, 1)
     const clock = state.clock.elapsedTime
@@ -216,6 +349,8 @@ export function CameraRig({ reducedMotion, destination, onArrive, timeRef }: Cam
     const pitch = current.current.pitch - parallaxY * 0.012 + idleY
     if (currentView.current === 'star') {
       scratch.set(0, 0, 0)
+    } else if (currentView.current === 'comet') {
+      cometPosition(time, scratch)
     } else {
       planetPosition(currentView.current, time, scratch)
     }

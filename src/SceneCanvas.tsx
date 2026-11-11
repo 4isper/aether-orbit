@@ -2,8 +2,11 @@ import { useCallback, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { PerformanceMonitor } from '@react-three/drei'
 import { ACESFilmicToneMapping, SRGBColorSpace, type WebGLRenderer } from 'three'
+import { SceneErrorBoundary } from './SceneErrorBoundary'
 import { SpaceScene } from './components/SpaceScene'
 import type { SceneView } from './planets'
+import type { CameraPose } from './camera-math'
+import type { Locale } from './strings'
 
 const MIN_DPR = 0.85
 const MAX_DPR = 1.75
@@ -16,10 +19,14 @@ type SceneCanvasProps = {
   label: string
   activeView: SceneView
   destination: SceneView
+  initialView: SceneView
+  initialPose?: CameraPose | null
   timeScale: number
+  locale: Locale
   reducedMotion: boolean
   onReady: () => void
   onArrive: (view: SceneView) => void
+  onSharePose: (view: SceneView, pose: CameraPose) => void
   onSelect: (view: SceneView) => void
 }
 
@@ -27,17 +34,25 @@ export default function SceneCanvas({
   label,
   activeView,
   destination,
+  initialView,
+  initialPose,
   timeScale,
+  locale,
   reducedMotion,
   onReady,
   onArrive,
+  onSharePose,
   onSelect,
 }: SceneCanvasProps) {
   const [dpr, setDpr] = useState(getMaxDpr)
+  const [lowEnd, setLowEnd] = useState(false)
   const [contextLost, setContextLost] = useState(false)
   const handleQualityChange = useCallback(({ factor }: { factor: number }) => {
     const nextDpr = MIN_DPR + (getMaxDpr() - MIN_DPR) * factor
     setDpr(Math.round(nextDpr * 20) / 20)
+    // Hysteresis: drop the expensive postprocessing below 0.35, restore it
+    // only above 0.5 so the toggle cannot flicker around one threshold.
+    setLowEnd((prev) => (prev ? factor > 0.5 : factor < 0.35))
   }, [])
   const handleCreated = useCallback(({ gl }: { gl: WebGLRenderer }) => {
     gl.domElement.tabIndex = 0
@@ -60,25 +75,32 @@ export default function SceneCanvas({
         gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
         onCreated={handleCreated}
       >
-      <PerformanceMonitor
-        factor={1}
-        step={0.2}
-        iterations={8}
-        ms={250}
-        threshold={0.75}
-        bounds={(refreshRate) => (refreshRate > 100 ? [50, 100] : [42, 56])}
-        onChange={handleQualityChange}
-      >
-        <SpaceScene
-          activeView={activeView}
-          destination={destination}
-          timeScale={timeScale}
-          reducedMotion={reducedMotion}
-          onReady={onReady}
-          onArrive={onArrive}
-          onSelect={onSelect}
-        />
-      </PerformanceMonitor>
+      <SceneErrorBoundary locale={locale}>
+        <PerformanceMonitor
+          factor={1}
+          step={0.2}
+          iterations={8}
+          ms={250}
+          threshold={0.75}
+          bounds={(refreshRate) => (refreshRate > 100 ? [50, 100] : [42, 56])}
+          onChange={handleQualityChange}
+        >
+          <SpaceScene
+            activeView={activeView}
+            destination={destination}
+            initialView={initialView}
+            initialPose={initialPose}
+            timeScale={timeScale}
+            locale={locale}
+            reducedMotion={reducedMotion}
+            lowEnd={lowEnd}
+            onReady={onReady}
+            onArrive={onArrive}
+            onSharePose={onSharePose}
+            onSelect={onSelect}
+          />
+        </PerformanceMonitor>
+      </SceneErrorBoundary>
       </Canvas>
       {contextLost && (
         <div className="webgl-fallback webgl-fallback--overlay" role="alert">

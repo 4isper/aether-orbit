@@ -1,12 +1,15 @@
 import { MathUtils, Vector3 } from 'three'
 import { cometOrbitPoint } from './comet.ts'
-import { planetIds } from './planets.ts'
+import { planetIds, type SceneView } from './planets.ts'
 import { orbitPoint } from './orbits.ts'
 
 export const PLANET_VIEW_DISTANCE = 9
 export const STAR_VIEW_DISTANCE = 11.5
+export const COMET_VIEW_DISTANCE = 3.4
 export const MIN_ZOOM = 7.6
 export const MAX_ZOOM = 12.6
+export const COMET_MIN_ZOOM = 2.2
+export const COMET_MAX_ZOOM = 4.6
 const FLIGHT_TIME = 4.2
 const INTRO_TIME = 4.5
 const OVERVIEW_HALF_FOV_DEG = 18
@@ -44,10 +47,116 @@ export function orbitOffset(
   return out
 }
 
+/**
+ * Camera distance for a two-finger pinch, recomputed from the gesture start so
+ * every move is idempotent. Fingers apart (zoom in) shrink the distance.
+ */
+export function pinchZoom(zoom: number, startDistance: number, nextDistance: number, min: number, max: number) {
+  if (startDistance <= 0 || nextDistance <= 0) return zoom
+  return MathUtils.clamp(zoom * (startDistance / nextDistance), min, max)
+}
+
+/**
+ * Default orbit distance and zoom clamp for a flyable view. The comet orbits
+ * much closer than the planets, so it gets its own tighter range; 'system'
+ * keeps the planet defaults because the overview has its own pose.
+ */
+export function viewZoomBounds(view: SceneView) {
+  if (view === 'star') return { distance: STAR_VIEW_DISTANCE, min: MIN_ZOOM, max: MAX_ZOOM }
+  if (view === 'comet') return { distance: COMET_VIEW_DISTANCE, min: COMET_MIN_ZOOM, max: COMET_MAX_ZOOM }
+  return { distance: PLANET_VIEW_DISTANCE, min: MIN_ZOOM, max: MAX_ZOOM }
+}
+
+/**
+ * A shareable camera pose: the orbit angle around a body and the framing
+ * distance, as kept by CameraRig for every non-overview view.
+ */
+export type CameraPose = {
+  yaw: number
+  pitch: number
+  zoom: number
+}
+
+const YAW_LIMIT = 0.32
+const PITCH_LIMIT = 0.18
+
+/** Clamp a pose to what the orbit controls can actually reach for this view. */
+export function clampPose(pose: CameraPose, view: SceneView): CameraPose {
+  const bounds = viewZoomBounds(view)
+  return {
+    yaw: MathUtils.clamp(pose.yaw, -YAW_LIMIT, YAW_LIMIT),
+    pitch: MathUtils.clamp(pose.pitch, -PITCH_LIMIT, PITCH_LIMIT),
+    zoom: MathUtils.clamp(pose.zoom, bounds.min, bounds.max),
+  }
+}
+
+const POSE_FORMAT = { minimumFractionDigits: 0, maximumFractionDigits: 3 } as const
+
+/** Query-string fragment for a pose, e.g. "yaw=0.21&pitch=-0.05&zoom=9.4". */
+export function poseParams(pose: CameraPose): string {
+  const number = (value: number) => value.toLocaleString('en-US', POSE_FORMAT)
+  return `yaw=${number(pose.yaw)}&pitch=${number(pose.pitch)}&zoom=${number(pose.zoom)}`
+}
+
+/** Parse a pose from URL params; null when any part is missing or malformed. */
+export function parsePose(params: URLSearchParams): CameraPose | null {
+  const yaw = params.get('yaw')
+  const pitch = params.get('pitch')
+  const zoom = params.get('zoom')
+  if (!yaw || !pitch || !zoom) return null
+  const pose = { yaw: Number(yaw), pitch: Number(pitch), zoom: Number(zoom) }
+  if (!Number.isFinite(pose.yaw) || !Number.isFinite(pose.pitch) || !Number.isFinite(pose.zoom)) return null
+  return pose
+}
+
 export type OverviewPose = {
   target: Vector3
   position: Vector3
   up: Vector3
+}
+
+export type OverviewRotation = { position: Vector3; up: Vector3 }
+
+const OVERVIEW_MIN_ELEVATION = -0.12
+const OVERVIEW_MAX_ELEVATION = 1.1
+export const OVERVIEW_MIN_ZOOM = 0.7
+export const OVERVIEW_MAX_ZOOM = 1.35
+
+/**
+ * User-controlled orbit of the overview camera: yaw circles the system, pitch
+ * changes elevation (clamped so the camera never dives under the ecliptic),
+ * zoom scales the distance. The up vector rotates by the same yaw so the roll
+ * of the framing stays as composed.
+ */
+export function rotateOverviewPose(
+  pose: OverviewPose,
+  yaw: number,
+  pitch: number,
+  zoom: number,
+  out: OverviewRotation,
+) {
+  const offset = new Vector3().subVectors(pose.position, pose.target)
+  const radius = offset.length()
+  const baseElevation = Math.asin(MathUtils.clamp(offset.y / radius, -1, 1))
+  const baseAzimuth = Math.atan2(offset.x, offset.z)
+  const elevation = MathUtils.clamp(baseElevation + pitch, OVERVIEW_MIN_ELEVATION, OVERVIEW_MAX_ELEVATION)
+  const azimuth = baseAzimuth + yaw
+  const distance = radius * MathUtils.clamp(zoom, OVERVIEW_MIN_ZOOM, OVERVIEW_MAX_ZOOM)
+
+  out.position.set(
+    pose.target.x + distance * Math.cos(elevation) * Math.sin(azimuth),
+    pose.target.y + distance * Math.sin(elevation),
+    pose.target.z + distance * Math.cos(elevation) * Math.cos(azimuth),
+  )
+
+  const upLengthXZ = Math.hypot(pose.up.x, pose.up.z)
+  if (upLengthXZ > 1e-6) {
+    const upAzimuth = Math.atan2(pose.up.x, pose.up.z) + yaw
+    out.up.set(Math.sin(upAzimuth) * upLengthXZ, pose.up.y, Math.cos(upAzimuth) * upLengthXZ)
+  } else {
+    out.up.copy(pose.up)
+  }
+  return out
 }
 
 /**

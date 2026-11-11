@@ -37,6 +37,12 @@
   inset: 0;
   z-index: 2;
   pointer-events: none;
+  transition: opacity 0.5s ease;
+}
+
+.is-cinema .interface {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .reveal {
@@ -104,6 +110,33 @@
   padding-left: 22px;
   border-left: 1px solid rgba(255, 255, 255, 0.13);
   color: rgba(211, 224, 232, 0.34);
+}
+
+.locale-toggle {
+  margin-left: 14px;
+  padding: 4px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.locale-toggle span {
+  color: rgba(211, 224, 232, 0.32);
+  transition: color 0.3s ease;
+}
+
+.locale-toggle span.is-active {
+  color: rgba(229, 238, 243, 0.85);
+}
+
+.locale-toggle:hover span {
+  color: rgba(229, 238, 243, 0.65);
+}
+
+.locale-toggle:hover span.is-active {
+  color: rgba(243, 248, 251, 0.95);
 }
 
 .intro {
@@ -223,6 +256,17 @@ h1 > em {
   background: rgba(255, 255, 255, 0.1);
 }
 
+.telemetry-item--facts {
+  gap: 4px;
+}
+
+.telemetry-fact {
+  color: rgba(199, 214, 223, 0.44);
+  font-size: 9.5px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+}
+
 .control-hint {
   position: absolute;
   bottom: 35px;
@@ -263,10 +307,23 @@ h1 > em {
   letter-spacing: 0.08em;
 }
 
-.reset-view {
+.view-actions {
   position: absolute;
   right: 43px;
   bottom: 37px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition-delay: 0.9s;
+}
+
+.view-actions-divider {
+  width: 1px;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.reset-view {
   display: flex;
   align-items: center;
   gap: 9px;
@@ -476,6 +533,11 @@ h1 > em {
   box-shadow: 0 0 9px rgba(224, 152, 78, 0.18);
 }
 
+.planet-link--comet .planet-dot {
+  background: radial-gradient(circle at 30% 30%, #e8f0fb, #8fa3c4 48%, #232c40 75%);
+  box-shadow: 0 0 9px rgba(143, 163, 196, 0.18);
+}
+
 .experience[data-view="star"] h1 > em {
   color: #e2b98a;
 }
@@ -623,7 +685,7 @@ h1 > em {
 .is-travelling .intro,
 .is-travelling .telemetry,
 .is-travelling .control-hint,
-.is-travelling .reset-view,
+.is-travelling .view-actions,
 .is-travelling .time-controls,
 .is-travelling .system-intro,
 .is-travelling .system-note {
@@ -702,6 +764,11 @@ h1 > em {
 .system-label--vesper {
   color: #c4dad6;
   border-top-color: rgba(159, 184, 180, 0.35);
+}
+
+.system-label--comet {
+  color: #bcc9dc;
+  border-top-color: rgba(143, 163, 196, 0.35);
 }
 
 .system-label > span {
@@ -939,11 +1006,15 @@ h1 > em {
     font-size: 18px;
   }
 
+  .telemetry-item--facts {
+    display: none;
+  }
+
   .control-hint {
     display: none;
   }
 
-  .reset-view {
+  .view-actions {
     right: 20px;
     bottom: 24px;
   }

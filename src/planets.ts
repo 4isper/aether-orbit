@@ -1,59 +1,156 @@
+import type { Locale } from './strings'
+
 export type PlanetId = 'aurelia' | 'cinder' | 'vesper'
-export type SceneView = PlanetId | 'system' | 'star'
+export type SceneView = PlanetId | 'system' | 'star' | 'comet'
 export const planetIds: PlanetId[] = ['aurelia', 'cinder', 'vesper']
 
-export type BodyInfo = {
-  name: string
+/** Locale-bound copy of a body: what the interface says about it. */
+export type BodyCopy = {
   label: string
-  code: string
   title: [string, string]
   description: [string, string]
+  metricLabel: string
+  metricUnit: string
+  facts: [string, string]
+}
+
+export type BodyInfo = {
+  /** Latin name, shared by both locales. */
+  name: string
+  code: string
   radius: string
-  metric: [string, string, string]
+  metricValue: string
+  copy: Record<Locale, BodyCopy>
 }
 
 export const planets: Record<PlanetId, BodyInfo> = {
   aurelia: {
     name: 'Aurelia',
-    label: 'Аурелия',
     code: '001',
-    title: ['Тихая', 'орбита'],
-    description: ['На границе света и тени.', 'Новый мир — на расстоянии взгляда.'],
     radius: '1.12',
-    metric: ['Дистанция', '384', 'св. года'],
+    metricValue: '384',
+    copy: {
+      ru: {
+        label: 'Аурелия',
+        title: ['Тихая', 'орбита'],
+        description: ['На границе света и тени.', 'Новый мир — на расстоянии взгляда.'],
+        metricLabel: 'Дистанция',
+        metricUnit: 'св. года',
+        facts: ['Авроры у ночных полюсов', 'Транзиты луны по диску Solis'],
+      },
+      en: {
+        label: 'Aurelia',
+        title: ['The quiet', 'orbit'],
+        description: ['On the border of light and shadow.', 'A new world at the distance of a glance.'],
+        metricLabel: 'Distance',
+        metricUnit: 'ly',
+        facts: ['Auroras at the night poles', 'Moon transits across Solis'],
+      },
+    },
   },
   cinder: {
     name: 'Cinder',
-    label: 'Синдер',
     code: '002',
-    title: ['Пепел', 'и свет'],
-    description: ['Там, где ветер хранит тишину.', 'Следующая остановка — за горизонтом.'],
     radius: '1.03',
-    metric: ['Температура', '−42', '°C'],
+    metricValue: '−42',
+    copy: {
+      ru: {
+        label: 'Синдер',
+        title: ['Пепел', 'и свет'],
+        description: ['Там, где ветер хранит тишину.', 'Следующая остановка — за горизонтом.'],
+        metricLabel: 'Температура',
+        metricUnit: '°C',
+        facts: ['Дымка на терминаторе', 'Процедурный микрорельеф'],
+      },
+      en: {
+        label: 'Cinder',
+        title: ['Ash', 'and light'],
+        description: ['Where the wind keeps the silence.', 'The next stop is past the horizon.'],
+        metricLabel: 'Temperature',
+        metricUnit: '°C',
+        facts: ['Haze at the terminator', 'Procedural micro-relief'],
+      },
+    },
   },
   vesper: {
     name: 'Vesper',
-    label: 'Веспер',
     code: '003',
-    title: ['Кольца', 'тишины'],
-    description: ['Там, где лёд хранит свет.', 'Третий мир — за пределами ветра.'],
-    radius: '9.1',
-    metric: ['Ветер', '1 800', 'км/ч'],
+    radius: '1.21',
+    metricValue: '1 800',
+    copy: {
+      ru: {
+        label: 'Веспер',
+        title: ['Кольца', 'тишины'],
+        description: ['Там, где лёд хранит свет.', 'Третий мир — за пределами ветра.'],
+        metricLabel: 'Ветер',
+        metricUnit: 'км/ч',
+        facts: ['Тень колец на поверхности', 'Щель Кассини в ободах'],
+      },
+      en: {
+        label: 'Vesper',
+        title: ['Rings', 'of silence'],
+        description: ['Where the ice keeps the light.', 'The third world is past the wind.'],
+        metricLabel: 'Wind',
+        metricUnit: 'km/h',
+        facts: ['Ring shadows on the surface', 'The Cassini gap in the bands'],
+      },
+    },
   },
 }
 
 export const starInfo: BodyInfo = {
   name: 'Solis',
-  label: 'Солис',
   code: '000',
-  title: ['Сердце', 'системы'],
-  description: ['Отсюда расходится весь свет.', 'Источник каждой орбиты.'],
   radius: '8.4',
-  metric: ['Температура', '5 800', 'K'],
+  metricValue: '5 800',
+  copy: {
+    ru: {
+      label: 'Солис',
+      title: ['Сердце', 'системы'],
+      description: ['Отсюда расходится весь свет.', 'Источник каждой орбиты.'],
+      metricLabel: 'Температура',
+      metricUnit: 'K',
+      facts: ['Протуберанцы у лимба', 'Пятна дрейфуют днями'],
+    },
+    en: {
+      label: 'Solis',
+      title: ['The heart', 'of the system'],
+      description: ['All light spreads from here.', 'The source of every orbit.'],
+      metricLabel: 'Temperature',
+      metricUnit: 'K',
+      facts: ['Prominences at the limb', 'Spots drift for days'],
+    },
+  },
+}
+
+export const cometInfo: BodyInfo = {
+  name: 'Boreas',
+  code: '004',
+  radius: '0.002',
+  metricValue: '0.70',
+  copy: {
+    ru: {
+      label: 'Борея',
+      title: ['Ледяной', 'гость'],
+      description: ['Ионный хвост — строго от звезды.', 'Пылевой изогнут следом орбиты.'],
+      metricLabel: 'Эксцентриситет',
+      metricUnit: 'e',
+      facts: ['Два хвоста: ион и пыль', 'Разгар у перицентра'],
+    },
+    en: {
+      label: 'Boreas',
+      title: ['An icy', 'visitor'],
+      description: ['The ion tail points straight from the star.', 'The dust tail curves along its wake.'],
+      metricLabel: 'Eccentricity',
+      metricUnit: 'e',
+      facts: ['Two tails: ion and dust', 'Fullest at periapsis'],
+    },
+  },
 }
 
 /** Telemetry for every flyable destination except the system overview. */
 export const bodies: Record<Exclude<SceneView, 'system'>, BodyInfo> = {
   ...planets,
   star: starInfo,
+  comet: cometInfo,
 }

@@ -1,41 +1,44 @@
 import { useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { DoubleSide, Vector3, type Group, type Mesh } from 'three'
+import { DoubleSide, Vector3, type Group, type Mesh, type ShaderMaterial } from 'three'
 import { noiseGLSL } from '../shaders/noise'
+import { bodyVertexGLSL, perturbNormalGLSL } from '../shaders/common'
 import { Atmosphere } from './Atmosphere'
+import { starFlux } from '../orbits'
+import { useSunDirection } from '../hooks/useSunDirection'
 
-const surfaceVertexShader = /* glsl */ `
-varying vec3 vObjectPosition;
-varying vec3 vWorldPosition;
-varying vec3 vWorldNormal;
-
-void main() {
-  vObjectPosition = normalize(position);
-  vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-  vWorldPosition = worldPosition.xyz;
-  vWorldNormal = normalize(mat3(modelMatrix) * normal);
-  gl_Position = projectionMatrix * viewMatrix * worldPosition;
+/**
+ * Ring density as a function of the normalized radius t = (r - 2.5) / 1.5,
+ * shared by the ring shader and the planet's ring-shadow term so the shadow
+ * carries the same bands and Cassini gap the rings themselves show. The band
+ * pattern is exposed separately: the ring color grades by it directly.
+ */
+const ringDensityGLSL = /* glsl */ `
+float vesperRingBand(float t) {
+  return smoothstep(0.25, 0.75, fbm4(vec3(t * 70.0, 3.0, 9.0)) * 0.5 + 0.5);
+}
+float vesperRingDensity(float t) {
+  float stripes = 0.035 * sin(t * 420.0);
+  float cassini = smoothstep(0.60, 0.64, t) * (1.0 - smoothstep(0.70, 0.74, t));
+  return (0.35 + 0.65 * vesperRingBand(t) + stripes) * (1.0 - 0.85 * cassini);
+}
+float vesperRingEdge(float t) {
+  return smoothstep(0.0, 0.05, t) * (1.0 - smoothstep(0.93, 1.0, t));
 }
 `
 
 const surfaceFragment = /* glsl */ `
 uniform vec3 uSunDirection;
+uniform float uStarFlux;
+uniform vec3 uRingNormal;
+uniform vec3 uRingCenter;
+uniform float uGroupScale;
 varying vec3 vObjectPosition;
 varying vec3 vWorldPosition;
 varying vec3 vWorldNormal;
 ${noiseGLSL}
-
-vec3 perturbNormal(vec3 surfacePosition, vec3 surfaceNormal, float height) {
-  vec3 sigmaX = normalize(dFdx(surfacePosition));
-  vec3 sigmaY = normalize(dFdy(surfacePosition));
-  vec3 R1 = cross(sigmaY, surfaceNormal);
-  vec3 R2 = cross(surfaceNormal, sigmaX);
-  float det = dot(sigmaX, R1);
-  vec3 gradient = sign(det) * (
-    dFdx(height) * R1 + dFdy(height) * R2
-  );
-  return normalize(abs(det) * surfaceNormal - gradient);
-}
+${perturbNormalGLSL}
+${ringDensityGLSL}
 
 void main() {
   vec3 p = normalize(vObjectPosition);
@@ -63,7 +66,19 @@ void main() {
 
   vec3 L = normalize(uSunDirection);
   float diffuse = max(dot(N, L), 0.0);
-  vec3 color = albedo * (0.006 + diffuse * 1.1);
+
+  // Ring shadow: where the sun ray from this point crosses the ring plane
+  // inside the annulus, the rings dim the light by their own density - the
+  // Cassini gap lets a bright line through the shadow band.
+  float planeDot = dot(L, uRingNormal);
+  float crossingT = -dot(vWorldPosition - uRingCenter, uRingNormal) / planeDot;
+  float crosses = step(1e-4, abs(planeDot)) * step(0.0, crossingT);
+  vec3 crossing = vWorldPosition + L * crossingT;
+  float ringRadius = length(crossing - uRingCenter) / uGroupScale;
+  float ringT = (ringRadius - 2.5) / 1.5;
+  float shadow = 1.0 - crosses * vesperRingEdge(ringT) * vesperRingDensity(ringT) * 0.75;
+
+  vec3 color = albedo * (0.006 + diffuse * shadow * 1.1 * uStarFlux);
 
   gl_FragColor = vec4(color, 1.0);
   #include <tonemapping_fragment>
@@ -91,24 +106,24 @@ void main() {
 
 const ringFragment = /* glsl */ `
 uniform vec3 uSunDirection;
+uniform float uStarFlux;
 varying vec3 vLocalPosition;
 varying vec3 vWorldPosition;
 varying vec3 vWorldNormal;
 varying vec3 vCenter;
 varying float vScale;
 ${noiseGLSL}
+${ringDensityGLSL}
 
 void main() {
   float radius = length(vLocalPosition.xy);
   float t = (radius - 2.5) / 1.5;
-  float band = smoothstep(0.25, 0.75, fbm4(vec3(t * 70.0, 3.0, 9.0)) * 0.5 + 0.5);
-  float stripes = 0.035 * sin(t * 420.0);
-  float cassini = smoothstep(0.60, 0.64, t) * (1.0 - smoothstep(0.70, 0.74, t));
-  float density = (0.35 + 0.65 * band + stripes) * (1.0 - 0.85 * cassini);
-  float edge = smoothstep(0.0, 0.05, t) * (1.0 - smoothstep(0.93, 1.0, t));
+  float band = vesperRingBand(t);
+  float density = vesperRingDensity(t);
+  float edge = vesperRingEdge(t);
 
   vec3 L = normalize(uSunDirection);
-  float light = abs(dot(normalize(vWorldNormal), L)) * 0.75 + 0.25;
+  float light = abs(dot(normalize(vWorldNormal), L)) * 0.75 * uStarFlux + 0.25;
 
   vec3 d = vWorldPosition - vCenter;
   float along = dot(d, L);
@@ -135,29 +150,43 @@ type VesperProps = {
 export function Vesper({ reducedMotion, timeScale }: VesperProps) {
   const groupRef = useRef<Group>(null)
   const surfaceRef = useRef<Mesh>(null)
+  const surfaceMaterialRef = useRef<ShaderMaterial>(null)
+  const ringMaterialRef = useRef<ShaderMaterial>(null)
   const { width, height } = useThree((state) => state.viewport)
   const compact = useThree((state) => state.size.width < 700) || width / height < 0.9
 
-  const sunDirection = useMemo(() => new Vector3(-1, 0, 0), [])
-  const worldPosition = useMemo(() => new Vector3(), [])
+  const { sunDirection, worldPosition, updateSunDirection } = useSunDirection(groupRef)
   const surfaceUniforms = useMemo(
     () => ({
       uSunDirection: { value: sunDirection },
+      uStarFlux: { value: 1 },
+      uRingNormal: { value: new Vector3(0, 1, 0) },
+      uRingCenter: { value: worldPosition },
+      uGroupScale: { value: 1.08 },
     }),
-    [sunDirection],
+    [sunDirection, worldPosition],
   )
   const ringUniforms = useMemo(
     () => ({
       uSunDirection: { value: sunDirection },
+      uStarFlux: { value: 1 },
     }),
     [sunDirection],
   )
 
   useFrame((_, rawDelta) => {
     const delta = Math.min(rawDelta, 0.1)
-    if (groupRef.current) {
-      groupRef.current.getWorldPosition(worldPosition)
-      sunDirection.copy(worldPosition).multiplyScalar(-1).normalize()
+    updateSunDirection()
+    const flux = starFlux(worldPosition)
+    if (surfaceMaterialRef.current) surfaceMaterialRef.current.uniforms.uStarFlux.value = flux
+    if (ringMaterialRef.current) ringMaterialRef.current.uniforms.uStarFlux.value = flux
+    if (groupRef.current && surfaceMaterialRef.current) {
+      // The ring plane's world axis and scale feed the planet's shadow term.
+      surfaceMaterialRef.current.uniforms.uRingNormal.value
+        .setFromMatrixColumn(groupRef.current.matrixWorld, 1)
+        .normalize()
+      surfaceMaterialRef.current.uniforms.uGroupScale.value
+        = groupRef.current.matrixWorld.getMaxScaleOnAxis()
     }
 
     if (!reducedMotion && surfaceRef.current) {
@@ -174,7 +203,8 @@ export function Vesper({ reducedMotion, timeScale }: VesperProps) {
       <mesh ref={surfaceRef}>
         <sphereGeometry args={[2, 128, 128]} />
         <shaderMaterial
-          vertexShader={surfaceVertexShader}
+          ref={surfaceMaterialRef}
+          vertexShader={bodyVertexGLSL(false)}
           fragmentShader={surfaceFragment}
           uniforms={surfaceUniforms}
         />
@@ -183,6 +213,7 @@ export function Vesper({ reducedMotion, timeScale }: VesperProps) {
       <mesh rotation-x={-Math.PI / 2} renderOrder={1}>
         <ringGeometry args={[2.5, 4, 180, 1]} />
         <shaderMaterial
+          ref={ringMaterialRef}
           vertexShader={ringVertexShader}
           fragmentShader={ringFragment}
           uniforms={ringUniforms}

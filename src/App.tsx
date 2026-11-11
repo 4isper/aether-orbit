@@ -1,12 +1,33 @@
 import { Suspense, lazy, useCallback, useEffect, useState } from 'react'
+import { SceneErrorBoundary } from './SceneErrorBoundary'
 import { bodies, planetIds, type SceneView } from './planets'
+import { parsePose, poseParams, type CameraPose } from './camera-math'
+import { readStoredLocale, storeLocale, t, type Locale } from './strings'
 import './App.css'
 
 const SceneCanvas = lazy(() => import('./SceneCanvas'))
 
 const SPEED_OPTIONS = [0.5, 1, 2, 4]
-const TOUR_STOPS: SceneView[] = ['aurelia', 'cinder', 'vesper', 'star', 'system']
+const TOUR_STOPS: SceneView[] = ['aurelia', 'cinder', 'vesper', 'comet', 'star', 'system']
 const TOUR_DWELL_MS = 7000
+const SCENE_VIEWS: SceneView[] = [...planetIds, 'star', 'comet', 'system']
+
+/** Deep link support: ?view=vesper opens the scene already on that orbit. */
+function readInitialView(): SceneView {
+  const param = new URLSearchParams(window.location.search).get('view')
+  return SCENE_VIEWS.includes(param as SceneView) ? (param as SceneView) : 'aurelia'
+}
+
+/** Deep link support: ?yaw=…&pitch=…&zoom=… restores the saved camera pose. */
+function readInitialPose(): CameraPose | null {
+  return parsePose(new URLSearchParams(window.location.search))
+}
+
+function urlFor(view: SceneView, pose?: CameraPose) {
+  const suffix = pose ? `?${poseParams(pose)}` : ''
+  if (view === 'aurelia') return suffix ? `/${suffix}` : '/'
+  return pose ? `/?view=${view}&${poseParams(pose)}` : `/?view=${view}`
+}
 
 function formatSpeed(speed: number) {
   return speed === 0.5 ? '½' : String(speed)
@@ -50,21 +71,30 @@ function useReducedMotion() {
 }
 
 function App() {
+  const [initialView] = useState(readInitialView)
+  const [initialPose] = useState(readInitialPose)
+  const [locale, setLocale] = useState<Locale>(readStoredLocale)
   const [ready, setReady] = useState(false)
   const [webglSupported] = useState(detectWebGLSupport)
-  const [activeView, setActiveView] = useState<SceneView>('aurelia')
-  const [destination, setDestination] = useState<SceneView>('aurelia')
+  const [activeView, setActiveView] = useState<SceneView>(initialView)
+  const [destination, setDestination] = useState<SceneView>(initialView)
   const reducedMotion = useReducedMotion()
   const travelling = activeView !== destination
   const overview = activeView === 'system'
   const isStar = activeView === 'star'
   const body = activeView === 'system' ? null : bodies[activeView]
-  const currentName = body ? body.name : 'Система'
+  const currentName = body ? body.name : t(locale, 'systemOverview')
   const destinationName = destination === 'system'
-    ? 'Система'
+    ? t(locale, 'systemOverview')
     : bodies[destination].name
   const handleReady = useCallback(() => setReady(true), [])
-  const handleArrive = useCallback((arrived: SceneView) => setActiveView(arrived), [])
+  const handleArrive = useCallback((arrived: SceneView) => {
+    setActiveView(arrived)
+    window.history.replaceState(null, '', urlFor(arrived))
+  }, [])
+  const handleSharePose = useCallback((view: SceneView, pose: CameraPose) => {
+    window.history.replaceState(null, '', urlFor(view, pose))
+  }, [])
   const travelTo = (next: SceneView) => {
     if (!ready) return
     setTour(false)
@@ -73,15 +103,50 @@ function App() {
   }
   const [paused, setPaused] = useState(false)
   const [speed, setSpeed] = useState(1)
+  const [reversed, setReversed] = useState(false)
   const [tour, setTour] = useState(false)
+  const [cinema, setCinema] = useState(false)
   const [tabVisible, setTabVisible] = useState(() => !document.hidden)
-  const timeScale = paused ? 0 : speed
+  const timeScale = paused ? 0 : reversed ? -speed : speed
+
+  const toggleLocale = useCallback(() => {
+    setLocale((value) => {
+      const next: Locale = value === 'ru' ? 'en' : 'ru'
+      storeLocale(next)
+      return next
+    })
+  }, [])
+
+  useEffect(() => {
+    document.documentElement.lang = locale
+    document.title = locale === 'ru'
+      ? 'Aether — Тихая орбита'
+      : 'Aether — The Quiet Orbit'
+  }, [locale])
   const resetView = () => window.dispatchEvent(new Event('aether:reset'))
+  const saveFrame = () => {
+    // The scene renders the composed frame and reads it back itself: the
+    // drawing buffer is not preserved between frames.
+    window.dispatchEvent(new CustomEvent('aether:screenshot', {
+      detail: { name: `aether-${activeView === 'system' ? 'system' : activeView}.png` },
+    }))
+  }
 
   useEffect(() => {
     const onVisibilityChange = () => setTabVisible(!document.hidden)
     document.addEventListener('visibilitychange', onVisibilityChange)
     return () => document.removeEventListener('visibilitychange', onVisibilityChange)
+  }, [])
+
+  useEffect(() => {
+    // H works on both layouts: latin H and Cyrillic Р sit on the same key.
+    const onKey = (event: KeyboardEvent) => {
+      const key = event.key.toLowerCase()
+      if (key === 'h' || key === 'р') setCinema((value) => !value)
+      if (event.key === 'Escape') setCinema(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
   }, [])
 
   useEffect(() => {
@@ -95,32 +160,38 @@ function App() {
 
   return (
     <main
-      className={`experience ${ready ? 'is-ready' : ''} ${travelling ? 'is-travelling' : ''} ${overview ? 'is-system' : ''}`}
+      className={`experience ${ready ? 'is-ready' : ''} ${travelling ? 'is-travelling' : ''} ${overview ? 'is-system' : ''} ${cinema ? 'is-cinema' : ''}`}
       data-view={activeView}
       data-reduced-motion={reducedMotion || undefined}
     >
       {webglSupported && (
         <div className="scene">
-          <Suspense fallback={null}>
-            <SceneCanvas
-              label={travelling
-                ? `Перелёт: ${currentName} — ${destinationName}`
-                : body
-                  ? `${isStar ? 'Интерактивная сцена звезды' : 'Интерактивная сцена планеты'} ${body.label}. Перетаскивайте для вращения и используйте колесо для масштабирования.`
-                  : 'Обзор системы. Выберите мир или звезду нажатием на сферу или подпись.'}
+          <SceneErrorBoundary locale={locale}>
+              <Suspense fallback={null}>
+              <SceneCanvas
+                label={travelling
+                  ? t(locale, 'flightLabel', { from: currentName, to: destinationName })
+                  : body
+                    ? t(locale, isStar ? 'starSceneAria' : activeView === 'comet' ? 'cometSceneAria' : 'planetSceneAria', { name: body.copy[locale].label })
+                    : t(locale, 'systemAria')}
               activeView={activeView}
               destination={destination}
+              initialView={initialView}
+              initialPose={initialPose}
               timeScale={timeScale}
-              reducedMotion={reducedMotion}
-              onReady={handleReady}
-              onArrive={handleArrive}
-              onSelect={travelTo}
-            />
-          </Suspense>
+                locale={locale}
+                reducedMotion={reducedMotion}
+                onReady={handleReady}
+                onArrive={handleArrive}
+                onSharePose={handleSharePose}
+                onSelect={travelTo}
+              />
+            </Suspense>
+          </SceneErrorBoundary>
         </div>
       )}
 
-      <div className="interface" inert={!webglSupported || undefined}>
+      <div className="interface" inert={(!webglSupported || cinema) || undefined}>
         <header className="topbar reveal">
           <div className="brand">
             <OrbitMark className="brand-mark" />
@@ -128,38 +199,47 @@ function App() {
           </div>
           <div className="scene-status">
             <span className="status-dot" />
-            <span>{travelling ? 'Межорбитальный перелёт' : overview ? 'Обзор системы' : 'Симуляция активна'}</span>
+            <span>{travelling ? t(locale, 'inFlight') : overview ? t(locale, 'systemOverview') : t(locale, 'simActive')}</span>
             <span className="status-code">{body ? `SC—${body.code}` : 'SYS—01'}</span>
           </div>
+          <button
+            type="button"
+            className="locale-toggle"
+            aria-label={t(locale, 'localeSwitch')}
+            onClick={toggleLocale}
+          >
+            <span className={locale === 'ru' ? 'is-active' : ''}>RU</span>
+            <span className={locale === 'en' ? 'is-active' : ''}>EN</span>
+          </button>
         </header>
 
-        <nav className="planet-nav reveal" aria-label="Навигация по системе" aria-busy={travelling}>
+        <nav className="planet-nav reveal" aria-label={t(locale, 'navLabel')} aria-busy={travelling}>
           <button
             type="button"
             className="planet-link system-link"
             aria-pressed={overview}
-            aria-label="Обзор системы"
+            aria-label={t(locale, 'systemOverview')}
             disabled={!ready || travelling}
             onClick={() => travelTo('system')}
           >
             <OrbitMark className="system-icon" />
-            Обзор
+            {t(locale, 'systemOverviewLabel')}
           </button>
           <button
             type="button"
             className="planet-link tour-link"
             aria-pressed={tour}
-            aria-label={tour ? 'Остановить тур по системе' : 'Автоматический тур по системе'}
+            aria-label={tour ? t(locale, 'tourStop') : t(locale, 'tourStart')}
             disabled={!ready}
             onClick={() => setTour((value) => !value)}
           >
-            Тур
+            {t(locale, 'tour')}
           </button>
           <button
             type="button"
             className="planet-link planet-link--star"
             aria-pressed={isStar}
-            aria-label={`Перелёт к звезде ${bodies.star.name}`}
+            aria-label={t(locale, 'flyToStar', { name: bodies.star.name })}
             disabled={!ready || travelling}
             onClick={() => travelTo('star')}
           >
@@ -173,7 +253,7 @@ function App() {
               type="button"
               className={`planet-link planet-link--${id}`}
               aria-pressed={activeView === id}
-              aria-label={`Перелёт к планете ${bodies[id].name}`}
+              aria-label={t(locale, 'flyToPlanet', { name: bodies[id].name })}
               disabled={!ready || travelling}
               onClick={() => travelTo(id)}
             >
@@ -182,14 +262,26 @@ function App() {
               {bodies[id].name}
             </button>
           ))}
+          <button
+            type="button"
+            className="planet-link planet-link--comet"
+            aria-pressed={activeView === 'comet'}
+            aria-label={t(locale, 'flyToComet', { name: bodies.comet.name })}
+            disabled={!ready || travelling}
+            onClick={() => travelTo('comet')}
+          >
+            <span className="planet-dot" aria-hidden="true" />
+            <span className="planet-number">{bodies.comet.code}</span>
+            {bodies.comet.name}
+          </button>
         </nav>
 
-        <div className="time-controls reveal" role="group" aria-label="Управление временем">
+        <div className="time-controls reveal" role="group" aria-label={t(locale, 'timeControls')}>
           <button
             type="button"
             className="time-button"
             aria-pressed={paused}
-            aria-label={paused ? 'Возобновить время' : 'Остановить время'}
+            aria-label={paused ? t(locale, 'resume') : t(locale, 'pause')}
             disabled={!ready}
             onClick={() => setPaused((value) => !value)}
           >
@@ -204,14 +296,27 @@ function App() {
               </svg>
             )}
           </button>
-          <div className="speed-group" role="group" aria-label="Скорость времени">
+          <button
+            type="button"
+            className="time-button"
+            aria-pressed={reversed}
+            aria-label={reversed ? t(locale, 'unreverse') : t(locale, 'reverse')}
+            disabled={!ready}
+            onClick={() => setReversed((value) => !value)}
+          >
+            <svg viewBox="0 0 12 12" fill="none" aria-hidden="true">
+              <path d="M6.4 1.6v8.8L1.6 6z" fill="currentColor" />
+              <path d="M11 1.6v8.8L6.2 6z" fill="currentColor" />
+            </svg>
+          </button>
+          <div className="speed-group" role="group" aria-label={t(locale, 'speedGroup')}>
             {SPEED_OPTIONS.map((option) => (
               <button
                 key={option}
                 type="button"
                 className="time-button speed-option"
                 aria-pressed={speed === option}
-                aria-label={`Скорость времени ×${formatSpeed(option)}`}
+                aria-label={t(locale, 'speed', { value: formatSpeed(option) })}
                 disabled={!ready}
                 onClick={() => setSpeed(option)}
               >
@@ -223,35 +328,42 @@ function App() {
 
         <div className="flight-status" role="status" aria-live="polite" aria-atomic="true">
           {travelling ? (
-            <><span>Межорбитальный перелёт</span><strong>{currentName} <span aria-hidden="true">→</span> {destinationName}</strong></>
+            <><span>{t(locale, 'inFlight')}</span><strong>{currentName} <span aria-hidden="true">→</span> {destinationName}</strong></>
           ) : (
-            <span className="sr-only">{ready ? overview ? 'Обзор системы. Два мира доступны для исследования.' : `На орбите ${currentName}` : 'Формируем орбиту'}</span>
+            <span className="sr-only">{ready ? overview ? t(locale, 'overviewHint') : t(locale, 'onOrbit', { name: currentName }) : t(locale, 'loader')}</span>
           )}
         </div>
 
         {body ? (
           <>
             <section className="intro reveal" aria-labelledby="scene-title" aria-hidden={travelling}>
-              <p className="eyebrow"><span />{body.name} / {activeView === 'star' ? 'Звезда системы' : activeView === 'cinder' ? 'Пустынный мир' : activeView === 'vesper' ? 'Газовый гигант' : 'Экзопланета'}</p>
+              <p className="eyebrow"><span />{body.name} / {activeView === 'star' ? t(locale, 'orbitOfStar') : activeView === 'cinder' ? t(locale, 'worldDesert') : activeView === 'vesper' ? t(locale, 'worldIce') : activeView === 'comet' ? t(locale, 'worldComet') : t(locale, 'worldExo')}</p>
               <h1 id="scene-title">
-                <span>{body.title[0]}</span>
-                <em>{body.title[1]}</em>
+                <span>{body.copy[locale].title[0]}</span>
+                <em>{body.copy[locale].title[1]}</em>
               </h1>
               <p className="intro-copy">
-                {body.description[0]}<br />
-                {body.description[1]}
+                {body.copy[locale].description[0]}<br />
+                {body.copy[locale].description[1]}
               </p>
             </section>
 
-            <aside className="telemetry reveal" aria-label="Параметры небесного тела" aria-hidden={travelling}>
+            <aside className="telemetry reveal" aria-label={t(locale, 'bodyTelemetry')} aria-hidden={travelling}>
               <div className="telemetry-item">
-                <span className="telemetry-label">Радиус</span>
+                <span className="telemetry-label">{t(locale, 'radius')}</span>
                 <strong>{body.radius} <small>{isStar ? 'R☉' : 'R⊕'}</small></strong>
               </div>
               <span className="telemetry-divider" />
               <div className="telemetry-item">
-                <span className="telemetry-label">{body.metric[0]}</span>
-                <strong>{body.metric[1]} <small>{body.metric[2]}</small></strong>
+                <span className="telemetry-label">{body.copy[locale].metricLabel}</span>
+                <strong>{body.metricValue} <small>{body.copy[locale].metricUnit}</small></strong>
+              </div>
+              <span className="telemetry-divider" />
+              <div className="telemetry-item telemetry-item--facts">
+                <span className="telemetry-label">{t(locale, 'observations')}</span>
+                {body.copy[locale].facts.map((fact) => (
+                  <span className="telemetry-fact" key={fact}>{fact}</span>
+                ))}
               </div>
             </aside>
 
@@ -261,27 +373,38 @@ function App() {
                 <path d="M12 7v5" stroke="currentColor" strokeLinecap="round" />
               </svg>
               <div>
-                <span>Исследуйте орбиту</span>
-                <small>Движение · масштаб · вращение</small>
+                <span>{t(locale, 'exploreOrbit')}</span>
+                <small>{t(locale, 'exploreHint')}</small>
               </div>
             </div>
 
-            <button className="reset-view reveal" type="button" onClick={resetView} disabled={!ready || travelling} aria-label="Сбросить ракурс камеры">
-              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M4.8 8.2A8 8 0 1 1 4 14" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-                <path d="M4.8 3.8v4.4h4.4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              <span>Сбросить ракурс</span>
-            </button>
+            <div className="view-actions reveal">
+              <button className="reset-view" type="button" onClick={resetView} disabled={!ready || travelling} aria-label={t(locale, 'resetCamera')}>
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M4.8 8.2A8 8 0 1 1 4 14" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                  <path d="M4.8 3.8v4.4h4.4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <span>{t(locale, 'resetCameraShort')}</span>
+              </button>
+              <span className="view-actions-divider" aria-hidden="true" />
+              <button className="reset-view" type="button" onClick={saveFrame} disabled={!ready} aria-label={t(locale, 'saveFrame')}>
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <rect x="3.5" y="6" width="17" height="13" rx="2.5" stroke="currentColor" strokeWidth="1.3" />
+                  <circle cx="12" cy="12.5" r="3.4" stroke="currentColor" strokeWidth="1.3" />
+                  <path d="M9 6l1.2-2h3.6L15 6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <span>{t(locale, 'saveFrameShort')}</span>
+              </button>
+            </div>
           </>
         ) : (
           <>
             <section className="system-intro reveal" aria-labelledby="scene-title" aria-hidden={travelling}>
-              <p className="eyebrow">Aether / Три мира</p>
-              <h1 id="scene-title">Обзор системы</h1>
-              <p>Выберите планету, чтобы выйти на орбиту.</p>
+              <p className="eyebrow">{t(locale, 'threeWorlds')}</p>
+              <h1 id="scene-title">{t(locale, 'systemOverview')}</h1>
+              <p>{t(locale, 'choosePlanet')}</p>
             </section>
-            <p className="system-note reveal" aria-hidden={travelling}>Орбиты вокруг звезды · Масштаб условный</p>
+            <p className="system-note reveal" aria-hidden={travelling}>{t(locale, 'orbitsNote')}</p>
           </>
         )}
 
@@ -301,7 +424,7 @@ function App() {
       <div className="loader" aria-hidden={ready}>
         <div className="loader-inner">
           <OrbitMark className="loader-mark" />
-          <span>Формируем орбиту</span>
+          <span>{t(locale, 'loader')}</span>
           <div className="loader-track"><span /></div>
         </div>
       </div>
@@ -310,10 +433,10 @@ function App() {
         <div className="webgl-fallback" role="alert">
           <div className="webgl-fallback-inner">
             <OrbitMark className="loader-mark" />
-            <h2>WebGL недоступен</h2>
-            <p>Сцена считается на вашем устройстве в реальном времени — для неё нужен WebGL2 или WebGL.</p>
+            <h2>{t(locale, 'webglTitle')}</h2>
+            <p>{t(locale, 'webglBody')}</p>
             <p className="webgl-fallback-hint">
-              Включите аппаратное ускорение в настройках браузера, обновите видеодрайвер и перезагрузите страницу.
+              {t(locale, 'webglHint')}
             </p>
           </div>
         </div>

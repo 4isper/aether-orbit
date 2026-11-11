@@ -1,46 +1,23 @@
 import { useCallback, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { useTexture } from '@react-three/drei'
-import { RepeatWrapping, SRGBColorSpace, Vector3, type Group, type Mesh, type Texture } from 'three'
+import { RepeatWrapping, SRGBColorSpace, type Group, type Mesh, type ShaderMaterial, type Texture } from 'three'
 import { noiseGLSL } from '../shaders/noise'
+import { bodyVertexGLSL, perturbNormalGLSL } from '../shaders/common'
+import { useSunDirection } from '../hooks/useSunDirection'
+import { starFlux } from '../orbits'
 import { Atmosphere } from './Atmosphere'
-
-const vertexShader = /* glsl */ `
-varying vec2 vUv;
-varying vec3 vObjectPosition;
-varying vec3 vWorldPosition;
-varying vec3 vWorldNormal;
-
-void main() {
-  vUv = uv;
-  vObjectPosition = normalize(position);
-  vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-  vWorldPosition = worldPosition.xyz;
-  vWorldNormal = normalize(mat3(modelMatrix) * normal);
-  gl_Position = projectionMatrix * viewMatrix * worldPosition;
-}
-`
 
 const surfaceFragment = /* glsl */ `
 uniform sampler2D uDayMap;
 uniform vec3 uSunDirection;
+uniform float uStarFlux;
 varying vec2 vUv;
 varying vec3 vObjectPosition;
 varying vec3 vWorldPosition;
 varying vec3 vWorldNormal;
 ${noiseGLSL}
-
-vec3 perturbNormal(vec3 surfacePosition, vec3 surfaceNormal, float height) {
-  vec3 sigmaX = normalize(dFdx(surfacePosition));
-  vec3 sigmaY = normalize(dFdy(surfacePosition));
-  vec3 R1 = cross(sigmaY, surfaceNormal);
-  vec3 R2 = cross(surfaceNormal, sigmaX);
-  float det = dot(sigmaX, R1);
-  vec3 gradient = sign(det) * (
-    dFdx(height) * R1 + dFdy(height) * R2
-  );
-  return normalize(abs(det) * surfaceNormal - gradient);
-}
+${perturbNormalGLSL}
 
 void main() {
   vec3 p = normalize(vObjectPosition);
@@ -55,7 +32,7 @@ void main() {
 
   vec3 L = normalize(uSunDirection);
   float diffuse = max(dot(N, L), 0.0);
-  vec3 color = albedo * (0.008 + diffuse * 1.15);
+  vec3 color = albedo * (0.008 + diffuse * 1.15 * uStarFlux);
 
   gl_FragColor = vec4(color, 1.0);
   #include <tonemapping_fragment>
@@ -71,6 +48,7 @@ type CinderProps = {
 export function Cinder({ reducedMotion, timeScale }: CinderProps) {
   const groupRef = useRef<Group>(null)
   const surfaceRef = useRef<Mesh>(null)
+  const surfaceMaterialRef = useRef<ShaderMaterial>(null)
   const { width, height } = useThree((state) => state.viewport)
   const compact = useThree((state) => state.size.width < 700) || width / height < 0.9
   const gl = useThree((state) => state.gl)
@@ -85,21 +63,21 @@ export function Cinder({ reducedMotion, timeScale }: CinderProps) {
   )
   const dayMap = useTexture('/textures/mars-day.webp', configureTexture)
 
-  const sunDirection = useMemo(() => new Vector3(-1, 0, 0), [])
-  const worldPosition = useMemo(() => new Vector3(), [])
+  const { sunDirection, worldPosition, updateSunDirection } = useSunDirection(groupRef)
   const surfaceUniforms = useMemo(
     () => ({
       uSunDirection: { value: sunDirection },
       uDayMap: { value: dayMap },
+      uStarFlux: { value: 1 },
     }),
     [sunDirection, dayMap],
   )
 
   useFrame((_, rawDelta) => {
     const delta = Math.min(rawDelta, 0.1)
-    if (groupRef.current) {
-      groupRef.current.getWorldPosition(worldPosition)
-      sunDirection.copy(worldPosition).multiplyScalar(-1).normalize()
+    updateSunDirection()
+    if (surfaceMaterialRef.current) {
+      surfaceMaterialRef.current.uniforms.uStarFlux.value = starFlux(worldPosition)
     }
 
     if (!reducedMotion && surfaceRef.current) {
@@ -116,7 +94,8 @@ export function Cinder({ reducedMotion, timeScale }: CinderProps) {
       <mesh ref={surfaceRef}>
         <sphereGeometry args={[2, 128, 128]} />
         <shaderMaterial
-          vertexShader={vertexShader}
+          ref={surfaceMaterialRef}
+          vertexShader={bodyVertexGLSL(true)}
           fragmentShader={surfaceFragment}
           uniforms={surfaceUniforms}
         />
