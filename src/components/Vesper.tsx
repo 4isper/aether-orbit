@@ -4,7 +4,7 @@ import { DoubleSide, Vector3, type Group, type Mesh, type ShaderMaterial } from 
 import { noiseGLSL } from '../shaders/noise'
 import { bodyVertexGLSL, perturbNormalGLSL } from '../shaders/common'
 import { Atmosphere } from './Atmosphere'
-import { starFlux } from '../orbits'
+import { shepherdLocalPosition, starFlux } from '../orbits'
 import { useSunDirection } from '../hooks/useSunDirection'
 
 /**
@@ -104,6 +104,27 @@ void main() {
 }
 `
 
+const shepherdFragment = /* glsl */ `
+uniform vec3 uSunDirection;
+uniform float uStarFlux;
+varying vec3 vObjectPosition;
+varying vec3 vWorldPosition;
+varying vec3 vWorldNormal;
+${noiseGLSL}
+
+void main() {
+  // A small iced world: marble bands from the same noise family as the
+  // rings it herds, lit from the star with the same flux falloff.
+  float marble = fbm4(normalize(vObjectPosition) * 6.0);
+  vec3 albedo = mix(vec3(0.70, 0.72, 0.76), vec3(0.90, 0.88, 0.82), smoothstep(0.3, 0.7, marble));
+  float diffuse = max(dot(normalize(vWorldNormal), normalize(uSunDirection)), 0.0);
+  vec3 color = albedo * (0.012 + diffuse * uStarFlux);
+  gl_FragColor = vec4(color, 1.0);
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
+}
+`
+
 const ringFragment = /* glsl */ `
 uniform vec3 uSunDirection;
 uniform float uStarFlux;
@@ -145,13 +166,16 @@ void main() {
 type VesperProps = {
   reducedMotion: boolean
   timeScale: number
+  timeRef: { current: number }
 }
 
-export function Vesper({ reducedMotion, timeScale }: VesperProps) {
+export function Vesper({ reducedMotion, timeScale, timeRef }: VesperProps) {
   const groupRef = useRef<Group>(null)
   const surfaceRef = useRef<Mesh>(null)
+  const shepherdRef = useRef<Mesh>(null)
   const surfaceMaterialRef = useRef<ShaderMaterial>(null)
   const ringMaterialRef = useRef<ShaderMaterial>(null)
+  const shepherdMaterialRef = useRef<ShaderMaterial>(null)
   const { width, height } = useThree((state) => state.viewport)
   const compact = useThree((state) => state.size.width < 700) || width / height < 0.9
 
@@ -173,6 +197,14 @@ export function Vesper({ reducedMotion, timeScale }: VesperProps) {
     }),
     [sunDirection],
   )
+  const shepherdUniforms = useMemo(
+    () => ({
+      uSunDirection: { value: sunDirection },
+      uStarFlux: { value: 1 },
+    }),
+    [sunDirection],
+  )
+  const shepherdScratch = useMemo(() => new Vector3(), [])
 
   useFrame((_, rawDelta) => {
     const delta = Math.min(rawDelta, 0.1)
@@ -180,6 +212,10 @@ export function Vesper({ reducedMotion, timeScale }: VesperProps) {
     const flux = starFlux(worldPosition)
     if (surfaceMaterialRef.current) surfaceMaterialRef.current.uniforms.uStarFlux.value = flux
     if (ringMaterialRef.current) ringMaterialRef.current.uniforms.uStarFlux.value = flux
+    if (shepherdMaterialRef.current) shepherdMaterialRef.current.uniforms.uStarFlux.value = flux
+    if (shepherdRef.current) {
+      shepherdRef.current.position.copy(shepherdLocalPosition(timeRef.current, shepherdScratch))
+    }
     if (groupRef.current && surfaceMaterialRef.current) {
       // The ring plane's world axis and scale feed the planet's shadow term.
       surfaceMaterialRef.current.uniforms.uRingNormal.value
@@ -220,6 +256,18 @@ export function Vesper({ reducedMotion, timeScale }: VesperProps) {
           side={DoubleSide}
           transparent
           depthWrite={false}
+        />
+      </mesh>
+
+      {/* The shepherd: a small iced moon keeping the Cassini gap swept,
+        * riding the ring plane on the shared clock. */}
+      <mesh ref={shepherdRef}>
+        <sphereGeometry args={[0.12, 32, 24]} />
+        <shaderMaterial
+          ref={shepherdMaterialRef}
+          vertexShader={bodyVertexGLSL(false)}
+          fragmentShader={shepherdFragment}
+          uniforms={shepherdUniforms}
         />
       </mesh>
 

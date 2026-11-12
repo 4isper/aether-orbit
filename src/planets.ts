@@ -84,7 +84,7 @@ export const planets: Record<PlanetId, BodyInfo> = {
         description: ['Там, где лёд хранит свет.', 'Третий мир — за пределами ветра.'],
         metricLabel: 'Ветер',
         metricUnit: 'км/ч',
-        facts: ['Тень колец на поверхности', 'Щель Кассини в ободах'],
+        facts: ['Тень колец на поверхности', 'Щель Кассини выметена пастухом'],
       },
       en: {
         label: 'Vesper',
@@ -92,7 +92,7 @@ export const planets: Record<PlanetId, BodyInfo> = {
         description: ['Where the ice keeps the light.', 'The third world is past the wind.'],
         metricLabel: 'Wind',
         metricUnit: 'km/h',
-        facts: ['Ring shadows on the surface', 'The Cassini gap in the bands'],
+        facts: ['Ring shadows on the surface', 'The Cassini gap swept by a shepherd'],
       },
     },
   },

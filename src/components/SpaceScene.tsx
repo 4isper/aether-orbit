@@ -241,7 +241,7 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
         <Cinder reducedMotion={reducedMotion} timeScale={timeScale} />
       </group>
       <group ref={(node) => { groupRefs.current.vesper = node }} position={initialPositions[2]} {...planetEvents('vesper')}>
-        <Vesper reducedMotion={reducedMotion} timeScale={timeScale} />
+        <Vesper reducedMotion={reducedMotion} timeScale={timeScale} timeRef={orbitTime} />
       </group>
       <CameraRig
         initialView={initialView}

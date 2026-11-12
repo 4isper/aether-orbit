@@ -79,3 +79,31 @@ export const aureliaFrame = {
 export function moonPhaseAngle(time: number) {
   return aureliaClock.moonPhase + time * aureliaClock.moonAngularSpeed
 }
+
+/**
+ * Vesper's own clock: the shepherd moon pacing the Cassini gap. Its orbit
+ * radius sits inside the gap's core (the ring t in [0.64, 0.70] of the
+ * density shared by Vesper.tsx) — one body, one story: the moon is what
+ * keeps the gap swept clear.
+ */
+export const vesperClock = {
+  /** Shepherd orbit radius in Vesper's local frame, scene units. */
+  shepherdOrbitRadius: 3.5,
+  /** Shepherd mean motion, radians per time unit — orbital-fast against the
+   * planet's day, far slower than Aurelia's moon, as befits a lighter world. */
+  shepherdAngularSpeed: 0.065,
+  /** Where in its lap the shepherd starts. */
+  shepherdPhase: 1.9,
+} as const
+
+/** The shepherd's angle on the shared clock: pure like the moon's phase. */
+export function shepherdAngle(time: number) {
+  return vesperClock.shepherdPhase + time * vesperClock.shepherdAngularSpeed
+}
+
+/** Shepherd position in Vesper's local frame: the ring plane is local XZ. */
+export function shepherdLocalPosition(time: number, target: Vector3) {
+  const angle = shepherdAngle(time)
+  const radius = vesperClock.shepherdOrbitRadius
+  return target.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius)
+}
