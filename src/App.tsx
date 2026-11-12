@@ -4,7 +4,7 @@ import { bodies, planetIds, type SceneView } from './planets'
 import type { TransitAnnouncement } from './components/SpaceScene'
 import { parsePose, poseParams, type CameraPose } from './camera-math'
 import { readStoredLocale, storeLocale, t, type Locale, type StringKey } from './strings'
-import { setAmbience } from './audio'
+import { isAmbienceOn, readStoredAmbience, setAmbience, storeAmbience } from './audio'
 import './App.css'
 
 const SceneCanvas = lazy(() => import('./SceneCanvas'))
@@ -134,7 +134,7 @@ function App() {
   const [paused, setPaused] = useState(false)
   const [speed, setSpeed] = useState(1)
   const [reversed, setReversed] = useState(false)
-  const [sound, setSound] = useState(false)
+  const [sound, setSound] = useState(readStoredAmbience)
   const [tour, setTour] = useState(false)
   const [freeFlight, setFreeFlight] = useState(false)
   const [cinema, setCinema] = useState(false)
@@ -155,6 +155,22 @@ function App() {
     // invokes updaters and the ambience toggle must run exactly once.
     setAmbience(!sound)
     setSound(!sound)
+    storeAmbience(!sound)
+  }, [sound])
+
+  useEffect(() => {
+    // A remembered intent starts on the first gesture anywhere: browsers
+    // hold the AudioContext until one, so the choice resumes instead.
+    if (!sound) return
+    const resume = () => {
+      if (!isAmbienceOn()) setAmbience(true)
+    }
+    window.addEventListener('pointerdown', resume)
+    window.addEventListener('keydown', resume)
+    return () => {
+      window.removeEventListener('pointerdown', resume)
+      window.removeEventListener('keydown', resume)
+    }
   }, [sound])
 
   useEffect(() => {

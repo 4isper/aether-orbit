@@ -71,6 +71,29 @@ export function isAmbienceOn() {
   return enabled
 }
 
+const AMBIENCE_KEY = 'aether-ambience'
+
+/**
+ * The user's sound intent, persisted like the locale: autoplay policies still
+ * hold the actual start until the first gesture, but the button renders in
+ * the remembered state and the first interaction anywhere resumes it.
+ */
+export function readStoredAmbience(): boolean {
+  try {
+    return localStorage.getItem(AMBIENCE_KEY) === 'on'
+  } catch {
+    return false
+  }
+}
+
+export function storeAmbience(on: boolean): void {
+  try {
+    localStorage.setItem(AMBIENCE_KEY, on ? 'on' : 'off')
+  } catch {
+    // private mode: the choice just does not persist
+  }
+}
+
 /** Fade the ambience in or out; safe to call with the same value repeatedly. */
 export function setAmbience(on: boolean) {
   if (on && !ctx) {
