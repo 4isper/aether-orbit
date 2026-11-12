@@ -1,7 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
 import { SceneErrorBoundary } from './SceneErrorBoundary'
 import { bodies, planetIds, type SceneView } from './planets'
-import type { EventAnnouncement } from './components/SpaceScene'
+import type { EventAnnouncement, EventKind } from './components/SpaceScene'
 import type { FlightTelemetry } from './components/CameraRig'
 import { parsePose, type CameraPose } from './camera-math'
 import { deepLinkUrl, parseTimeParam } from './deep-link'
@@ -34,6 +34,15 @@ function readInitialTime(): number | null {
 
 function formatSpeed(speed: number) {
   return speed === 0.5 ? '½' : String(speed)
+}
+
+/** The event chip's label, one string per kind of sky moment; a conjunction
+ * names its pair, which the announcing view already knows. */
+function eventLabel(kind: EventKind, view: SceneView): StringKey {
+  if (kind === 'transit') return 'eventTransit'
+  if (kind === 'eclipse') return 'eventEclipse'
+  if (kind === 'perihelion') return 'eventPerihelion'
+  return view === 'cinder' ? 'eventConjunctionVesper' : 'eventConjunctionAurelia'
 }
 
 function formatDuration(seconds: number, locale: Locale) {
@@ -543,11 +552,7 @@ function App() {
             {event && body && !travelling && (
               <div className="event-chip reveal" role="status">
                 <span className="event-label">
-                  {t(locale, event.kind === 'transit'
-                    ? 'eventTransit'
-                    : event.kind === 'eclipse'
-                      ? 'eventEclipse'
-                      : 'eventPerihelion')}
+                  {t(locale, eventLabel(event.kind, activeView))}
                 </span>
                 <strong>
                   {event.inProgress

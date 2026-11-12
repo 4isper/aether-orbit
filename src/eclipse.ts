@@ -99,7 +99,7 @@ const SCAN_HORIZON = SYNODIC + (Math.PI * 2) / aureliaClock.moonAngularSpeed
 // windows; the horizon test in eclipse.test.ts keeps this honest.
 export const ECLIPSE_SCAN_HORIZON = planetPeriod('aurelia') + (Math.PI * 2) / aureliaClock.moonAngularSpeed
 
-type WindowScan = {
+export type WindowScan = {
   /** Depth of the alignment at time t; a window is where it dips below threshold. */
   measure: (time: number) => number
   threshold: number
@@ -125,7 +125,12 @@ function refineEdge(scan: WindowScan, outside: number, inside: number) {
  * below the scan step so countdowns and the in-progress flag stay honest
  * even when a window runs past the horizon.
  */
-function nextWindow(now: number, scan: WindowScan): TransitEvent | null {
+/** Walk forward at SCAN_STEP, catch the first window where the depth dips
+ * below the threshold, refine its edges by bisection and its peak with a
+ * fine walk. `entry` is first contact, `peak` the deepest alignment, `exit`
+ * the last moment inside. Shared by every event in the sky: shadow geometry
+ * here, conjunctions in conjunction.ts. */
+export function nextWindow(now: number, scan: WindowScan): TransitEvent | null {
   let entry = -1
   let coarsePeak = -1
   let depth = Number.POSITIVE_INFINITY

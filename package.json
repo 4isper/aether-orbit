@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "test": "node --experimental-strip-types --test src/orbits.test.ts src/comet.test.ts src/camera-math.test.ts src/random.test.ts src/prominences.test.ts src/ring-shadow.test.ts src/galactic.test.ts src/strings.test.ts src/eclipse.test.ts src/audio.test.ts src/meteors.test.ts src/deep-link.test.ts",
+    "test": "node --experimental-strip-types --test src/orbits.test.ts src/comet.test.ts src/camera-math.test.ts src/random.test.ts src/prominences.test.ts src/ring-shadow.test.ts src/galactic.test.ts src/strings.test.ts src/eclipse.test.ts src/audio.test.ts src/meteors.test.ts src/deep-link.test.ts src/conjunction.test.ts",
     "preview": "vite preview",
     "test:smoke": "node scripts/smoke.mjs"
   },

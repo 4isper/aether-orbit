@@ -17,6 +17,7 @@ import { SystemOverview } from './SystemOverview'
 import { planetIds, type PlanetId, type SceneView } from '../planets'
 import { planetPosition } from '../orbits'
 import { nextEclipse, nextTransit } from '../eclipse'
+import { nextConjunction } from '../conjunction'
 import { nextPerihelion } from '../comet'
 import type { CameraPose } from '../camera-math'
 import type { FlightTelemetry } from './CameraRig'
@@ -61,7 +62,7 @@ function ComposerCapture() {
 
 /** What the interface needs to announce an event: which one, a countdown
  * and the absolute peak time the "skip to the moment" button seeks to. */
-export type EventKind = 'transit' | 'eclipse' | 'perihelion'
+export type EventKind = 'transit' | 'eclipse' | 'perihelion' | 'conjunction'
 export type EventAnnouncement = {
   kind: EventKind
   seconds: number
@@ -71,7 +72,9 @@ export type EventAnnouncement = {
 
 /** One event per view, each on the view where the sky actually shows it:
  * the transit shadow belongs to Aurelia's orbit, the eclipse darkens Nox,
- * the periapsis flares on the comet. */
+ * the periapsis flares on the comet, the conjunctions line up on the views
+ * of the outer watcher (Cinder sees Vesper hide behind Solis, Vesper sees
+ * Aurelia cross the disc). */
 function sceneEvent(view: SceneView, now: number): EventAnnouncement | null {
   const shadowEvent = view === 'aurelia'
     ? nextTransit(now)
@@ -93,6 +96,18 @@ function sceneEvent(view: SceneView, now: number): EventAnnouncement | null {
       seconds: event.inProgress ? 0 : Math.max(event.entry - now, 0),
       peakAt: event.peak,
       inProgress: event.inProgress,
+    }
+  }
+  if (view === 'cinder' || view === 'vesper') {
+    const target = view === 'cinder' ? 'vesper' : 'aurelia'
+    const event = nextConjunction(view, target, now)
+    if (event) {
+      return {
+        kind: 'conjunction',
+        seconds: event.inProgress ? 0 : Math.max(event.entry - now, 0),
+        peakAt: event.peak,
+        inProgress: event.inProgress,
+      }
     }
   }
   return null
