@@ -14,6 +14,7 @@ import {
   OVERVIEW_MIN_ZOOM,
   pinchZoom,
   rotateOverviewPose,
+  shiftIntoFrame,
   viewZoomBounds,
   type CameraPose,
 } from '../camera-math'
@@ -26,12 +27,25 @@ type CameraRigProps = {
   onArrive: (view: SceneView) => void
   sharePose?: (view: SceneView, pose: CameraPose) => void
   timeRef: { current: number }
+  /** The moon's live world position, published by Planet every frame. */
+  moonWorldRef: { current: Vector3 }
 }
 
 const MAX_STEP = 0.1
 const SHARE_INTERVAL = 1.5
+const BASE_FOV = 36
 
-export function CameraRig({ initialView, initialPose, reducedMotion, destination, onArrive, sharePose, timeRef }: CameraRigProps) {
+/**
+ * Screen-space framing for the small bodies, in half-frame fractions
+ * (+x right, +y up). Unlike the planets' world-space compOffset this holds
+ * the body on its side of the frame over the whole orbit.
+ */
+const SMALL_BODY_FRAMING = {
+  comet: { x: 0.12, y: -0.31 },
+  moon: { x: 0.25, y: -0.15 },
+} as const
+
+export function CameraRig({ initialView, initialPose, reducedMotion, destination, onArrive, sharePose, timeRef, moonWorldRef }: CameraRigProps) {
   const gl = useThree((state) => state.gl)
   const size = useThree((state) => state.size)
   const overviewPose = useMemo(
@@ -230,13 +244,15 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
     const delta = Math.min(rawDelta, MAX_STEP)
     const camera = state.camera as PerspectiveCamera
     const compact = state.size.width < 700
+    const aspect = state.size.width / Math.max(state.size.height, 1)
     const journey = flight.current
     const time = timeRef.current
-    // The comet is ten times smaller than the planets: its framing offset is
-    // proportionally smaller so it stays inside the frame.
-    if ((journey.active ? destination : currentView.current) === 'comet') {
-      compOffset.set(compact ? -0.3 : -0.6, compact ? 0.9 : 0.3, 0)
-    } else {
+    // Small bodies are framed in screen space (see SMALL_BODY_FRAMING); the
+    // planets and the star keep their world-space composition offset.
+    const framed = journey.active ? destination : currentView.current
+    const small = framed === 'comet' || framed === 'moon'
+    const screenFrame = small ? SMALL_BODY_FRAMING[framed] : null
+    if (!small) {
       compOffset.set(compact ? -0.45 : -1.8, compact ? 1.3 : 0.5, 0)
     }
 
@@ -277,12 +293,17 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
       } else {
         if (destination === 'comet') {
           cometPosition(time, journey.endLook)
+        } else if (destination === 'moon') {
+          journey.endLook.copy(moonWorldRef.current)
         } else {
           planetPosition(destination, time, journey.endLook)
         }
-        journey.endLook.add(compOffset)
+        if (!small) journey.endLook.add(compOffset)
         orbitOffset(journey.endLook, 0, 0, viewZoomBounds(destination).distance + (compact ? 0.55 : 0), journey.endPosition)
         journey.endUp.set(0, 1, 0)
+        if (screenFrame) {
+          shiftIntoFrame(journey.endLook, journey.endPosition, journey.endUp, screenFrame.x, screenFrame.y, BASE_FOV, aspect)
+        }
       }
       camera.position.lerpVectors(journey.startPosition, journey.endPosition, eased)
       camera.position.y += arc * 2.8
@@ -351,11 +372,18 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
       scratch.set(0, 0, 0)
     } else if (currentView.current === 'comet') {
       cometPosition(time, scratch)
+    } else if (currentView.current === 'moon') {
+      scratch.copy(moonWorldRef.current)
     } else {
       planetPosition(currentView.current, time, scratch)
     }
-    scratch.add(compOffset)
+    if (!small) scratch.add(compOffset)
     orbitOffset(scratch, yaw, pitch, distance, camera.position)
+    if (screenFrame) {
+      // Hold the small body on its side of the frame regardless of where it
+      // is on its orbit.
+      shiftIntoFrame(scratch, camera.position, camera.up, screenFrame.x, screenFrame.y, BASE_FOV, aspect)
+    }
     camera.position.x += parallaxX * 0.06
     camera.position.y += parallaxY * 0.04
     lookAt.current.copy(scratch)

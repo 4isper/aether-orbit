@@ -1,7 +1,7 @@
 import type { Locale } from './strings'
 
 export type PlanetId = 'aurelia' | 'cinder' | 'vesper'
-export type SceneView = PlanetId | 'system' | 'star' | 'comet'
+export type SceneView = PlanetId | 'system' | 'star' | 'comet' | 'moon'
 export const planetIds: PlanetId[] = ['aurelia', 'cinder', 'vesper']
 
 /** Locale-bound copy of a body: what the interface says about it. */
@@ -148,9 +148,35 @@ export const cometInfo: BodyInfo = {
   },
 }
 
+export const moonInfo: BodyInfo = {
+  name: 'Nox',
+  code: '005',
+  radius: '0.19',
+  metricValue: '79',
+  copy: {
+    ru: {
+      label: 'Нокс',
+      title: ['Вечная', 'сторона'],
+      description: ['Всегда одним ликом к Aurelia.', 'Полмесяца света, полмесяца тьмы.'],
+      metricLabel: 'Период',
+      metricUnit: 'сут',
+      facts: ['Приливной захват', 'Кольцевые транзиты на диск Aurelia'],
+    },
+    en: {
+      label: 'Nox',
+      title: ['The far', 'side'],
+      description: ['Always the same face to Aurelia.', 'Half a month of light, half of dark.'],
+      metricLabel: 'Period',
+      metricUnit: 'days',
+      facts: ['Tidal lock', 'Annular transits onto Aurelia'],
+    },
+  },
+}
+
 /** Telemetry for every flyable destination except the system overview. */
 export const bodies: Record<Exclude<SceneView, 'system'>, BodyInfo> = {
   ...planets,
   star: starInfo,
   comet: cometInfo,
+  moon: moonInfo,
 }

@@ -6,10 +6,13 @@ import { orbitPoint } from './orbits.ts'
 export const PLANET_VIEW_DISTANCE = 9
 export const STAR_VIEW_DISTANCE = 11.5
 export const COMET_VIEW_DISTANCE = 3.4
+export const MOON_VIEW_DISTANCE = 1.7
 export const MIN_ZOOM = 7.6
 export const MAX_ZOOM = 12.6
 export const COMET_MIN_ZOOM = 2.2
 export const COMET_MAX_ZOOM = 4.6
+export const MOON_MIN_ZOOM = 1.0
+export const MOON_MAX_ZOOM = 3.2
 const FLIGHT_TIME = 4.2
 const INTRO_TIME = 4.5
 const OVERVIEW_HALF_FOV_DEG = 18
@@ -64,6 +67,7 @@ export function pinchZoom(zoom: number, startDistance: number, nextDistance: num
 export function viewZoomBounds(view: SceneView) {
   if (view === 'star') return { distance: STAR_VIEW_DISTANCE, min: MIN_ZOOM, max: MAX_ZOOM }
   if (view === 'comet') return { distance: COMET_VIEW_DISTANCE, min: COMET_MIN_ZOOM, max: COMET_MAX_ZOOM }
+  if (view === 'moon') return { distance: MOON_VIEW_DISTANCE, min: MOON_MIN_ZOOM, max: MOON_MAX_ZOOM }
   return { distance: PLANET_VIEW_DISTANCE, min: MIN_ZOOM, max: MAX_ZOOM }
 }
 
@@ -157,6 +161,32 @@ export function rotateOverviewPose(
     out.up.copy(pose.up)
   }
   return out
+}
+
+/**
+ * Slide the look point so the framed body sits at a stable screen position:
+ * offsets are fractions of the half-frame (+x right, +y up), so the framing
+ * survives the body's whole orbit, unlike a fixed world-space offset whose
+ * projection rotates with the camera. Mutates lookAt in place.
+ */
+export function shiftIntoFrame(
+  lookAt: Vector3,
+  cameraPosition: Vector3,
+  up: Vector3,
+  sx: number,
+  sy: number,
+  fovDeg: number,
+  aspect: number,
+) {
+  const dir = new Vector3().subVectors(lookAt, cameraPosition)
+  const distance = dir.length()
+  if (distance === 0) return
+  dir.normalize()
+  const right = new Vector3().crossVectors(dir, up).normalize()
+  const screenUp = new Vector3().crossVectors(right, dir).normalize()
+  const halfH = distance * Math.tan(MathUtils.degToRad(fovDeg / 2))
+  lookAt.addScaledVector(right, -sx * halfH * aspect)
+  lookAt.addScaledVector(screenUp, -sy * halfH)
 }
 
 /**

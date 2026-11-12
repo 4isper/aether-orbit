@@ -54,4 +54,12 @@ export const aureliaClock = {
   moonAngularSpeed: 0.08,
   /** Moon orbit radius around Aurelia, in scene units. */
   moonOrbitRadius: 3.6,
+  /** Moon phase at time zero: where in its orbit the month begins. */
+  moonPhase: 2.1,
 } as const
+
+/** The moon's phase angle on Aurelia's shared clock: pure, so time reversal
+ * and pause come for free and the tidal lock stays exact. */
+export function moonPhaseAngle(time: number) {
+  return aureliaClock.moonPhase + time * aureliaClock.moonAngularSpeed
+}

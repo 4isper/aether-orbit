@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { Vector3 } from 'three'
-import { aureliaClock, orbitPoint, planetPeriod, planetPosition, starFlux } from './orbits.ts'
+import { aureliaClock, moonPhaseAngle, orbitPoint, planetPeriod, planetPosition, starFlux } from './orbits.ts'
 import { planetIds } from './planets.ts'
 
 const scratch = new Vector3()
@@ -67,6 +67,17 @@ test('the moon makes a handful of orbits per year, Earth-scale', () => {
     monthsPerYear > 2 && monthsPerYear < 7,
     `${monthsPerYear.toFixed(1)} months per year is outside the plausible band`,
   )
+})
+
+test('the moon phase angle advances exactly with the shared clock', () => {
+  assert.ok(Math.abs(moonPhaseAngle(0) - aureliaClock.moonPhase) < 1e-12)
+  const month = (Math.PI * 2) / aureliaClock.moonAngularSpeed
+  // One month later the angle has gained exactly one full turn, whatever the
+  // starting phase: the tidal lock depends on this being exact.
+  const gain = moonPhaseAngle(month) - moonPhaseAngle(0)
+  assert.ok(Math.abs(gain - Math.PI * 2) < 1e-9, `per-month gain ${gain}`)
+  // Negative time (reversed playback) rewinds the phase by the same law.
+  assert.ok(Math.abs(moonPhaseAngle(-month) - moonPhaseAngle(0) + Math.PI * 2) < 1e-9)
 })
 
 test('a year of Aurelia holds several day-night cycles', () => {

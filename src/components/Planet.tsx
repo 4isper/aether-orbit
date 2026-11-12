@@ -16,7 +16,7 @@ import { noiseGLSL } from '../shaders/noise'
 import { bodyVertexGLSL, perturbNormalGLSL } from '../shaders/common'
 import { Atmosphere } from './Atmosphere'
 import { Moon, MOON_RADIUS } from './Moon'
-import { aureliaClock, starFlux } from '../orbits'
+import { aureliaClock, moonPhaseAngle, starFlux } from '../orbits'
 import { useSunDirection } from '../hooks/useSunDirection'
 import { t, type Locale } from '../strings'
 
@@ -238,9 +238,13 @@ type PlanetProps = {
   timeScale: number
   showMoonLabel?: boolean
   locale: Locale
+  /** Shared simulation clock, advanced by SpaceScene once per frame. */
+  timeRef: { current: number }
+  /** Receives the moon's world position every frame, for the camera rig. */
+  moonWorldRef?: { current: Vector3 }
 }
 
-export function Planet({ reducedMotion, timeScale, showMoonLabel, locale }: PlanetProps) {
+export function Planet({ reducedMotion, timeScale, showMoonLabel, locale, timeRef, moonWorldRef }: PlanetProps) {
   const groupRef = useRef<Group>(null)
   const surfaceRef = useRef<Mesh>(null)
   const cloudsRef = useRef<Mesh>(null)
@@ -276,7 +280,6 @@ export function Planet({ reducedMotion, timeScale, showMoonLabel, locale }: Plan
 
   const { sunDirection, worldPosition, updateSunDirection } = useSunDirection(groupRef)
   const moonWorld = useMemo(() => new Vector3(), [])
-  const moonAngle = useRef(2.1)
   const surfaceUniforms = useMemo(
     () => ({
       uSunDirection: { value: sunDirection },
@@ -343,14 +346,17 @@ export function Planet({ reducedMotion, timeScale, showMoonLabel, locale }: Plan
 
     const moon = moonRef.current
     if (moon) {
-      if (!reducedMotion) moonAngle.current += delta * aureliaClock.moonAngularSpeed * timeScale
+      // The moon rides the shared simulation clock: pause, reverse and time
+      // speed come from one place instead of a private accumulator.
+      const moonAngle = moonPhaseAngle(timeRef.current)
       moon.position.set(
-        Math.cos(moonAngle.current) * aureliaClock.moonOrbitRadius,
+        Math.cos(moonAngle) * aureliaClock.moonOrbitRadius,
         0,
-        Math.sin(moonAngle.current) * aureliaClock.moonOrbitRadius,
+        Math.sin(moonAngle) * aureliaClock.moonOrbitRadius,
       )
-      moon.rotation.y = moonAngle.current + 1.2
+      moon.rotation.y = moonAngle + 1.2
       moon.getWorldPosition(moonWorld)
+      moonWorldRef?.current.copy(moonWorld)
 
       const moonWorldRadius = MOON_RADIUS * (compact ? 0.76 : 1)
       if (surfaceMaterialRef.current) {

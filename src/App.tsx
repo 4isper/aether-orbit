@@ -10,7 +10,7 @@ const SceneCanvas = lazy(() => import('./SceneCanvas'))
 const SPEED_OPTIONS = [0.5, 1, 2, 4]
 const TOUR_STOPS: SceneView[] = ['aurelia', 'cinder', 'vesper', 'comet', 'star', 'system']
 const TOUR_DWELL_MS = 7000
-const SCENE_VIEWS: SceneView[] = [...planetIds, 'star', 'comet', 'system']
+const SCENE_VIEWS: SceneView[] = [...planetIds, 'star', 'comet', 'moon', 'system']
 
 /** Deep link support: ?view=vesper opens the scene already on that orbit. */
 function readInitialView(): SceneView {
@@ -35,7 +35,7 @@ function formatSpeed(speed: number) {
 
 /** Rows of the "?" help dialog, in the order users will scan them. */
 const SHORTCUT_ROWS: Array<{ keys: string; label: StringKey }> = [
-  { keys: '1–6', label: 'shortcutViews' },
+  { keys: '1–7', label: 'shortcutViews' },
   { keys: 'Space', label: 'shortcutPause' },
   { keys: 'R', label: 'shortcutReset' },
   { keys: 'H', label: 'shortcutCinema' },
@@ -191,7 +191,7 @@ function App() {
         event.preventDefault()
         setPaused((value) => !value)
       }
-      if (!onControl && /^[1-6]$/.test(event.key)) {
+      if (!onControl && /^[1-7]$/.test(event.key)) {
         const view = SCENE_VIEWS[Number(event.key) - 1]
         if (view) travelTo(view)
       }
@@ -223,7 +223,13 @@ function App() {
                 label={travelling
                   ? t(locale, 'flightLabel', { from: currentName, to: destinationName })
                   : body
-                    ? t(locale, isStar ? 'starSceneAria' : activeView === 'comet' ? 'cometSceneAria' : 'planetSceneAria', { name: body.copy[locale].label })
+                    ? t(locale, isStar
+                      ? 'starSceneAria'
+                      : activeView === 'comet'
+                        ? 'cometSceneAria'
+                        : activeView === 'moon'
+                          ? 'moonSceneAria'
+                          : 'planetSceneAria', { name: body.copy[locale].label })
                     : t(locale, 'systemAria')}
               activeView={activeView}
               destination={destination}
@@ -315,6 +321,18 @@ function App() {
           ))}
           <button
             type="button"
+            className="planet-link planet-link--moon"
+            aria-pressed={activeView === 'moon'}
+            aria-label={t(locale, 'flyToMoon', { name: bodies.moon.name })}
+            disabled={!ready || travelling}
+            onClick={() => travelTo('moon')}
+          >
+            <span className="planet-dot" aria-hidden="true" />
+            <span className="planet-number">{bodies.moon.code}</span>
+            {bodies.moon.name}
+          </button>
+          <button
+            type="button"
             className="planet-link planet-link--comet"
             aria-pressed={activeView === 'comet'}
             aria-label={t(locale, 'flyToComet', { name: bodies.comet.name })}
@@ -388,7 +406,7 @@ function App() {
         {body ? (
           <>
             <section className="intro reveal" aria-labelledby="scene-title" aria-hidden={travelling}>
-              <p className="eyebrow"><span />{body.name} / {activeView === 'star' ? t(locale, 'orbitOfStar') : activeView === 'cinder' ? t(locale, 'worldDesert') : activeView === 'vesper' ? t(locale, 'worldIce') : activeView === 'comet' ? t(locale, 'worldComet') : t(locale, 'worldExo')}</p>
+              <p className="eyebrow"><span />{body.name} / {activeView === 'star' ? t(locale, 'orbitOfStar') : activeView === 'cinder' ? t(locale, 'worldDesert') : activeView === 'vesper' ? t(locale, 'worldIce') : activeView === 'comet' ? t(locale, 'worldComet') : activeView === 'moon' ? t(locale, 'worldMoon') : t(locale, 'worldExo')}</p>
               <h1 id="scene-title">
                 <span>{body.copy[locale].title[0]}</span>
                 <em>{body.copy[locale].title[1]}</em>
@@ -485,7 +503,7 @@ function App() {
             CC BY 4.0
           </a>
           <span>{body ? `${body.code} / ${body.name}` : 'SYS / Aether'}</span>
-          <span className="footer-keys">{t(locale, 'shortcutsHint')} · 1–6 · Space · R · H · ?</span>
+          <span className="footer-keys">{t(locale, 'shortcutsHint')} · 1–7 · Space · R · H · ?</span>
         </footer>
       </div>
 

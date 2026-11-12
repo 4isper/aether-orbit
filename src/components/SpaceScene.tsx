@@ -78,6 +78,7 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
   useCursor(overview && hovered, 'pointer', travelling ? 'progress' : overview ? 'default' : 'grab', gl.domElement)
 
   const orbitTime = useRef(0)
+  const moonWorld = useRef(new Vector3())
   const groupRefs = useRef<Record<PlanetId, Group | null>>({ aurelia: null, cinder: null, vesper: null })
   const scratch = useMemo(() => new Vector3(), [])
   const initialPositions = useMemo(
@@ -134,7 +135,7 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
         <Star reducedMotion={reducedMotion} timeScale={timeScale} />
       </group>
       <group ref={(node) => { groupRefs.current.aurelia = node }} position={initialPositions[0]} {...planetEvents('aurelia')}>
-        <Planet reducedMotion={reducedMotion} timeScale={timeScale} showMoonLabel={overview} locale={locale} />
+        <Planet reducedMotion={reducedMotion} timeScale={timeScale} showMoonLabel={overview} locale={locale} timeRef={orbitTime} moonWorldRef={moonWorld} />
       </group>
       <group ref={(node) => { groupRefs.current.cinder = node }} position={initialPositions[1]} {...planetEvents('cinder')}>
         <Cinder reducedMotion={reducedMotion} timeScale={timeScale} />
@@ -150,6 +151,7 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
         onArrive={onArrive}
         sharePose={onSharePose}
         timeRef={orbitTime}
+        moonWorldRef={moonWorld}
       />
       {overview && <SystemOverview onSelect={selectBody} timeRef={orbitTime} locale={locale} />}
       <SceneReady onReady={onReady} />

@@ -9,6 +9,7 @@ import {
   poseParams,
   rotateOverviewPose,
   pinchZoom,
+  shiftIntoFrame,
   viewZoomBounds,
   COMET_VIEW_DISTANCE,
   MAX_ZOOM,
@@ -174,4 +175,30 @@ test('viewZoomBounds gives every flyable view its distance and clamp', () => {
   assert.equal(comet.distance, COMET_VIEW_DISTANCE)
   assert.ok(comet.min < comet.distance && comet.distance < comet.max, 'comet default outside its clamp')
   assert.equal(viewZoomBounds('system').distance, PLANET_VIEW_DISTANCE)
+})
+
+test('shiftIntoFrame moves the look point against the requested screen offset', () => {
+  // Camera on +Z looking at the origin, screen-right is +X, screen-up is +Y.
+  const lookAt = new Vector3(0, 0, 0)
+  const camera = new Vector3(0, 0, 10)
+  const up = new Vector3(0, 1, 0)
+  // +sx puts the BODY to the right, so the look point slides left.
+  shiftIntoFrame(lookAt, camera, up, 1, 0, 36, 1.5)
+  const halfH = 10 * Math.tan((36 / 2) * Math.PI / 180)
+  assert.ok(Math.abs(lookAt.x + halfH * 1.5) < 1e-9, `x ${lookAt.x}`)
+  assert.ok(Math.abs(lookAt.y) < 1e-9)
+  assert.ok(Math.abs(lookAt.z) < 1e-9)
+})
+
+test('shiftIntoFrame keeps the frame distance and scales with it', () => {
+  const camera = new Vector3(3, 0, 0)
+  const lookAt = new Vector3(0, 0, 0)
+  const up = new Vector3(0, 1, 0)
+  shiftIntoFrame(lookAt, camera, up, 0, -0.5, 36, 1)
+  // -sy puts the body low, the look point slides up; the z shift is zero
+  // because the offset lives in the screen plane.
+  const halfH = 3 * Math.tan((36 / 2) * Math.PI / 180)
+  assert.ok(Math.abs(lookAt.y - halfH * 0.5) < 1e-9, `y ${lookAt.y}`)
+  assert.ok(Math.abs(lookAt.x) < 1e-9)
+  assert.ok(Math.abs(lookAt.z) < 1e-9)
 })
