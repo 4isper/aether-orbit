@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { Vector3 } from 'three'
-import { cometOrbit, cometOrbitPoint, cometPosition, tailParticlePosition } from './comet.ts'
+import { cometOrbit, cometOrbitPoint, cometPosition, nextPerihelion, PERIHELION_RADIUS, tailParticlePosition } from './comet.ts'
 
 const scratch = new Vector3()
 
@@ -84,4 +84,38 @@ test('the comet tracks negative time the same as the equivalent positive time', 
   const reversed = cometPosition(-42, new Vector3())
   const forward = cometPosition(-42 + cometOrbit.period, new Vector3())
   assert.ok(reversed.distanceTo(forward) < 1e-6, `gap ${reversed.distanceTo(forward)}`)
+})
+
+test('nextPerihelion lands on the periapsis, strictly ahead', () => {
+  for (let start = 0; start <= 500; start += 23) {
+    const event = nextPerihelion(start)
+    assert.ok(event.peak >= start, `peak ${event.peak} behind start ${start}`)
+    const radius = cometPosition(event.peak, new Vector3()).length()
+    assert.ok(
+      Math.abs(radius - cometOrbit.periapsis) < 1e-3,
+      `peak radius ${radius} is not the periapsis ${cometOrbit.periapsis}`,
+    )
+    assert.ok(event.entry < event.peak && event.peak < event.exit, 'window is not ordered')
+    assert.ok(event.inProgress === (start >= event.entry && start <= event.exit))
+  }
+})
+
+test('perihelion repeats on the orbit period', () => {
+  const first = nextPerihelion(0)
+  const second = nextPerihelion(first.peak + 1)
+  assert.ok(Math.abs(second.peak - first.peak - cometOrbit.period) < 1e-6, `period drift ${second.peak - first.peak}`)
+})
+
+test('the perihelion window matches the comet actually blazing', () => {
+  const event = nextPerihelion(0)
+  // Inside the window the comet is within the announced radius; just outside
+  // it the tails have visibly faded.
+  const entryRadius = cometPosition(event.entry, new Vector3()).length()
+  const exitRadius = cometPosition(event.exit, new Vector3()).length()
+  assert.ok(entryRadius <= PERIHELION_RADIUS + 1e-6, `entry radius ${entryRadius}`)
+  assert.ok(exitRadius <= PERIHELION_RADIUS + 1e-6, `exit radius ${exitRadius}`)
+  const before = cometPosition(event.entry - 0.3, new Vector3()).length()
+  const after = cometPosition(event.exit + 0.3, new Vector3()).length()
+  assert.ok(before > PERIHELION_RADIUS, `before radius ${before}`)
+  assert.ok(after > PERIHELION_RADIUS, `after radius ${after}`)
 })

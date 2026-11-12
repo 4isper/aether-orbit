@@ -65,6 +65,26 @@ export type TransitEvent = {
  */
 export const DISC_THRESHOLD_MOON_RADII = aureliaFrame.planetRadius / aureliaFrame.moonRadius
 
+/**
+ * Eclipse of the moon: the depth of Nox inside Aurelia's shadow cylinder,
+ * measured from the planet along the anti-sun ray, in planet radii. The
+ * rendered penumbra on the moon fades over 0.82–1.04 radii, so the
+ * geometric threshold of 1.0 sits mid-penumbra — the moon is already a
+ * quarter as bright, which reads as an eclipse worth announcing.
+ */
+export const ECLIPSE_THRESHOLD_PLANET_RADII = 1.0
+
+export function moonShadowDepth(time: number) {
+  planetPosition('aurelia', time, planetScratch)
+  moonWorldPosition(time, moonScratch)
+  const offset = shadowOffsetScratch.copy(moonScratch).sub(planetScratch)
+  // The planet's shadow runs from the planet straight away from the star.
+  const antiSun = sunScratch.copy(planetScratch).normalize()
+  const along = offset.dot(antiSun)
+  if (along <= 0) return Number.POSITIVE_INFINITY
+  return Math.sqrt(Math.max(offset.lengthSq() - along * along, 0)) / aureliaFrame.planetRadius
+}
+
 const SCAN_STEP = 0.5
 // Conjunctions repeat on the synodic clock (moon vs the planet's year), not
 // on the moon's own month, and the tilted orbit makes some of them miss the
@@ -73,46 +93,62 @@ const SCAN_STEP = 0.5
 const SYNODIC = 1 / (1 / ((Math.PI * 2) / aureliaClock.moonAngularSpeed) - 1 / planetPeriod('aurelia'))
 const SCAN_HORIZON = SYNODIC + (Math.PI * 2) / aureliaClock.moonAngularSpeed
 
+// Eclipses come in seasons tied to the planet's year (the moon-orbit nodes
+// are fixed in the world frame, so the anti-sun direction visits each node
+// once a year). A year plus a month covers every measured gap between
+// windows; the horizon test in eclipse.test.ts keeps this honest.
+export const ECLIPSE_SCAN_HORIZON = planetPeriod('aurelia') + (Math.PI * 2) / aureliaClock.moonAngularSpeed
+
+type WindowScan = {
+  /** Depth of the alignment at time t; a window is where it dips below threshold. */
+  measure: (time: number) => number
+  threshold: number
+  /** How far ahead to look for the next window before giving up. */
+  horizon: number
+}
+
 /** Bisect the threshold crossing between an outside and an inside sample. */
-function refineEdge(outside: number, inside: number) {
+function refineEdge(scan: WindowScan, outside: number, inside: number) {
   for (let i = 0; i < 24; i++) {
     const mid = (outside + inside) / 2
-    if (shadowDistance(mid) <= DISC_THRESHOLD_MOON_RADII) inside = mid
+    if (scan.measure(mid) <= scan.threshold) inside = mid
     else outside = mid
   }
   return inside
 }
 
 /**
- * The next transit at or after `now`. `entry` is first contact, `peak` the
- * deepest alignment, `exit` the last moment of shading; the edges are
- * refined well below the scan step so countdowns and the in-progress flag
- * stay honest even when a window runs past the scan horizon.
+ * Shared scan for both shadow events: walk forward at SCAN_STEP, catch the
+ * first window where the depth dips below the threshold, refine its edges by
+ * bisection and its peak with a fine walk. `entry` is first contact, `peak`
+ * the deepest alignment, `exit` the last moment inside; the edges land well
+ * below the scan step so countdowns and the in-progress flag stay honest
+ * even when a window runs past the horizon.
  */
-export function nextTransit(now: number): TransitEvent | null {
+function nextWindow(now: number, scan: WindowScan): TransitEvent | null {
   let entry = -1
   let coarsePeak = -1
   let depth = Number.POSITIVE_INFINITY
   let exit = -1
   let previous = now
   let t = now
-  let horizon = now + SCAN_HORIZON
+  let horizon = now + scan.horizon
   while (t <= horizon) {
-    const distance = shadowDistance(t)
+    const distance = scan.measure(t)
     if (distance < depth) {
       depth = distance
       coarsePeak = t
     }
-    if (distance <= DISC_THRESHOLD_MOON_RADII) {
+    if (distance <= scan.threshold) {
       // First contact: `previous` is the outside sample, `t` the inside one.
-      if (entry < 0) entry = refineEdge(previous, t)
+      if (entry < 0) entry = refineEdge(scan, previous, t)
       exit = t
     } else if (entry >= 0) {
       // The first outside sample after the window: refine the last contact.
-      exit = refineEdge(t, exit)
+      exit = refineEdge(scan, t, exit)
       break
     }
-    // A window may outlive the month horizon; keep scanning until it closes.
+    // A window may outlive the horizon; keep scanning until it closes.
     if (entry >= 0 && t + SCAN_STEP > horizon) horizon = t + SCAN_STEP
     previous = t
     t += SCAN_STEP
@@ -121,7 +157,31 @@ export function nextTransit(now: number): TransitEvent | null {
   // The coarse peak is within half a step of the true one; a fine walk nails it.
   let peak = coarsePeak
   for (let fine = coarsePeak - SCAN_STEP; fine <= coarsePeak + SCAN_STEP; fine += 0.02) {
-    if (shadowDistance(fine) < shadowDistance(peak)) peak = fine
+    if (scan.measure(fine) < scan.measure(peak)) peak = fine
   }
   return { entry, peak, exit, inProgress: now >= entry && now <= exit }
+}
+
+/**
+ * The next transit at or after `now`.
+ */
+export function nextTransit(now: number): TransitEvent | null {
+  return nextWindow(now, {
+    measure: shadowDistance,
+    threshold: DISC_THRESHOLD_MOON_RADII,
+    horizon: SCAN_HORIZON,
+  })
+}
+
+/**
+ * The next eclipse at or after `now`: Nox crossing into Aurelia's shadow,
+ * going visibly dark from the moon's orbit. Geometry matches the penumbra
+ * the moon surface actually renders.
+ */
+export function nextEclipse(now: number): TransitEvent | null {
+  return nextWindow(now, {
+    measure: moonShadowDepth,
+    threshold: ECLIPSE_THRESHOLD_PLANET_RADII,
+    horizon: ECLIPSE_SCAN_HORIZON,
+  })
 }

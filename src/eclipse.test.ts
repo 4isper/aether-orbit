@@ -2,7 +2,16 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { Group, Mesh, Vector3 } from 'three'
 import { moonPhaseAngle, planetPosition, aureliaClock } from './orbits.ts'
-import { shadowDistance, nextTransit, moonWorldPosition, DISC_THRESHOLD_MOON_RADII } from './eclipse.ts'
+import {
+  shadowDistance,
+  nextTransit,
+  moonWorldPosition,
+  DISC_THRESHOLD_MOON_RADII,
+  nextEclipse,
+  moonShadowDepth,
+  ECLIPSE_THRESHOLD_PLANET_RADII,
+  ECLIPSE_SCAN_HORIZON,
+} from './eclipse.ts'
 
 /**
  * The scene graph rebuilt from raw literals: this pins the pure math in
@@ -92,4 +101,37 @@ test('nextTransit after an event finds the next month, strictly ahead', () => {
   assert.ok(after)
   assert.ok(after.entry > first.exit, 'the next event must start strictly later')
   assert.ok(!after.inProgress)
+})
+
+test("nextEclipse finds windows where Nox enters Aurelia's shadow", () => {
+  // Walk years of simulation time window by window: every scan must return
+  // an event, every window must bracket real crossings, and the peak must
+  // be the deepest point of the umbra pass.
+  let cursor = 0
+  for (let i = 0; i < 40; i++) {
+    const event = nextEclipse(cursor)
+    assert.ok(event, `no eclipse found from t=${cursor}`)
+    assert.ok(event.entry >= cursor, `event from t=${cursor} starts in the past`)
+    assert.ok(event.entry < event.peak && event.peak < event.exit, 'window is not ordered')
+    assert.ok(moonShadowDepth(event.peak) <= ECLIPSE_THRESHOLD_PLANET_RADII + 1e-9, 'peak is not inside the shadow')
+    assert.ok(moonShadowDepth(event.entry - 0.2) > ECLIPSE_THRESHOLD_PLANET_RADII, 'entry is not a real crossing')
+    assert.ok(moonShadowDepth(event.exit + 0.2) > ECLIPSE_THRESHOLD_PLANET_RADII, 'exit is not a real crossing')
+    cursor = event.exit + 0.5
+  }
+})
+
+test('the eclipse horizon covers the worst gap between windows', () => {
+  // Seasons come and go with the planet's year; the scan must never come up
+  // empty in between. Walk with the published horizon and measure the gaps.
+  const first = nextEclipse(0)
+  assert.ok(first)
+  let cursor = first.exit + 0.5
+  let worst = 0
+  for (let i = 0; i < 40; i++) {
+    const event = nextEclipse(cursor)
+    assert.ok(event, `no eclipse after ${cursor}`)
+    worst = Math.max(worst, event.entry - cursor)
+    cursor = event.exit + 0.5
+  }
+  assert.ok(worst < ECLIPSE_SCAN_HORIZON, `worst gap ${worst.toFixed(1)} exceeds the horizon`)
 })

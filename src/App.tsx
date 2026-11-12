@@ -1,7 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
 import { SceneErrorBoundary } from './SceneErrorBoundary'
 import { bodies, planetIds, type SceneView } from './planets'
-import type { TransitAnnouncement } from './components/SpaceScene'
+import type { EventAnnouncement } from './components/SpaceScene'
 import type { FlightTelemetry } from './components/CameraRig'
 import { parsePose, poseParams, type CameraPose } from './camera-math'
 import { readStoredLocale, storeLocale, t, type Locale, type StringKey } from './strings'
@@ -99,7 +99,7 @@ function App() {
   const [webglSupported] = useState(detectWebGLSupport)
   const [activeView, setActiveView] = useState<SceneView>(initialView)
   const [destination, setDestination] = useState<SceneView>(initialView)
-  const [transit, setTransit] = useState<TransitAnnouncement | null>(null)
+  const [event, setEvent] = useState<EventAnnouncement | null>(null)
   const reducedMotion = useReducedMotion()
   const travelling = activeView !== destination
   const overview = activeView === 'system'
@@ -117,17 +117,17 @@ function App() {
   const handleSharePose = useCallback((view: SceneView, pose: CameraPose) => {
     window.history.replaceState(null, '', urlFor(view, pose))
   }, [])
-  const handleTransit = useCallback((announcement: TransitAnnouncement | null) => {
-    setTransit(announcement)
+  const handleEvent = useCallback((announcement: EventAnnouncement | null) => {
+    setEvent(announcement)
   }, [])
   const [flightInfo, setFlightInfo] = useState<FlightTelemetry | null>(null)
   const handleFlightTelemetry = useCallback((telemetry: FlightTelemetry) => {
     setFlightInfo(telemetry)
   }, [])
-  const seekToTransit = useCallback(() => {
-    if (!transit) return
-    window.dispatchEvent(new CustomEvent('aether:seek', { detail: { time: transit.peakAt } }))
-  }, [transit])
+  const seekToEvent = useCallback(() => {
+    if (!event) return
+    window.dispatchEvent(new CustomEvent('aether:seek', { detail: { time: event.peakAt } }))
+  }, [event])
   const travelTo = useCallback((next: SceneView) => {
     if (!ready) return
     setTour(false)
@@ -295,7 +295,7 @@ function App() {
                 onArrive={handleArrive}
                 onSharePose={handleSharePose}
                 onSelect={travelTo}
-                onTransit={handleTransit}
+                onEvent={handleEvent}
                 onFlightTelemetry={handleFlightTelemetry}
               />
             </Suspense>
@@ -532,15 +532,21 @@ function App() {
               </div>
             </aside>
 
-            {activeView === 'aurelia' && transit && !travelling && (
+            {event && body && !travelling && (
               <div className="event-chip reveal" role="status">
-                <span className="event-label">{t(locale, 'eventTransit')}</span>
+                <span className="event-label">
+                  {t(locale, event.kind === 'transit'
+                    ? 'eventTransit'
+                    : event.kind === 'eclipse'
+                      ? 'eventEclipse'
+                      : 'eventPerihelion')}
+                </span>
                 <strong>
-                  {transit.inProgress
+                  {event.inProgress
                     ? t(locale, 'eventNow')
-                    : t(locale, 'eventIn', { time: formatDuration(transit.seconds, locale) })}
+                    : t(locale, 'eventIn', { time: formatDuration(event.seconds, locale) })}
                 </strong>
-                <button type="button" className="event-go" onClick={seekToTransit} disabled={!ready}>
+                <button type="button" className="event-go" onClick={seekToEvent} disabled={!ready}>
                   {t(locale, 'eventGo')}
                 </button>
               </div>

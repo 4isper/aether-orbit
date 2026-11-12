@@ -42,6 +42,53 @@ export function cometPosition(time: number, target: Vector3) {
   return cometOrbitPoint(cometOrbit.meanAnomalyAtZero + meanMotion * time, target)
 }
 
+/**
+ * The comet's blaze window: within this radius of the star the tails are
+ * visibly burning (1.3× periapsis). It is the event's own threshold, the
+ * same discipline as eclipse.ts: a season would be wrong, an approach is
+ * an event.
+ */
+export const PERIHELION_RADIUS = 6
+
+export type PerihelionEvent = {
+  /** First moment inside the blaze window. */
+  entry: number
+  /** Closest approach to the star. */
+  peak: number
+  exit: number
+  /** True when simulation time is inside the window right now. */
+  inProgress: boolean
+}
+
+// r = a(1 − e·cosE) crosses PERIHELION_RADIUS at ±E*, swept in mean anomaly
+// by M* = E* − e·sinE* (Kepler's equation, monotone for e < 1). The window is
+// symmetric around the periapsis, so it follows analytically — no scan.
+const windowCosine = (1 - PERIHELION_RADIUS / semiMajor) / eccentricity
+const windowEccentric = Math.acos(Math.max(-1, Math.min(1, windowCosine)))
+const windowMean = windowEccentric - eccentricity * Math.sin(windowEccentric)
+const WINDOW_HALF = windowMean / meanMotion
+
+function TWO_PI_MOD(angle: number) {
+  return ((angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)
+}
+
+/**
+ * The next periapsis passage at or after `now`, with the blaze window around
+ * it. Pure arithmetic on the orbit constants: perihelia repeat on the period,
+ * so the scan machinery of eclipse.ts would be wasted here.
+ */
+export function nextPerihelion(now: number): PerihelionEvent {
+  const meanNow = cometOrbit.meanAnomalyAtZero + meanMotion * now
+  const delta = TWO_PI_MOD(-meanNow) / meanMotion
+  const peak = now + delta
+  return {
+    entry: peak - WINDOW_HALF,
+    peak,
+    exit: peak + WINDOW_HALF,
+    inProgress: now >= peak - WINDOW_HALF && now <= peak + WINDOW_HALF,
+  }
+}
+
 const scratchAntiSun = new Vector3()
 
 /**

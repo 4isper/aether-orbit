@@ -16,7 +16,8 @@ import { Meteors } from './Meteors'
 import { SystemOverview } from './SystemOverview'
 import { planetIds, type PlanetId, type SceneView } from '../planets'
 import { planetPosition } from '../orbits'
-import { nextTransit } from '../eclipse'
+import { nextEclipse, nextTransit } from '../eclipse'
+import { nextPerihelion } from '../comet'
 import type { CameraPose } from '../camera-math'
 import type { FlightTelemetry } from './CameraRig'
 import type { Locale } from '../strings'
@@ -58,12 +59,43 @@ function ComposerCapture() {
   return null
 }
 
-/** What the interface needs to announce a transit: a countdown and the
- * absolute peak time the "skip to the moment" button seeks to. */
-export type TransitAnnouncement = {
+/** What the interface needs to announce an event: which one, a countdown
+ * and the absolute peak time the "skip to the moment" button seeks to. */
+export type EventKind = 'transit' | 'eclipse' | 'perihelion'
+export type EventAnnouncement = {
+  kind: EventKind
   seconds: number
   peakAt: number
   inProgress: boolean
+}
+
+/** One event per view, each on the view where the sky actually shows it:
+ * the transit shadow belongs to Aurelia's orbit, the eclipse darkens Nox,
+ * the periapsis flares on the comet. */
+function sceneEvent(view: SceneView, now: number): EventAnnouncement | null {
+  const shadowEvent = view === 'aurelia'
+    ? nextTransit(now)
+    : view === 'moon'
+      ? nextEclipse(now)
+      : null
+  if (shadowEvent) {
+    return {
+      kind: view === 'aurelia' ? 'transit' : 'eclipse',
+      seconds: shadowEvent.inProgress ? 0 : Math.max(shadowEvent.entry - now, 0),
+      peakAt: shadowEvent.peak,
+      inProgress: shadowEvent.inProgress,
+    }
+  }
+  if (view === 'comet') {
+    const event = nextPerihelion(now)
+    return {
+      kind: 'perihelion',
+      seconds: event.inProgress ? 0 : Math.max(event.entry - now, 0),
+      peakAt: event.peak,
+      inProgress: event.inProgress,
+    }
+  }
+  return null
 }
 
 type SpaceSceneProps = {
@@ -80,11 +112,11 @@ type SpaceSceneProps = {
   onArrive: (view: SceneView) => void
   onSharePose: (view: SceneView, pose: CameraPose) => void
   onSelect: (view: SceneView) => void
-  onTransit?: (announcement: TransitAnnouncement | null) => void
+  onEvent?: (announcement: EventAnnouncement | null) => void
   onFlightTelemetry?: (telemetry: FlightTelemetry) => void
 }
 
-export function SpaceScene({ activeView, destination, initialView, initialPose, timeScale, locale, reducedMotion, lowEnd = false, freeFlight, onReady, onArrive, onSharePose, onSelect, onTransit, onFlightTelemetry }: SpaceSceneProps) {
+export function SpaceScene({ activeView, destination, initialView, initialPose, timeScale, locale, reducedMotion, lowEnd = false, freeFlight, onReady, onArrive, onSharePose, onSelect, onEvent, onFlightTelemetry }: SpaceSceneProps) {
   const gl = useThree((state) => state.gl)
   const [hovered, setHovered] = useState(false)
   const travelling = activeView !== destination
@@ -99,8 +131,9 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
     () => planetIds.map((id) => planetPosition(id, 0, new Vector3()).toArray() as [number, number, number]),
     [],
   )
-  const transitTimer = useRef(0)
-  const transitRef = useRef<{ seconds: number; peakAt: number; inProgress: boolean } | null>(null)
+  const eventTimer = useRef(0)
+  const lastEventView = useRef(initialView)
+  const eventRef = useRef<EventAnnouncement | null>(null)
 
   useEffect(() => {
     // "Skip to the moment": jump the shared simulation clock. Everything
@@ -121,26 +154,22 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
       groupRefs.current[id]?.position.copy(planetPosition(id, orbitTime.current, scratch))
     }
 
-    // Announce the next moon transit at a calm one-update-per-second pace.
-    transitTimer.current += delta
-    if (onTransit && transitTimer.current >= 1) {
-      transitTimer.current = 0
-      const event = nextTransit(orbitTime.current)
-      const next = event
-        ? {
-            seconds: event.inProgress ? 0 : Math.max(event.entry - orbitTime.current, 0),
-            peakAt: event.peak,
-            inProgress: event.inProgress,
-          }
-        : null
-      const prev = transitRef.current
+    // Announce the active view's event at a calm one-update-per-second pace;
+    // a view change announces immediately so the chip switches without lag.
+    eventTimer.current += delta
+    if (onEvent && (eventTimer.current >= 1 || lastEventView.current !== activeView)) {
+      eventTimer.current = 0
+      lastEventView.current = activeView
+      const next = sceneEvent(activeView, orbitTime.current)
+      const prev = eventRef.current
       const changed = (next === null) !== (prev === null)
-        || (next && prev && (next.inProgress !== prev.inProgress
+        || (next && prev && (next.kind !== prev.kind
+          || next.inProgress !== prev.inProgress
           || Math.abs(next.seconds - prev.seconds) >= 0.5
           || Math.abs(next.peakAt - prev.peakAt) > 1))
       if (changed) {
-        transitRef.current = next
-        onTransit(next)
+        eventRef.current = next
+        onEvent(next)
       }
     }
   })
