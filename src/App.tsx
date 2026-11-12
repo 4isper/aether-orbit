@@ -95,12 +95,12 @@ function App() {
   const handleSharePose = useCallback((view: SceneView, pose: CameraPose) => {
     window.history.replaceState(null, '', urlFor(view, pose))
   }, [])
-  const travelTo = (next: SceneView) => {
+  const travelTo = useCallback((next: SceneView) => {
     if (!ready) return
     setTour(false)
     if (travelling || next === activeView) return
     setDestination(next)
-  }
+  }, [ready, travelling, activeView])
   const [paused, setPaused] = useState(false)
   const [speed, setSpeed] = useState(1)
   const [reversed, setReversed] = useState(false)
@@ -123,14 +123,14 @@ function App() {
       ? 'Aether — Тихая орбита'
       : 'Aether — The Quiet Orbit'
   }, [locale])
-  const resetView = () => window.dispatchEvent(new Event('aether:reset'))
-  const saveFrame = () => {
+  const resetView = useCallback(() => window.dispatchEvent(new Event('aether:reset')), [])
+  const saveFrame = useCallback(() => {
     // The scene renders the composed frame and reads it back itself: the
     // drawing buffer is not preserved between frames.
     window.dispatchEvent(new CustomEvent('aether:screenshot', {
       detail: { name: `aether-${activeView === 'system' ? 'system' : activeView}.png` },
     }))
-  }
+  }, [activeView])
 
   useEffect(() => {
     const onVisibilityChange = () => setTabVisible(!document.hidden)
