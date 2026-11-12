@@ -77,6 +77,8 @@ const ru = {
   shortcutCinema: 'Режим кино: скрыть интерфейс',
   shortcutHelp: 'Эта справка',
   shortcutsHint: 'Клавиши',
+  ambienceOn: 'Включить эмбиент',
+  ambienceOff: 'Выключить эмбиент',
 }
 
 export type StringKey = keyof typeof ru
@@ -151,6 +153,8 @@ const en: Record<StringKey, string> = {
   shortcutCinema: 'Cinema mode: hide the interface',
   shortcutHelp: 'This help',
   shortcutsHint: 'Keys',
+  ambienceOn: 'Turn on the ambience',
+  ambienceOff: 'Turn off the ambience',
 }
 
 export const strings: Record<Locale, Record<StringKey, string>> = { ru, en }

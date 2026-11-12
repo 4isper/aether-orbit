@@ -3,6 +3,7 @@ import { SceneErrorBoundary } from './SceneErrorBoundary'
 import { bodies, planetIds, type SceneView } from './planets'
 import { parsePose, poseParams, type CameraPose } from './camera-math'
 import { readStoredLocale, storeLocale, t, type Locale, type StringKey } from './strings'
+import { setAmbience } from './audio'
 import './App.css'
 
 const SceneCanvas = lazy(() => import('./SceneCanvas'))
@@ -113,6 +114,7 @@ function App() {
   const [paused, setPaused] = useState(false)
   const [speed, setSpeed] = useState(1)
   const [reversed, setReversed] = useState(false)
+  const [sound, setSound] = useState(false)
   const [tour, setTour] = useState(false)
   const [cinema, setCinema] = useState(false)
   const [help, setHelp] = useState(false)
@@ -126,6 +128,13 @@ function App() {
       return next
     })
   }, [])
+
+  const toggleSound = useCallback(() => {
+    // The audio call stays outside the state updater: StrictMode double-
+    // invokes updaters and the ambience toggle must run exactly once.
+    setAmbience(!sound)
+    setSound(!sound)
+  }, [sound])
 
   useEffect(() => {
     document.documentElement.lang = locale
@@ -393,6 +402,20 @@ function App() {
               </button>
             ))}
           </div>
+          <button
+            type="button"
+            className="time-button"
+            aria-pressed={sound}
+            aria-label={t(locale, sound ? 'ambienceOff' : 'ambienceOn')}
+            disabled={!ready}
+            onClick={toggleSound}
+          >
+            <svg viewBox="0 0 16 12" fill="none" aria-hidden="true">
+              <path d="M2 4.6v2.8h2.2L7 9.6V2.4L4.2 4.6H2z" fill="currentColor" />
+              <path d="M9.6 3.4c1.5 1.4 1.5 3.8 0 5.2" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+              <path d="M11.8 1.8c2.5 2.3 2.5 6.1 0 8.4" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+            </svg>
+          </button>
         </div>
 
         <div className="flight-status" role="status" aria-live="polite" aria-atomic="true">
