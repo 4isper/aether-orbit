@@ -15,8 +15,8 @@ import {
 import { noiseGLSL } from '../shaders/noise'
 import { bodyVertexGLSL, perturbNormalGLSL } from '../shaders/common'
 import { Atmosphere } from './Atmosphere'
-import { Moon, MOON_RADIUS } from './Moon'
-import { aureliaClock, moonPhaseAngle, starFlux } from '../orbits'
+import { Moon } from './Moon'
+import { aureliaFrame, aureliaClock, moonPhaseAngle, starFlux } from '../orbits'
 import { useSunDirection } from '../hooks/useSunDirection'
 import { t, type Locale } from '../strings'
 
@@ -300,7 +300,7 @@ export function Planet({ reducedMotion, timeScale, showMoonLabel, locale, timeRe
       uSunDirection: { value: sunDirection },
       uCloudMap: { value: cloudMap },
       uMoonPosition: { value: new Vector3() },
-      uMoonRadius: { value: MOON_RADIUS },
+      uMoonRadius: { value: aureliaFrame.moonRadius },
       uStarFlux: { value: 1 },
     }),
     [sunDirection, cloudMap],
@@ -329,7 +329,7 @@ export function Planet({ reducedMotion, timeScale, showMoonLabel, locale, timeRe
       if (clouds) clouds.rotation.y += delta * aureliaClock.spin * 1.5 * timeScale
     }
 
-    const planetRadius = 2 * (compact ? 0.76 : 1)
+    const planetRadius = aureliaFrame.planetRadius * (compact ? 0.76 : 1)
     if (surfaceMaterialRef.current) {
       surfaceMaterialRef.current.uniforms.uCloudOffset.value =
         surface && clouds ? (surface.rotation.y - clouds.rotation.y) / (Math.PI * 2) : 0
@@ -358,7 +358,7 @@ export function Planet({ reducedMotion, timeScale, showMoonLabel, locale, timeRe
       moon.getWorldPosition(moonWorld)
       moonWorldRef?.current.copy(moonWorld)
 
-      const moonWorldRadius = MOON_RADIUS * (compact ? 0.76 : 1)
+      const moonWorldRadius = aureliaFrame.moonRadius * (compact ? 0.76 : 1)
       if (surfaceMaterialRef.current) {
         surfaceMaterialRef.current.uniforms.uMoonPosition.value.copy(moonWorld)
         surfaceMaterialRef.current.uniforms.uMoonRadius.value = moonWorldRadius
@@ -379,7 +379,7 @@ export function Planet({ reducedMotion, timeScale, showMoonLabel, locale, timeRe
     <group
       ref={groupRef}
       scale={compact ? 0.76 : 1}
-      rotation={[0.08, 0, -0.09]}
+      rotation={aureliaFrame.worldRotation}
     >
       <mesh ref={surfaceRef} rotation={[0, -1.15, 0]}>
         <sphereGeometry args={[2, 160, 160]} />
@@ -417,7 +417,7 @@ export function Planet({ reducedMotion, timeScale, showMoonLabel, locale, timeRe
         />
       </mesh>
 
-      <group rotation={[0.24, 0, 0.09]}>
+      <group rotation={aureliaFrame.moonOrbitRotation}>
         <Moon ref={moonRef} materialRef={moonMaterialRef}>
           {showMoonLabel && (
             <Html center position={[0, 2.4, 0]} zIndexRange={[1, 1]} style={{ pointerEvents: 'none' }}>

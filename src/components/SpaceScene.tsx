@@ -15,6 +15,7 @@ import { Starfield } from './Starfield'
 import { SystemOverview } from './SystemOverview'
 import { planetIds, type PlanetId, type SceneView } from '../planets'
 import { planetPosition } from '../orbits'
+import { nextTransit } from '../eclipse'
 import type { CameraPose } from '../camera-math'
 import type { Locale } from '../strings'
 
@@ -55,6 +56,14 @@ function ComposerCapture() {
   return null
 }
 
+/** What the interface needs to announce a transit: a countdown and the
+ * absolute peak time the "skip to the moment" button seeks to. */
+export type TransitAnnouncement = {
+  seconds: number
+  peakAt: number
+  inProgress: boolean
+}
+
 type SpaceSceneProps = {
   activeView: SceneView
   destination: SceneView
@@ -68,9 +77,10 @@ type SpaceSceneProps = {
   onArrive: (view: SceneView) => void
   onSharePose: (view: SceneView, pose: CameraPose) => void
   onSelect: (view: SceneView) => void
+  onTransit?: (announcement: TransitAnnouncement | null) => void
 }
 
-export function SpaceScene({ activeView, destination, initialView, initialPose, timeScale, locale, reducedMotion, lowEnd = false, onReady, onArrive, onSharePose, onSelect }: SpaceSceneProps) {
+export function SpaceScene({ activeView, destination, initialView, initialPose, timeScale, locale, reducedMotion, lowEnd = false, onReady, onArrive, onSharePose, onSelect, onTransit }: SpaceSceneProps) {
   const gl = useThree((state) => state.gl)
   const [hovered, setHovered] = useState(false)
   const travelling = activeView !== destination
@@ -85,12 +95,49 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
     () => planetIds.map((id) => planetPosition(id, 0, new Vector3()).toArray() as [number, number, number]),
     [],
   )
+  const transitTimer = useRef(0)
+  const transitRef = useRef<{ seconds: number; peakAt: number; inProgress: boolean } | null>(null)
+
+  useEffect(() => {
+    // "Skip to the moment": jump the shared simulation clock. Everything
+    // derived from it (orbits, moon phases, the comet) is deterministic and
+    // lands on the requested instant exactly.
+    const onSeek = (event: Event) => {
+      const time = (event as CustomEvent<{ time?: number }>).detail?.time
+      if (Number.isFinite(time)) orbitTime.current = time as number
+    }
+    window.addEventListener('aether:seek', onSeek)
+    return () => window.removeEventListener('aether:seek', onSeek)
+  }, [])
 
   useFrame((_, rawDelta) => {
     const delta = Math.min(rawDelta, 0.1)
     if (!reducedMotion) orbitTime.current += delta * timeScale
     for (const id of planetIds) {
       groupRefs.current[id]?.position.copy(planetPosition(id, orbitTime.current, scratch))
+    }
+
+    // Announce the next moon transit at a calm one-update-per-second pace.
+    transitTimer.current += delta
+    if (onTransit && transitTimer.current >= 1) {
+      transitTimer.current = 0
+      const event = nextTransit(orbitTime.current)
+      const next = event
+        ? {
+            seconds: event.inProgress ? 0 : Math.max(event.entry - orbitTime.current, 0),
+            peakAt: event.peak,
+            inProgress: event.inProgress,
+          }
+        : null
+      const prev = transitRef.current
+      const changed = (next === null) !== (prev === null)
+        || (next && prev && (next.inProgress !== prev.inProgress
+          || Math.abs(next.seconds - prev.seconds) >= 0.5
+          || Math.abs(next.peakAt - prev.peakAt) > 1))
+      if (changed) {
+        transitRef.current = next
+        onTransit(next)
+      }
     }
   })
 

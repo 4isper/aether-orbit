@@ -79,6 +79,12 @@ const ru = {
   shortcutsHint: 'Клавиши',
   ambienceOn: 'Включить эмбиент',
   ambienceOff: 'Выключить эмбиент',
+  eventTransit: 'Транзит Nox по диску Solis',
+  eventNow: 'идёт сейчас',
+  eventIn: 'через {time}',
+  eventGo: 'К моменту',
+  eventDuration: '{m} мин {s} с',
+  eventSeconds: '{s} с',
 }
 
 export type StringKey = keyof typeof ru
@@ -155,6 +161,12 @@ const en: Record<StringKey, string> = {
   shortcutsHint: 'Keys',
   ambienceOn: 'Turn on the ambience',
   ambienceOff: 'Turn off the ambience',
+  eventTransit: 'Nox transit across Solis',
+  eventNow: 'happening now',
+  eventIn: 'in {time}',
+  eventGo: 'Skip to the moment',
+  eventDuration: '{m} min {s} s',
+  eventSeconds: '{s} s',
 }
 
 export const strings: Record<Locale, Record<StringKey, string>> = { ru, en }

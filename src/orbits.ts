@@ -58,6 +58,22 @@ export const aureliaClock = {
   moonPhase: 2.1,
 } as const
 
+/**
+ * Orientation of Aurelia's local frame in world space and of the moon orbit
+ * inside it. Planet.tsx builds its scene graph from these same numbers, so
+ * the pure geometry in eclipse.ts stays exact with a single source of truth.
+ */
+export const aureliaFrame = {
+  /** Euler angles of the planet group in world space. */
+  worldRotation: [0.08, 0, -0.09],
+  /** Euler angles of the moon-orbit group inside the planet frame. */
+  moonOrbitRotation: [0.24, 0, 0.09],
+  /** Planet surface radius, scene units (before the compact-scale). */
+  planetRadius: 2,
+  /** Moon surface radius, scene units (before the compact-scale). */
+  moonRadius: 0.34,
+} as const
+
 /** The moon's phase angle on Aurelia's shared clock: pure, so time reversal
  * and pause come for free and the tidal lock stays exact. */
 export function moonPhaseAngle(time: number) {

@@ -1,6 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
 import { SceneErrorBoundary } from './SceneErrorBoundary'
 import { bodies, planetIds, type SceneView } from './planets'
+import type { TransitAnnouncement } from './components/SpaceScene'
 import { parsePose, poseParams, type CameraPose } from './camera-math'
 import { readStoredLocale, storeLocale, t, type Locale, type StringKey } from './strings'
 import { setAmbience } from './audio'
@@ -32,6 +33,14 @@ function urlFor(view: SceneView, pose?: CameraPose) {
 
 function formatSpeed(speed: number) {
   return speed === 0.5 ? '½' : String(speed)
+}
+
+function formatDuration(seconds: number, locale: Locale) {
+  const m = Math.floor(seconds / 60)
+  const s = Math.round(seconds % 60)
+  return m > 0
+    ? t(locale, 'eventDuration', { m, s })
+    : t(locale, 'eventSeconds', { s })
 }
 
 /** Rows of the "?" help dialog, in the order users will scan them. */
@@ -88,6 +97,7 @@ function App() {
   const [webglSupported] = useState(detectWebGLSupport)
   const [activeView, setActiveView] = useState<SceneView>(initialView)
   const [destination, setDestination] = useState<SceneView>(initialView)
+  const [transit, setTransit] = useState<TransitAnnouncement | null>(null)
   const reducedMotion = useReducedMotion()
   const travelling = activeView !== destination
   const overview = activeView === 'system'
@@ -105,6 +115,13 @@ function App() {
   const handleSharePose = useCallback((view: SceneView, pose: CameraPose) => {
     window.history.replaceState(null, '', urlFor(view, pose))
   }, [])
+  const handleTransit = useCallback((announcement: TransitAnnouncement | null) => {
+    setTransit(announcement)
+  }, [])
+  const seekToTransit = useCallback(() => {
+    if (!transit) return
+    window.dispatchEvent(new CustomEvent('aether:seek', { detail: { time: transit.peakAt } }))
+  }, [transit])
   const travelTo = useCallback((next: SceneView) => {
     if (!ready) return
     setTour(false)
@@ -251,6 +268,7 @@ function App() {
                 onArrive={handleArrive}
                 onSharePose={handleSharePose}
                 onSelect={travelTo}
+                onTransit={handleTransit}
               />
             </Suspense>
           </SceneErrorBoundary>
@@ -458,6 +476,20 @@ function App() {
                 ))}
               </div>
             </aside>
+
+            {activeView === 'aurelia' && transit && !travelling && (
+              <div className="event-chip reveal" role="status">
+                <span className="event-label">{t(locale, 'eventTransit')}</span>
+                <strong>
+                  {transit.inProgress
+                    ? t(locale, 'eventNow')
+                    : t(locale, 'eventIn', { time: formatDuration(transit.seconds, locale) })}
+                </strong>
+                <button type="button" className="event-go" onClick={seekToTransit} disabled={!ready}>
+                  {t(locale, 'eventGo')}
+                </button>
+              </div>
+            )}
 
             <div className="control-hint reveal" aria-hidden="true">
               <svg viewBox="0 0 24 32" fill="none">

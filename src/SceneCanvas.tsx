@@ -3,7 +3,7 @@ import { Canvas } from '@react-three/fiber'
 import { PerformanceMonitor } from '@react-three/drei'
 import { ACESFilmicToneMapping, SRGBColorSpace, type WebGLRenderer } from 'three'
 import { SceneErrorBoundary } from './SceneErrorBoundary'
-import { SpaceScene } from './components/SpaceScene'
+import { SpaceScene, type TransitAnnouncement } from './components/SpaceScene'
 import { t } from './strings'
 import type { SceneView } from './planets'
 import type { CameraPose } from './camera-math'
@@ -29,6 +29,7 @@ type SceneCanvasProps = {
   onArrive: (view: SceneView) => void
   onSharePose: (view: SceneView, pose: CameraPose) => void
   onSelect: (view: SceneView) => void
+  onTransit?: (announcement: TransitAnnouncement | null) => void
 }
 
 export default function SceneCanvas({
@@ -44,6 +45,7 @@ export default function SceneCanvas({
   onArrive,
   onSharePose,
   onSelect,
+  onTransit,
 }: SceneCanvasProps) {
   const [dpr, setDpr] = useState(getMaxDpr)
   const [lowEnd, setLowEnd] = useState(false)
@@ -99,6 +101,7 @@ export default function SceneCanvas({
             onArrive={onArrive}
             onSharePose={onSharePose}
             onSelect={onSelect}
+            onTransit={onTransit}
           />
         </PerformanceMonitor>
       </SceneErrorBoundary>

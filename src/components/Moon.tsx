@@ -1,10 +1,9 @@
 import { useMemo, type ReactNode } from 'react'
 import type { Ref } from 'react'
 import { Vector3, type Mesh, type ShaderMaterial } from 'three'
+import { aureliaFrame } from '../orbits'
 import { noiseGLSL } from '../shaders/noise'
 import { bodyVertexGLSL, perturbNormalGLSL } from '../shaders/common'
-
-export const MOON_RADIUS = 0.34
 
 const moonFragment = /* glsl */ `
 uniform vec3 uPlanetPosition;
@@ -59,7 +58,7 @@ type MoonProps = {
   children?: ReactNode
 }
 
-export function Moon({ radius = MOON_RADIUS, ref, materialRef, children }: MoonProps) {
+export function Moon({ radius = aureliaFrame.moonRadius, ref, materialRef, children }: MoonProps) {
   const uniforms = useMemo(
     () => ({
       uPlanetPosition: { value: new Vector3() },
