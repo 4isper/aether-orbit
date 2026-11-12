@@ -4,6 +4,7 @@ import { DoubleSide, Vector3, type Group, type Mesh, type ShaderMaterial } from 
 import { noiseGLSL } from '../shaders/noise'
 import { bodyVertexGLSL, perturbNormalGLSL } from '../shaders/common'
 import { Atmosphere } from './Atmosphere'
+import { RingRocks } from './RingRocks'
 import { shepherdLocalPosition, starFlux } from '../orbits'
 import { useSunDirection } from '../hooks/useSunDirection'
 
@@ -270,6 +271,10 @@ export function Vesper({ reducedMotion, timeScale, timeRef }: VesperProps) {
           uniforms={shepherdUniforms}
         />
       </mesh>
+
+      {/* Coarse cargo inside the annulus: rocks a close flight can thread
+        * between; invisible from the orbiting distances of the fixed views. */}
+      <RingRocks timeRef={timeRef} worldPosition={worldPosition} />
 
       <Atmosphere sunDirection={sunDirection} variant="ice" />
     </group>
