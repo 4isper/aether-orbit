@@ -10,6 +10,7 @@ import {
   rotateOverviewPose,
   pinchZoom,
   shiftIntoFrame,
+  stepFreeFlight,
   viewZoomBounds,
   COMET_VIEW_DISTANCE,
   MAX_ZOOM,
@@ -201,4 +202,56 @@ test('shiftIntoFrame keeps the frame distance and scales with it', () => {
   assert.ok(Math.abs(lookAt.y - halfH * 0.5) < 1e-9, `y ${lookAt.y}`)
   assert.ok(Math.abs(lookAt.x) < 1e-9)
   assert.ok(Math.abs(lookAt.z) < 1e-9)
+})
+
+const FREE_PARAMS = { accel: 10, damping: 2, maxSpeed: 12, minRadius: 9.5, maxRadius: 65, lookRate: 6 }
+
+test('free flight accelerates along the view direction', () => {
+  const state = { position: new Vector3(20, 0, 0), velocity: new Vector3(), yaw: 0, pitch: 0 }
+  // yaw 0 looks along +Z; holding forward must move along +Z, not X.
+  stepFreeFlight(state, { forward: true, back: false, left: false, right: false, up: false, down: false }, { yaw: 0, pitch: 0 }, 1, { ...FREE_PARAMS, damping: 0 })
+  assert.ok(state.position.z > 1, `z ${state.position.z}`)
+  assert.ok(Math.abs(state.position.x - 20) < 1e-9, 'strayed sideways')
+})
+
+test('free flight glides on with damping when the keys release', () => {
+  const state = { position: new Vector3(0, 0, 0), velocity: new Vector3(0, 0, 10), yaw: 0, pitch: 0 }
+  stepFreeFlight(state, { forward: false, back: false, left: false, right: false, up: false, down: false }, { yaw: 0, pitch: 0 }, 1, FREE_PARAMS)
+  const expected = 10 * Math.exp(-2)
+  assert.ok(Math.abs(state.velocity.z - expected) < 1e-9, `velocity ${state.velocity.z}`)
+})
+
+test('free flight never exceeds its speed cap', () => {
+  const state = { position: new Vector3(0, 0, 0), velocity: new Vector3(), yaw: 0, pitch: 0 }
+  for (let i = 0; i < 200; i++) {
+    stepFreeFlight(state, { forward: true, back: false, left: false, right: false, up: false, down: false }, { yaw: 0, pitch: 0 }, 0.1, { ...FREE_PARAMS, damping: 0 })
+  }
+  assert.ok(state.velocity.length() <= 12 + 1e-9, `speed ${state.velocity.length()}`)
+})
+
+test('free flight stays between the star and the outer bound', () => {
+  const params = { ...FREE_PARAMS, damping: 0 }
+  const out = { position: new Vector3(100, 0, 0), velocity: new Vector3(5, 0, 0), yaw: 0, pitch: 0 }
+  stepFreeFlight(out, { forward: false, back: false, left: false, right: false, up: false, down: false }, { yaw: 0, pitch: 0 }, 0.016, params)
+  assert.ok(Math.abs(out.position.length() - 65) < 1e-9, 'outer bound not enforced')
+  // The outward radial push is gone; the position rests on the sphere.
+  assert.ok(out.velocity.dot(out.position) <= 1e-9, 'still pushing outward')
+
+  const inr = { position: new Vector3(1, 0, 0), velocity: new Vector3(-5, 0, 0), yaw: 0, pitch: 0 }
+  stepFreeFlight(inr, { forward: false, back: false, left: false, right: false, up: false, down: false }, { yaw: 0, pitch: 0 }, 0.016, params)
+  assert.ok(Math.abs(inr.position.length() - 9.5) < 1e-9, 'inner bound not enforced')
+  assert.ok(inr.velocity.dot(inr.position) >= -1e-9, 'still pushing inward')
+})
+
+test('free flight turns toward the look target with pitch clamped', () => {
+  const state = { position: new Vector3(20, 0, 0), velocity: new Vector3(), yaw: 0, pitch: 0 }
+  stepFreeFlight(
+    state,
+    { forward: false, back: false, left: false, right: false, up: false, down: false },
+    { yaw: 1, pitch: 5 },
+    1,
+    { ...FREE_PARAMS, damping: 0, lookRate: 6 },
+  )
+  assert.ok(state.yaw > 0 && state.yaw < 1, `yaw ${state.yaw}`)
+  assert.ok(Math.abs(state.pitch) <= Math.PI / 2 + 1e-9, `pitch ${state.pitch}`)
 })

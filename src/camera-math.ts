@@ -119,6 +119,102 @@ export type OverviewPose = {
   up: Vector3
 }
 
+/**
+ * Free-flight dynamics, pure and allocation-light: WASD-style input pushes
+ * the velocity along the current view basis, damping glides the ship to a
+ * stop when keys release, and radial bounds keep the camera out of the star
+ * and inside the system. The look angles damp toward a target with the
+ * pitch clamped to straight up and down. Mutates state in place.
+ */
+export type FreeFlightInput = {
+  forward: boolean
+  back: boolean
+  left: boolean
+  right: boolean
+  up: boolean
+  down: boolean
+}
+
+export type FreeFlightState = {
+  position: Vector3
+  velocity: Vector3
+  yaw: number
+  pitch: number
+}
+
+export type FreeFlightParams = {
+  accel: number
+  damping: number
+  maxSpeed: number
+  minRadius: number
+  maxRadius: number
+  lookRate: number
+}
+
+const MAX_PITCH = Math.PI / 2 - 0.01
+
+export function stepFreeFlight(
+  state: FreeFlightState,
+  input: FreeFlightInput,
+  look: { yaw: number; pitch: number },
+  delta: number,
+  params: FreeFlightParams,
+) {
+  // Turn toward the look target first: the thrust basis follows the camera.
+  state.yaw = MathUtils.damp(state.yaw, look.yaw, params.lookRate, delta)
+  state.pitch = MathUtils.damp(state.pitch, MathUtils.clamp(look.pitch, -MAX_PITCH, MAX_PITCH), params.lookRate, delta)
+
+  const cosPitch = Math.cos(state.pitch)
+  const forwardX = Math.sin(state.yaw) * cosPitch
+  const forwardY = Math.sin(state.pitch)
+  const forwardZ = Math.cos(state.yaw) * cosPitch
+  const rightX = Math.cos(state.yaw)
+  const rightZ = -Math.sin(state.yaw)
+
+  const thrust = params.accel * delta
+  if (input.forward) {
+    state.velocity.x += forwardX * thrust
+    state.velocity.y += forwardY * thrust
+    state.velocity.z += forwardZ * thrust
+  }
+  if (input.back) {
+    state.velocity.x -= forwardX * thrust
+    state.velocity.y -= forwardY * thrust
+    state.velocity.z -= forwardZ * thrust
+  }
+  if (input.right) {
+    state.velocity.x += rightX * thrust
+    state.velocity.z += rightZ * thrust
+  }
+  if (input.left) {
+    state.velocity.x -= rightX * thrust
+    state.velocity.z -= rightZ * thrust
+  }
+  if (input.up) state.velocity.y += thrust
+  if (input.down) state.velocity.y -= thrust
+
+  const decay = Math.exp(-params.damping * delta)
+  state.velocity.multiplyScalar(decay)
+  if (state.velocity.length() > params.maxSpeed) {
+    state.velocity.setLength(params.maxSpeed)
+  }
+
+  state.position.addScaledVector(state.velocity, delta)
+
+  // Radial bounds: project back onto the sphere and remove the velocity
+  // component that pushes beyond it, so the ship can rest on the boundary.
+  const radius = state.position.length()
+  if (radius > params.maxRadius) {
+    state.position.multiplyScalar(params.maxRadius / radius)
+    const outward = state.position.clone().normalize()
+    state.velocity.addScaledVector(outward, -Math.max(state.velocity.dot(outward), 0))
+  } else if (radius < params.minRadius) {
+    state.position.multiplyScalar(params.minRadius / radius)
+    const outward = state.position.clone().normalize()
+    state.velocity.addScaledVector(outward, -Math.min(state.velocity.dot(outward), 0))
+  }
+}
+
 export type OverviewRotation = { position: Vector3; up: Vector3 }
 
 const OVERVIEW_MIN_ELEVATION = -0.12
