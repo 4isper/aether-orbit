@@ -14,6 +14,7 @@ import {
 import { noiseGLSL } from '../shaders/noise'
 import { bodyVertexGLSL } from '../shaders/common'
 import { arcPoint, prominenceEnvelope } from '../prominences'
+import { glareFactor } from '../glare'
 
 const surfaceFragment = /* glsl */ `
 uniform float uTime;
@@ -77,6 +78,7 @@ void main() {
 
 const glowFragment = /* glsl */ `
 uniform float uTime;
+uniform float uGlare;
 varying vec2 vUv;
 ${noiseGLSL}
 
@@ -107,6 +109,9 @@ void main() {
   streamers *= 0.4;
 
   float alpha = halo + core + streak + streamers;
+  // Looking into the star floods the frame: the glare factor is camera
+  // geometry (glare.ts), the flood itself rides this billboard.
+  alpha += uGlare * (exp(-d * 7.0) * 0.9 + exp(-d * 2.2) * 0.3);
   vec3 color = mix(vec3(1.0, 0.76, 0.52), vec3(1.0, 0.97, 0.93), core);
   gl_FragColor = vec4(color * alpha, alpha);
   #include <tonemapping_fragment>
@@ -267,7 +272,8 @@ export function Star({ reducedMotion, timeScale }: StarProps) {
   const surfaceMaterialRef = useRef<ShaderMaterial>(null)
   const glowMaterialRef = useRef<ShaderMaterial>(null)
   const surfaceUniforms = useMemo(() => ({ uTime: { value: 0 }, uSpotTime: { value: 0 } }), [])
-  const glowUniforms = useMemo(() => ({ uTime: { value: 0 } }), [])
+  const glowUniforms = useMemo(() => ({ uTime: { value: 0 }, uGlare: { value: 0 } }), [])
+  const forwardScratch = useMemo(() => new Vector3(), [])
   useFrame((state, rawDelta) => {
     const delta = Math.min(rawDelta, 0.1)
     // The photosphere and its prominences rotate together: the loops are
@@ -277,6 +283,16 @@ export function Star({ reducedMotion, timeScale }: StarProps) {
     if (glow) {
       glow.quaternion.copy(state.camera.quaternion)
       glow.position.copy(state.camera.position).normalize().multiplyScalar(2.42)
+    }
+    // The white-out of looking into the star: not motion, so it applies in
+    // every mode, including reduced motion.
+    state.camera.getWorldDirection(forwardScratch)
+    forwardScratch.negate()
+    if (glowMaterialRef.current) {
+      glowMaterialRef.current.uniforms.uGlare.value = glareFactor(
+        forwardScratch.dot(state.camera.position),
+        state.camera.position.length(),
+      )
     }
     if (reducedMotion) return
     if (surfaceMaterialRef.current) {
