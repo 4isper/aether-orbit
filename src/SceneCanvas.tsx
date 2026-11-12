@@ -25,6 +25,7 @@ type SceneCanvasProps = {
   timeScale: number
   locale: Locale
   reducedMotion: boolean
+  freeFlight: boolean
   onReady: () => void
   onArrive: (view: SceneView) => void
   onSharePose: (view: SceneView, pose: CameraPose) => void
@@ -41,6 +42,7 @@ export default function SceneCanvas({
   timeScale,
   locale,
   reducedMotion,
+  freeFlight,
   onReady,
   onArrive,
   onSharePose,
@@ -97,6 +99,7 @@ export default function SceneCanvas({
             locale={locale}
             reducedMotion={reducedMotion}
             lowEnd={lowEnd}
+            freeFlight={freeFlight}
             onReady={onReady}
             onArrive={onArrive}
             onSharePose={onSharePose}

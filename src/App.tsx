@@ -47,6 +47,7 @@ function formatDuration(seconds: number, locale: Locale) {
 const SHORTCUT_ROWS: Array<{ keys: string; label: StringKey }> = [
   { keys: '1–7', label: 'shortcutViews' },
   { keys: 'Space', label: 'shortcutPause' },
+  { keys: 'WASD', label: 'shortcutFree' },
   { keys: 'R', label: 'shortcutReset' },
   { keys: 'H', label: 'shortcutCinema' },
   { keys: '?', label: 'shortcutHelp' },
@@ -125,6 +126,8 @@ function App() {
   const travelTo = useCallback((next: SceneView) => {
     if (!ready) return
     setTour(false)
+    // Navigation always ends free flight; the rig flies the usual arc there.
+    setFreeFlight(false)
     if (travelling || next === activeView) return
     setDestination(next)
   }, [ready, travelling, activeView])
@@ -133,6 +136,7 @@ function App() {
   const [reversed, setReversed] = useState(false)
   const [sound, setSound] = useState(false)
   const [tour, setTour] = useState(false)
+  const [freeFlight, setFreeFlight] = useState(false)
   const [cinema, setCinema] = useState(false)
   const [help, setHelp] = useState(false)
   const [tabVisible, setTabVisible] = useState(() => !document.hidden)
@@ -203,6 +207,7 @@ function App() {
       if (event.key === 'Escape') {
         setCinema(false)
         setHelp(false)
+        setFreeFlight(false)
       }
       if (event.key === '?') setHelp((value) => !value)
       // Space and digits must not hijack an interactive element that has
@@ -264,6 +269,7 @@ function App() {
               timeScale={timeScale}
                 locale={locale}
                 reducedMotion={reducedMotion}
+                freeFlight={freeFlight}
                 onReady={handleReady}
                 onArrive={handleArrive}
                 onSharePose={handleSharePose}
@@ -283,7 +289,7 @@ function App() {
           </div>
           <div className="scene-status">
             <span className="status-dot" />
-            <span>{travelling ? t(locale, 'inFlight') : overview ? t(locale, 'systemOverview') : t(locale, 'simActive')}</span>
+            <span>{travelling ? t(locale, 'inFlight') : freeFlight ? t(locale, 'freeFlightStatus') : overview ? t(locale, 'systemOverview') : t(locale, 'simActive')}</span>
             <span className="status-code">{body ? `SC—${body.code}` : 'SYS—01'}</span>
           </div>
           <button
@@ -318,6 +324,19 @@ function App() {
             onClick={() => setTour((value) => !value)}
           >
             {t(locale, 'tour')}
+          </button>
+          <button
+            type="button"
+            className="planet-link tour-link"
+            aria-pressed={freeFlight}
+            aria-label={freeFlight ? t(locale, 'freeFlightStop') : t(locale, 'freeFlightStart')}
+            disabled={!ready || travelling}
+            onClick={() => {
+              setTour(false)
+              setFreeFlight((value) => !value)
+            }}
+          >
+            {t(locale, 'freeFlight')}
           </button>
           <button
             type="button"

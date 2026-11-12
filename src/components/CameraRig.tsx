@@ -15,8 +15,11 @@ import {
   pinchZoom,
   rotateOverviewPose,
   shiftIntoFrame,
+  stepFreeFlight,
   viewZoomBounds,
   type CameraPose,
+  type FreeFlightInput,
+  type FreeFlightState,
 } from '../camera-math'
 
 type CameraRigProps = {
@@ -24,6 +27,8 @@ type CameraRigProps = {
   initialPose?: CameraPose | null
   reducedMotion: boolean
   destination: SceneView
+  /** Free-flight mode: the camera detaches from the bodies and flies by hand. */
+  freeFlight: boolean
   onArrive: (view: SceneView) => void
   sharePose?: (view: SceneView, pose: CameraPose) => void
   timeRef: { current: number }
@@ -35,6 +40,18 @@ const MAX_STEP = 0.1
 const SHARE_INTERVAL = 1.5
 const BASE_FOV = 36
 
+/** Free-flight tuning: system scale runs from the 8.4-unit star out to the
+ * overview framing, so the bounds keep the camera off the star's surface and
+ * inside a comfortable sphere. */
+const FREE_FLIGHT_PARAMS = {
+  accel: 16,
+  damping: 2.6,
+  maxSpeed: 13,
+  minRadius: 9.5,
+  maxRadius: 65,
+  lookRate: 7,
+}
+
 /**
  * Screen-space framing for the small bodies, in half-frame fractions
  * (+x right, +y up). Unlike the planets' world-space compOffset this holds
@@ -45,9 +62,10 @@ const SMALL_BODY_FRAMING = {
   moon: { x: 0.25, y: -0.15 },
 } as const
 
-export function CameraRig({ initialView, initialPose, reducedMotion, destination, onArrive, sharePose, timeRef, moonWorldRef }: CameraRigProps) {
+export function CameraRig({ initialView, initialPose, reducedMotion, destination, freeFlight, onArrive, sharePose, timeRef, moonWorldRef }: CameraRigProps) {
   const gl = useThree((state) => state.gl)
   const size = useThree((state) => state.size)
+  const cameraRef = useThree((state) => state.camera)
   const overviewPose = useMemo(
     () => computeOverviewPose(size.width, size.height),
     [size.width, size.height],
@@ -69,7 +87,7 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
   const pointer = useRef({ x: 0, y: 0 })
   const drag = useRef({ active: false, x: 0, y: 0 })
   const pointers = useRef(new Map<number, { x: number; y: number }>())
-  const pinch = useRef<{ startDistance: number; startZoom: number } | null>(null)
+  const pinch = useRef<{ startDistance: number; startZoom: number; lastDistance: number } | null>(null)
   const intro = useRef(reducedMotion ? 1 : 0)
   const orbitTime = useRef(0)
   const currentView = useRef<SceneView>(initialView)
@@ -92,6 +110,49 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
     endLook: new Vector3(),
     endUp: new Vector3(),
   })
+  const free = useRef({
+    active: false,
+    keys: new Set<string>(),
+    look: { yaw: 0, pitch: 0 },
+    state: {
+      position: new Vector3(),
+      velocity: new Vector3(),
+      yaw: 0,
+      pitch: 0,
+    } as FreeFlightState,
+  })
+
+  /** Shared journey initialization: destination changes and exiting free
+   * flight both land here, so both reuse the same arc animation. */
+  const startJourney = () => {
+    const journey = flight.current
+    journey.active = true
+    journey.elapsed = 0
+    journey.startPosition.copy((cameraRef as PerspectiveCamera).position)
+    journey.startLook.copy(lookAt.current)
+    journey.startUp.copy((cameraRef as PerspectiveCamera).up)
+    const initialZoom = viewZoomBounds(destination).distance
+    target.current = { yaw: 0, pitch: 0, zoom: initialZoom }
+    current.current = { yaw: 0, pitch: 0, zoom: initialZoom }
+    overviewTarget.current = { yaw: 0, pitch: 0, zoom: 1 }
+    overviewCurrent.current = { yaw: 0, pitch: 0, zoom: 1 }
+    pointer.current = { x: 0, y: 0 }
+    pointers.current.clear()
+    pinch.current = null
+    drag.current.active = false
+    intro.current = 1
+    orbitTime.current = 0
+    shareTimer.current = SHARE_INTERVAL
+  }
+
+  /** Nudge the free-flight velocity along the current view direction. */
+  const freeThrust = (amount: number) => {
+    const st = free.current.state
+    const cosPitch = Math.cos(st.pitch)
+    st.velocity.x += Math.sin(st.yaw) * cosPitch * amount
+    st.velocity.y += Math.sin(st.pitch) * amount
+    st.velocity.z += Math.cos(st.yaw) * cosPitch * amount
+  }
 
   useEffect(() => {
     const element = gl.domElement
@@ -111,8 +172,10 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
       if (pointers.current.size >= 2) {
         drag.current.active = false
         const [first, second] = [...pointers.current.values()]
+        const distance = Math.hypot(first.x - second.x, first.y - second.y)
         pinch.current = {
-          startDistance: Math.hypot(first.x - second.x, first.y - second.y),
+          startDistance: distance,
+          lastDistance: distance,
           startZoom: currentView.current === 'system'
             ? overviewTarget.current.zoom
             : target.current.zoom,
@@ -137,6 +200,14 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
       if (pointers.current.size >= 2 && pinch.current) {
         const [first, second] = [...pointers.current.values()]
         const distance = Math.hypot(first.x - second.x, first.y - second.y)
+        if (free.current.active) {
+          // In free flight a pinch is a thrust lever: spread to accelerate
+          // along the view direction, close to brake backwards.
+          const kick = (distance - pinch.current.lastDistance) * 0.02
+          freeThrust(kick)
+          pinch.current.lastDistance = distance
+          return
+        }
         if (currentView.current === 'system') {
           overviewTarget.current.zoom = pinchZoom(
             pinch.current.startZoom, pinch.current.startDistance, distance,
@@ -155,7 +226,10 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
 
       const dx = event.clientX - drag.current.x
       const dy = event.clientY - drag.current.y
-      if (currentView.current === 'system') {
+      if (free.current.active) {
+        free.current.look.yaw -= dx * 0.0032
+        free.current.look.pitch += dy * 0.0022
+      } else if (currentView.current === 'system') {
         overviewTarget.current.yaw = MathUtils.clamp(overviewTarget.current.yaw - dx * 0.0035, -Math.PI, Math.PI)
         overviewTarget.current.pitch = MathUtils.clamp(overviewTarget.current.pitch + dy * 0.0022, -0.6, 0.6)
       } else {
@@ -184,6 +258,10 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
     const onWheel = (event: WheelEvent) => {
       event.preventDefault()
       if (flight.current.active) return
+      if (free.current.active) {
+        freeThrust(-event.deltaY * 0.012)
+        return
+      }
       if (currentView.current === 'system') {
         overviewTarget.current.zoom = MathUtils.clamp(overviewTarget.current.zoom + event.deltaY * 0.0012, 0.7, 1.35)
         return
@@ -196,6 +274,14 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
       if (flight.current.active) return
       if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', '+', '=', '-'].includes(event.key)) {
         event.preventDefault()
+      }
+      if (free.current.active) {
+        // Look with the arrows; WASDQE are tracked on the window below.
+        if (event.key === 'ArrowLeft') free.current.look.yaw += 0.06
+        if (event.key === 'ArrowRight') free.current.look.yaw -= 0.06
+        if (event.key === 'ArrowUp') free.current.look.pitch += 0.04
+        if (event.key === 'ArrowDown') free.current.look.pitch -= 0.04
+        return
       }
       if (event.key.toLowerCase() === 'r') reset()
       if (currentView.current === 'system') {
@@ -229,6 +315,23 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
     element.addEventListener('keydown', onKeyDown)
     window.addEventListener('aether:reset', reset)
 
+    // Movement keys ride on the window so free flight works without first
+    // focusing the canvas; physical key codes ignore keyboard layouts.
+    const moveKeys = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE'])
+    const onKeyDownMove = (event: KeyboardEvent) => {
+      if (moveKeys.has(event.code)) free.current.keys.add(event.code)
+    }
+    const onKeyUpMove = (event: KeyboardEvent) => {
+      free.current.keys.delete(event.code)
+    }
+    const onWindowBlur = () => {
+      // A lost focus must not leave a stuck key thrusting forever.
+      free.current.keys.clear()
+    }
+    window.addEventListener('keydown', onKeyDownMove)
+    window.addEventListener('keyup', onKeyUpMove)
+    window.addEventListener('blur', onWindowBlur)
+
     return () => {
       element.removeEventListener('pointerdown', onPointerDown)
       element.removeEventListener('pointermove', onPointerMove)
@@ -237,6 +340,9 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
       element.removeEventListener('wheel', onWheel)
       element.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('aether:reset', reset)
+      window.removeEventListener('keydown', onKeyDownMove)
+      window.removeEventListener('keyup', onKeyUpMove)
+      window.removeEventListener('blur', onWindowBlur)
     }
   }, [gl])
 
@@ -258,23 +364,28 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
 
     if (destination !== requestedView.current) {
       requestedView.current = destination
-      journey.active = true
-      journey.elapsed = 0
-      journey.startPosition.copy(camera.position)
-      journey.startLook.copy(lookAt.current)
-      journey.startUp.copy(camera.up)
-      const initialZoom = viewZoomBounds(destination).distance
-      target.current = { yaw: 0, pitch: 0, zoom: initialZoom }
-      current.current = { yaw: 0, pitch: 0, zoom: initialZoom }
-      overviewTarget.current = { yaw: 0, pitch: 0, zoom: 1 }
-      overviewCurrent.current = { yaw: 0, pitch: 0, zoom: 1 }
-      pointer.current = { x: 0, y: 0 }
-      pointers.current.clear()
-      pinch.current = null
-      drag.current.active = false
-      intro.current = 1
-      orbitTime.current = 0
-      shareTimer.current = SHARE_INTERVAL
+      free.current.active = false
+      startJourney()
+    }
+
+    // Entering free flight: detach exactly where the camera stands.
+    if (freeFlight && !free.current.active && !journey.active) {
+      free.current.active = true
+      const st = free.current.state
+      st.position.copy(camera.position)
+      st.velocity.set(0, 0, 0)
+      const dir = scratch.copy(lookAt.current).sub(camera.position).normalize()
+      st.yaw = Math.atan2(dir.x, dir.z)
+      st.pitch = Math.asin(MathUtils.clamp(dir.y, -1, 1))
+      free.current.look.yaw = st.yaw
+      free.current.look.pitch = st.pitch
+      free.current.keys.clear()
+    }
+    // Leaving free flight without a new destination (Escape, the button):
+    // fly the familiar arc back to the orbit we left.
+    if (!freeFlight && free.current.active) {
+      free.current.active = false
+      startJourney()
     }
 
     if (journey.active) {
@@ -319,6 +430,30 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
         currentView.current = destination
         onArrive(destination)
       }
+      return
+    }
+
+    if (free.current.active) {
+      const st = free.current.state
+      const input: FreeFlightInput = {
+        forward: free.current.keys.has('KeyW'),
+        back: free.current.keys.has('KeyS'),
+        left: free.current.keys.has('KeyA'),
+        right: free.current.keys.has('KeyD'),
+        up: free.current.keys.has('KeyE'),
+        down: free.current.keys.has('KeyQ'),
+      }
+      stepFreeFlight(st, input, free.current.look, delta, FREE_FLIGHT_PARAMS)
+      camera.position.copy(st.position)
+      camera.up.set(0, 1, 0)
+      const cosPitch = Math.cos(st.pitch)
+      scratch.set(
+        st.position.x + Math.sin(st.yaw) * cosPitch,
+        st.position.y + Math.sin(st.pitch),
+        st.position.z + Math.cos(st.yaw) * cosPitch,
+      )
+      lookAt.current.copy(scratch)
+      camera.lookAt(lookAt.current)
       return
     }
 

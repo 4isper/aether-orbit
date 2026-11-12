@@ -73,6 +73,7 @@ type SpaceSceneProps = {
   locale: Locale
   reducedMotion: boolean
   lowEnd?: boolean
+  freeFlight: boolean
   onReady: () => void
   onArrive: (view: SceneView) => void
   onSharePose: (view: SceneView, pose: CameraPose) => void
@@ -80,7 +81,7 @@ type SpaceSceneProps = {
   onTransit?: (announcement: TransitAnnouncement | null) => void
 }
 
-export function SpaceScene({ activeView, destination, initialView, initialPose, timeScale, locale, reducedMotion, lowEnd = false, onReady, onArrive, onSharePose, onSelect, onTransit }: SpaceSceneProps) {
+export function SpaceScene({ activeView, destination, initialView, initialPose, timeScale, locale, reducedMotion, lowEnd = false, freeFlight, onReady, onArrive, onSharePose, onSelect, onTransit }: SpaceSceneProps) {
   const gl = useThree((state) => state.gl)
   const [hovered, setHovered] = useState(false)
   const travelling = activeView !== destination
@@ -195,6 +196,7 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
         initialPose={initialPose}
         reducedMotion={reducedMotion}
         destination={destination}
+        freeFlight={freeFlight}
         onArrive={onArrive}
         sharePose={onSharePose}
         timeRef={orbitTime}
