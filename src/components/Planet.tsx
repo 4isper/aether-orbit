@@ -8,6 +8,7 @@ import {
   RepeatWrapping,
   SRGBColorSpace,
   Vector3,
+  Vector4,
   type Group,
   type Mesh,
   type ShaderMaterial,
@@ -16,6 +17,7 @@ import { noiseGLSL } from '../shaders/noise'
 import { bodyVertexGLSL, perturbNormalGLSL } from '../shaders/common'
 import { Atmosphere } from './Atmosphere'
 import { Moon } from './Moon'
+import { lightningStrikes, LIGHTNING_CELLS, type LightningStrike } from '../lightning'
 import { aureliaFrame, aureliaClock, moonPhaseAngle, starFlux } from '../orbits'
 import { useSunDirection } from '../hooks/useSunDirection'
 import { t, type Locale } from '../strings'
@@ -145,6 +147,7 @@ uniform vec3 uSunDirection;
 uniform vec3 uMoonPosition;
 uniform float uMoonRadius;
 uniform float uStarFlux;
+uniform vec4 uStrikes[3];
 varying vec2 vUv;
 varying vec3 vWorldPosition;
 varying vec3 vWorldNormal;
@@ -176,7 +179,25 @@ void main() {
   );
   color += vec3(0.2, 0.35, 0.55) * rim * daylight * 0.25 * uStarFlux;
   color *= moonShadow;
+
+  // Night-side lightning: each strike lights its own patch of the deck from
+  // within, only where clouds are dense and the sun is down. The schedule
+  // comes from the shared clock (lightning.ts); the shader just draws it.
+  float night = 1.0 - daylight;
+  float glowSum = 0.0;
+  for (int i = 0; i < 3; i++) {
+    vec4 strike = uStrikes[i];
+    if (strike.z <= 0.0) continue;
+    float du = abs(vUv.x - strike.x);
+    du = min(du, 1.0 - du);
+    float dv = vUv.y - strike.y;
+    float glow = exp(-(du * du * 1.8 + dv * dv) * 130.0) * strike.z * coverage * night;
+    color += vec3(0.82, 0.88, 1.0) * glow * 1.5;
+    glowSum += glow;
+  }
+
   float alpha = coverage * (0.015 + daylight * 0.66) * mix(1.0, moonShadow, 0.35);
+  alpha = min(alpha + glowSum * 0.45, 1.0);
 
   gl_FragColor = vec4(color, alpha);
   #include <tonemapping_fragment>
@@ -302,8 +323,13 @@ export function Planet({ reducedMotion, timeScale, showMoonLabel, locale, timeRe
       uMoonPosition: { value: new Vector3() },
       uMoonRadius: { value: aureliaFrame.moonRadius },
       uStarFlux: { value: 1 },
+      uStrikes: { value: Array.from({ length: LIGHTNING_CELLS }, () => new Vector4()) },
     }),
     [sunDirection, cloudMap],
+  )
+  const strikeSlots = useMemo<(LightningStrike | null)[]>(
+    () => new Array(LIGHTNING_CELLS).fill(null),
+    [],
   )
   const auroraMaterialRef = useRef<ShaderMaterial>(null)
   const auroraUniforms = useMemo(
@@ -337,6 +363,19 @@ export function Planet({ reducedMotion, timeScale, showMoonLabel, locale, timeRe
     }
     if (cloudMaterialRef.current) {
       cloudMaterialRef.current.uniforms.uStarFlux.value = flux
+      // The strike schedule rides the shared clock, so pause and reversal
+      // replay the same storm; the flash rides the cloud map's own frame.
+      const strikes = lightningStrikes(timeRef.current, strikeSlots)
+      const strikeUniforms = cloudMaterialRef.current.uniforms.uStrikes.value as Vector4[]
+      for (let i = 0; i < LIGHTNING_CELLS; i++) {
+        const strike = strikes[i]
+        strikeUniforms[i].set(
+          strike ? strike.u : 0,
+          strike ? strike.v : 0,
+          strike ? strike.strength : 0,
+          0,
+        )
+      }
     }
     if (!reducedMotion) auroraTime.current += delta * timeScale
     if (auroraMaterialRef.current) {
