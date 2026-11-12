@@ -19,10 +19,13 @@ An interactive space scene in the browser: three fictional worlds, cinematic fli
 - **Asteroid belt** — three rings of debris between the orbits of Cinder and Vesper; each rotates at its own angular speed, lit by the star. Along the belt lies zodiacal light — a warm haze of scattered starlight on dust: brightest near the star, fading outward.
 - **The comet** — a small icy guest, **Boreas**, on a Kepler-shaped orbit (e ≈ 0.7): it accelerates near pericenter inside Aurelia's orbit and swings out past Vesper. Two tails: the ion tail points straight away from the star, the dust tail is wider, warmer in color and curved along its orbital wake; both lengthen and brighten toward pericenter. You can fly to it — by button, from the overview map or via a deep link.
 - **Atmospheres** — single-pass Rayleigh/Mie scattering along the view ray: a blue haze and glowing limb on Aurelia, a warm sunset transition at the terminator, a dusty tint on Cinder and an icy haze on Vesper. Night sides stay dark.
-- **Sky** — 5400 stars with twinkle and adaptive point size; density rises toward a Milky Way band aligned with the nebula ribbon — the sky resolves into one galaxy.
+- **Sky** — 5400 stars with twinkle and adaptive point size; density rises toward a Milky Way band aligned with the nebula ribbon — the sky resolves into one galaxy. Rare meteors burn across it: three independent slots on deterministic cycles — pausing freezes a streak, reversing time replays it backwards.
 - **Flights** — the camera swings out on an arc, changes angle and settles onto the chosen world's orbit in ~4 seconds; the interface hides while travelling.
 - **Time controls** — pause, speed ×½–×4 and reverse: orbits, moon phases, the comet and the star's boiling slow down, speed up, freeze or run backwards; the camera stays alive in every mode.
 - **Heliocentric system** — the star in the center, three slightly inclined orbits with slow planetary motion; lighting and terminators follow the direction to the star, so the planet phase changes along the orbit. Illumination falls with distance from Solis — Vesper receives half to a third of Aurelia's light (exponent 1.5 — an exposure compromise between the honest inverse square and a legible frame).
+- **Event announcements** — the simulation is deterministic, so events are computed ahead by pure geometry: Nox's transit across Solis (from Aurelia's orbit), Nox's eclipse in Aurelia's shadow (from Nox's orbit), and Boreas's plunge toward perihelion (on the comet). Each shows a countdown chip with a "skip to the moment" button.
+- **Free flight** — the "Flight" button detaches the camera: WASD thrust, arrows and drag to look, Q/E down and up, wheel and pinch for impulse, Shift to boost (thrust and speed cap ×3) with a live HUD for speed and the nearest surface. Escape or the button flies back to the regular orbit.
+- **Ambient sound** — a quiet synthesized observation-deck background built from Web Audio, zero audio assets; the choice persists and resumes on the first gesture of the next visit.
 - **Tour mode** — the "Tour" button runs an automatic circuit: Aurelia → Cinder → Vesper → Boreas → Solis → system overview, ~7 seconds per stop; any manual navigation stops the tour.
 - **System overview** — all three worlds, the star and the asteroid belt in one frame; clicking a planet sphere, the star or a label starts a flight. Framing compensates for perspective so near planets stay inside the shot.
 - **World card** — telemetry on orbit plus an "Observations" row: short hints on what to look for from this angle — auroras, ring shadows, prominences, both comet tails.
@@ -140,14 +143,16 @@ src/
     Atmosphere.tsx     # shared Rayleigh/Mie scattering, dusty variant
     SystemOverview.tsx # orbits, route, clickable labels
     Starfield.tsx      # twinkling stars: density grows toward the galactic band
+    Meteors.tsx        # rare burn-ups: three slots on deterministic cycles
     Backdrop.tsx       # the nebula
-  comet.ts             # the comet's Kepler orbit: Kepler's equation, positions
+  comet.ts             # the comet's Kepler orbit: Kepler's equation, positions, perihelion window
   prominences.ts       # prominence loops: arc between legs, life cycle
+  meteors.ts           # meteors: deterministic spawns per cycle, tangential tracks
   ring-shadow.ts       # ring shadow geometry: ray-plane intersection
   galactic.ts          # the Milky Way: star directions along the galactic band
   camera-math.ts       # camera offsets, overview framing, pose serialization
   strings.ts           # interface strings: RU and EN dictionaries, locale
-  *.test.ts            # math tests: orbits, comet, camera, prominences, ring shadows, the band
+  *.test.ts            # math tests: orbits, comet and perihelion, camera, prominences, eclipses, meteors, ring shadows, the band
   shaders/noise.ts     # simplex/fbm for micro-relief
   planets.ts           # names, telemetry and the localized copy of worlds and star
   orbits.ts            # orbit radii, inclinations, speeds and phases; planet positions
