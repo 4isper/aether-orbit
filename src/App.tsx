@@ -6,7 +6,7 @@ import type { FlightTelemetry } from './components/CameraRig'
 import { parsePose, type CameraPose } from './camera-math'
 import { deepLinkUrl, parseTimeParam } from './deep-link'
 import { readStoredLocale, storeLocale, t, type Locale, type StringKey } from './strings'
-import { isAmbienceOn, readStoredAmbience, setAmbience, storeAmbience } from './audio'
+import { eventCueTransition, isAmbienceOn, playEventCue, readStoredAmbience, setAmbience, setBoost, storeAmbience } from './audio'
 import './App.css'
 
 const SceneCanvas = lazy(() => import('./SceneCanvas'))
@@ -130,16 +130,23 @@ function App() {
     poseRef.current = pose
     window.history.replaceState(null, '', deepLinkUrl(view, pose, time))
   }, [])
-  const handleEvent = useCallback((announcement: EventAnnouncement | null) => {
-    setEvent(announcement)
-  }, [])
   const [flightInfo, setFlightInfo] = useState<FlightTelemetry | null>(null)
   const handleFlightTelemetry = useCallback((telemetry: FlightTelemetry) => {
     setFlightInfo(telemetry)
   }, [])
+  const announcedRef = useRef<EventAnnouncement | null>(null)
+  const handleEvent = useCallback((announcement: EventAnnouncement | null) => {
+    // The cue belongs to the moment a window begins, not to the chip's
+    // once-per-second re-announcements (eventCueTransition is the judge).
+    if (eventCueTransition(announcedRef.current, announcement)) playEventCue()
+    announcedRef.current = announcement
+    setEvent(announcement)
+  }, [])
   const seekToEvent = useCallback(() => {
     if (!event) return
     window.dispatchEvent(new CustomEvent('aether:seek', { detail: { time: event.peakAt } }))
+    // The leap lands in the middle of the moment: let it be heard.
+    playEventCue()
     // The address bar carries the jumped-to moment too, so a copy right after
     // the leap still reproduces the frame; the pose is the last shared one.
     window.history.replaceState(null, '', deepLinkUrl(activeView, poseRef.current, event.peakAt))
@@ -162,6 +169,12 @@ function App() {
   const [help, setHelp] = useState(false)
   const [tabVisible, setTabVisible] = useState(() => !document.hidden)
   const timeScale = paused ? 0 : reversed ? -speed : speed
+
+  // The boost hum follows the pilot's foot, not the render loop.
+  const boosting = Boolean(freeFlight && flightInfo?.boosting)
+  useEffect(() => {
+    setBoost(boosting)
+  }, [boosting])
 
   const toggleLocale = useCallback(() => {
     setLocale((value) => {
