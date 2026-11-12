@@ -4,6 +4,7 @@ import { PerformanceMonitor } from '@react-three/drei'
 import { ACESFilmicToneMapping, SRGBColorSpace, type WebGLRenderer } from 'three'
 import { SceneErrorBoundary } from './SceneErrorBoundary'
 import { SpaceScene } from './components/SpaceScene'
+import { t } from './strings'
 import type { SceneView } from './planets'
 import type { CameraPose } from './camera-math'
 import type { Locale } from './strings'
@@ -105,8 +106,8 @@ export default function SceneCanvas({
       {contextLost && (
         <div className="webgl-fallback webgl-fallback--overlay" role="alert">
           <div className="webgl-fallback-inner">
-            <h2>Контекст WebGL потерян</h2>
-            <p>Перезагрузите страницу, чтобы вернуть сцену. Если проблема повторяется — обновите видеодрайвер.</p>
+            <h2>{t(locale, 'contextLostTitle')}</h2>
+            <p>{t(locale, 'contextLostBody')}</p>
           </div>
         </div>
       )}
