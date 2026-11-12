@@ -319,6 +319,55 @@ h1 > em {
   border-color: rgba(174, 205, 224, 0.55);
 }
 
+/* Free-flight HUD: live speed and the nearest surface, mirroring the
+ * event chip on the opposite side of the frame. Screen-reader traffic
+ * stays in .flight-status. */
+.flight-hud {
+  position: absolute;
+  right: 46px;
+  bottom: 96px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1px solid rgba(150, 180, 200, 0.14);
+  background: rgba(1, 2, 5, 0.55);
+  font-size: 8px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(202, 218, 227, 0.5);
+  pointer-events: none;
+}
+
+.flight-hud div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.flight-hud strong {
+  font-weight: 400;
+  color: rgba(229, 238, 243, 0.85);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.flight-hud small {
+  font-size: inherit;
+  color: rgba(202, 218, 227, 0.4);
+}
+
+.flight-hud-boost {
+  color: rgba(255, 208, 140, 0.75);
+}
+
+@media (max-width: 900px) {
+  .flight-hud {
+    right: 24px;
+  }
+}
+
 @media (max-width: 900px) {
   .event-chip {
     left: 24px;

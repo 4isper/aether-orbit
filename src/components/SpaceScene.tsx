@@ -17,6 +17,7 @@ import { planetIds, type PlanetId, type SceneView } from '../planets'
 import { planetPosition } from '../orbits'
 import { nextTransit } from '../eclipse'
 import type { CameraPose } from '../camera-math'
+import type { FlightTelemetry } from './CameraRig'
 import type { Locale } from '../strings'
 
 function SceneReady({ onReady }: { onReady: () => void }) {
@@ -79,9 +80,10 @@ type SpaceSceneProps = {
   onSharePose: (view: SceneView, pose: CameraPose) => void
   onSelect: (view: SceneView) => void
   onTransit?: (announcement: TransitAnnouncement | null) => void
+  onFlightTelemetry?: (telemetry: FlightTelemetry) => void
 }
 
-export function SpaceScene({ activeView, destination, initialView, initialPose, timeScale, locale, reducedMotion, lowEnd = false, freeFlight, onReady, onArrive, onSharePose, onSelect, onTransit }: SpaceSceneProps) {
+export function SpaceScene({ activeView, destination, initialView, initialPose, timeScale, locale, reducedMotion, lowEnd = false, freeFlight, onReady, onArrive, onSharePose, onSelect, onTransit, onFlightTelemetry }: SpaceSceneProps) {
   const gl = useThree((state) => state.gl)
   const [hovered, setHovered] = useState(false)
   const travelling = activeView !== destination
@@ -199,6 +201,7 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
         freeFlight={freeFlight}
         onArrive={onArrive}
         sharePose={onSharePose}
+        onFlightTelemetry={onFlightTelemetry}
         timeRef={orbitTime}
         moonWorldRef={moonWorld}
       />

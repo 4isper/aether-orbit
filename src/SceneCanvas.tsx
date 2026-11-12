@@ -4,6 +4,7 @@ import { PerformanceMonitor } from '@react-three/drei'
 import { ACESFilmicToneMapping, SRGBColorSpace, type WebGLRenderer } from 'three'
 import { SceneErrorBoundary } from './SceneErrorBoundary'
 import { SpaceScene, type TransitAnnouncement } from './components/SpaceScene'
+import type { FlightTelemetry } from './components/CameraRig'
 import { t } from './strings'
 import type { SceneView } from './planets'
 import type { CameraPose } from './camera-math'
@@ -31,6 +32,7 @@ type SceneCanvasProps = {
   onSharePose: (view: SceneView, pose: CameraPose) => void
   onSelect: (view: SceneView) => void
   onTransit?: (announcement: TransitAnnouncement | null) => void
+  onFlightTelemetry?: (telemetry: FlightTelemetry) => void
 }
 
 export default function SceneCanvas({
@@ -48,6 +50,7 @@ export default function SceneCanvas({
   onSharePose,
   onSelect,
   onTransit,
+  onFlightTelemetry,
 }: SceneCanvasProps) {
   const [dpr, setDpr] = useState(getMaxDpr)
   const [lowEnd, setLowEnd] = useState(false)
@@ -105,6 +108,7 @@ export default function SceneCanvas({
             onSharePose={onSharePose}
             onSelect={onSelect}
             onTransit={onTransit}
+            onFlightTelemetry={onFlightTelemetry}
           />
         </PerformanceMonitor>
       </SceneErrorBoundary>

@@ -9,6 +9,7 @@ import {
   computeOverviewPose,
   FLIGHT_DURATION,
   INTRO_DURATION,
+  nearestFlightBody,
   orbitOffset,
   OVERVIEW_MAX_ZOOM,
   OVERVIEW_MIN_ZOOM,
@@ -18,9 +19,19 @@ import {
   stepFreeFlight,
   viewZoomBounds,
   type CameraPose,
+  type FlightBodyId,
   type FreeFlightInput,
   type FreeFlightState,
 } from '../camera-math'
+
+/** What the interface's flight HUD needs: the live speed and how far the
+ * pilot is from the nearest surface, published at a calm throttle. */
+export type FlightTelemetry = {
+  speed: number
+  nearestId: FlightBodyId
+  nearestDistance: number
+  boosting: boolean
+}
 
 type CameraRigProps = {
   initialView: SceneView
@@ -31,6 +42,8 @@ type CameraRigProps = {
   freeFlight: boolean
   onArrive: (view: SceneView) => void
   sharePose?: (view: SceneView, pose: CameraPose) => void
+  /** Throttled free-flight readout for the HUD (null-capable consumers). */
+  onFlightTelemetry?: (telemetry: FlightTelemetry) => void
   timeRef: { current: number }
   /** The moon's live world position, published by Planet every frame. */
   moonWorldRef: { current: Vector3 }
@@ -38,6 +51,7 @@ type CameraRigProps = {
 
 const MAX_STEP = 0.1
 const SHARE_INTERVAL = 1.5
+const FLIGHT_INFO_INTERVAL = 0.25
 const BASE_FOV = 36
 
 /** Free-flight tuning: system scale runs from the 8.4-unit star out to the
@@ -50,6 +64,7 @@ const FREE_FLIGHT_PARAMS = {
   minRadius: 9.5,
   maxRadius: 65,
   lookRate: 7,
+  boost: 3,
 }
 
 /**
@@ -62,7 +77,7 @@ const SMALL_BODY_FRAMING = {
   moon: { x: 0.25, y: -0.15 },
 } as const
 
-export function CameraRig({ initialView, initialPose, reducedMotion, destination, freeFlight, onArrive, sharePose, timeRef, moonWorldRef }: CameraRigProps) {
+export function CameraRig({ initialView, initialPose, reducedMotion, destination, freeFlight, onArrive, sharePose, onFlightTelemetry, timeRef, moonWorldRef }: CameraRigProps) {
   const gl = useThree((state) => state.gl)
   const size = useThree((state) => state.size)
   const cameraRef = useThree((state) => state.camera)
@@ -100,6 +115,8 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
   const compOffset = useMemo(() => new Vector3(), [])
   const shareTimer = useRef(0)
   const sharedPose = useRef({ yaw: NaN, pitch: NaN, zoom: NaN })
+  const flightInfoTimer = useRef(0)
+  const flightInfoSent = useRef<FlightTelemetry | null>(null)
   const flight = useRef({
     active: false,
     elapsed: 0,
@@ -315,9 +332,9 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
     element.addEventListener('keydown', onKeyDown)
     window.addEventListener('aether:reset', reset)
 
-    // Movement keys ride on the window so free flight works without first
-    // focusing the canvas; physical key codes ignore keyboard layouts.
-    const moveKeys = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE'])
+    // Movement and boost keys ride on the window so free flight works without
+    // first focusing the canvas; physical key codes ignore keyboard layouts.
+    const moveKeys = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'ShiftLeft', 'ShiftRight'])
     const onKeyDownMove = (event: KeyboardEvent) => {
       if (moveKeys.has(event.code)) free.current.keys.add(event.code)
     }
@@ -435,6 +452,7 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
 
     if (free.current.active) {
       const st = free.current.state
+      const boosting = free.current.keys.has('ShiftLeft') || free.current.keys.has('ShiftRight')
       const input: FreeFlightInput = {
         forward: free.current.keys.has('KeyW'),
         back: free.current.keys.has('KeyS'),
@@ -442,8 +460,31 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
         right: free.current.keys.has('KeyD'),
         up: free.current.keys.has('KeyE'),
         down: free.current.keys.has('KeyQ'),
+        boost: boosting,
       }
       stepFreeFlight(st, input, free.current.look, delta, FREE_FLIGHT_PARAMS)
+      // Publish the HUD readout at a calm throttle, only when something
+      // the pilot could notice has actually changed.
+      if (onFlightTelemetry) {
+        flightInfoTimer.current += delta
+        if (flightInfoTimer.current >= FLIGHT_INFO_INTERVAL) {
+          flightInfoTimer.current = 0
+          const nearest = nearestFlightBody(st.position, moonWorldRef.current, time)
+          const info: FlightTelemetry = {
+            speed: st.velocity.length(),
+            nearestId: nearest.id,
+            nearestDistance: Math.max(nearest.distance, 0),
+            boosting,
+          }
+          const prev = flightInfoSent.current
+          if (!prev || prev.boosting !== info.boosting || prev.nearestId !== info.nearestId
+            || Math.abs(info.speed - prev.speed) > 0.05
+            || Math.abs(info.nearestDistance - prev.nearestDistance) > 0.05) {
+            flightInfoSent.current = info
+            onFlightTelemetry(info)
+          }
+        }
+      }
       camera.position.copy(st.position)
       camera.up.set(0, 1, 0)
       const cosPitch = Math.cos(st.pitch)

@@ -5,6 +5,7 @@ import {
   clampPose,
   orbitOffset,
   computeOverviewPose,
+  nearestFlightBody,
   parsePose,
   poseParams,
   rotateOverviewPose,
@@ -13,6 +14,7 @@ import {
   stepFreeFlight,
   viewZoomBounds,
   COMET_VIEW_DISTANCE,
+  FLIGHT_BODY_IDS,
   MAX_ZOOM,
   MIN_ZOOM,
   PLANET_VIEW_DISTANCE,
@@ -20,6 +22,7 @@ import {
 } from './camera-math.ts'
 import { planetIds } from './planets.ts'
 import { planetPosition } from './orbits.ts'
+import { moonWorldPosition } from './eclipse.ts'
 
 const center = new Vector3(-1.8, 0.5, 0)
 const out = new Vector3()
@@ -206,17 +209,44 @@ test('shiftIntoFrame keeps the frame distance and scales with it', () => {
 
 const FREE_PARAMS = { accel: 10, damping: 2, maxSpeed: 12, minRadius: 9.5, maxRadius: 65, lookRate: 6 }
 
+const FLIGHT_KEYS = { forward: false, back: false, left: false, right: false, up: false, down: false }
+
 test('free flight accelerates along the view direction', () => {
   const state = { position: new Vector3(20, 0, 0), velocity: new Vector3(), yaw: 0, pitch: 0 }
   // yaw 0 looks along +Z; holding forward must move along +Z, not X.
-  stepFreeFlight(state, { forward: true, back: false, left: false, right: false, up: false, down: false }, { yaw: 0, pitch: 0 }, 1, { ...FREE_PARAMS, damping: 0 })
+  stepFreeFlight(state, { ...FLIGHT_KEYS, forward: true }, { yaw: 0, pitch: 0 }, 1, { ...FREE_PARAMS, damping: 0 })
   assert.ok(state.position.z > 1, `z ${state.position.z}`)
   assert.ok(Math.abs(state.position.x - 20) < 1e-9, 'strayed sideways')
 })
 
+test('boost multiplies the thrust exactly', () => {
+  const plain = { position: new Vector3(0, 0, 0), velocity: new Vector3(), yaw: 0, pitch: 0 }
+  const boosted = { position: new Vector3(0, 0, 0), velocity: new Vector3(), yaw: 0, pitch: 0 }
+  const params = { ...FREE_PARAMS, boost: 3 }
+  stepFreeFlight(plain, { ...FLIGHT_KEYS, forward: true }, { yaw: 0, pitch: 0 }, 0.1, params)
+  stepFreeFlight(boosted, { ...FLIGHT_KEYS, forward: true, boost: true }, { yaw: 0, pitch: 0 }, 0.1, params)
+  // Same damping applies to both, so the thrust ratio survives untouched.
+  assert.ok(
+    Math.abs(boosted.velocity.length() / plain.velocity.length() - 3) < 1e-9,
+    `ratio ${boosted.velocity.length() / plain.velocity.length()}`,
+  )
+})
+
+test('boost raises the speed cap instead of only the push', () => {
+  // Pre-charge a speed between the plain cap (12) and the boost cap (36):
+  // without boost it must clamp down, with boost it must survive.
+  const params = { ...FREE_PARAMS, damping: 0, boost: 3 }
+  const plain = { position: new Vector3(20, 0, 0), velocity: new Vector3(0, 0, 20), yaw: 0, pitch: 0 }
+  const boosted = { position: new Vector3(20, 0, 0), velocity: new Vector3(0, 0, 20), yaw: 0, pitch: 0 }
+  stepFreeFlight(plain, FLIGHT_KEYS, { yaw: 0, pitch: 0 }, 0.016, params)
+  assert.ok(plain.velocity.length() <= 12 + 1e-9, `plain speed ${plain.velocity.length()} kept flying`)
+  stepFreeFlight(boosted, { ...FLIGHT_KEYS, boost: true }, { yaw: 0, pitch: 0 }, 0.016, params)
+  assert.ok(Math.abs(boosted.velocity.length() - 20) < 1e-9, `boosted speed ${boosted.velocity.length()}`)
+})
+
 test('free flight glides on with damping when the keys release', () => {
   const state = { position: new Vector3(0, 0, 0), velocity: new Vector3(0, 0, 10), yaw: 0, pitch: 0 }
-  stepFreeFlight(state, { forward: false, back: false, left: false, right: false, up: false, down: false }, { yaw: 0, pitch: 0 }, 1, FREE_PARAMS)
+  stepFreeFlight(state, FLIGHT_KEYS, { yaw: 0, pitch: 0 }, 1, FREE_PARAMS)
   const expected = 10 * Math.exp(-2)
   assert.ok(Math.abs(state.velocity.z - expected) < 1e-9, `velocity ${state.velocity.z}`)
 })
@@ -224,7 +254,7 @@ test('free flight glides on with damping when the keys release', () => {
 test('free flight never exceeds its speed cap', () => {
   const state = { position: new Vector3(0, 0, 0), velocity: new Vector3(), yaw: 0, pitch: 0 }
   for (let i = 0; i < 200; i++) {
-    stepFreeFlight(state, { forward: true, back: false, left: false, right: false, up: false, down: false }, { yaw: 0, pitch: 0 }, 0.1, { ...FREE_PARAMS, damping: 0 })
+    stepFreeFlight(state, { ...FLIGHT_KEYS, forward: true }, { yaw: 0, pitch: 0 }, 0.1, { ...FREE_PARAMS, damping: 0 })
   }
   assert.ok(state.velocity.length() <= 12 + 1e-9, `speed ${state.velocity.length()}`)
 })
@@ -232,26 +262,42 @@ test('free flight never exceeds its speed cap', () => {
 test('free flight stays between the star and the outer bound', () => {
   const params = { ...FREE_PARAMS, damping: 0 }
   const out = { position: new Vector3(100, 0, 0), velocity: new Vector3(5, 0, 0), yaw: 0, pitch: 0 }
-  stepFreeFlight(out, { forward: false, back: false, left: false, right: false, up: false, down: false }, { yaw: 0, pitch: 0 }, 0.016, params)
+  stepFreeFlight(out, FLIGHT_KEYS, { yaw: 0, pitch: 0 }, 0.016, params)
   assert.ok(Math.abs(out.position.length() - 65) < 1e-9, 'outer bound not enforced')
   // The outward radial push is gone; the position rests on the sphere.
   assert.ok(out.velocity.dot(out.position) <= 1e-9, 'still pushing outward')
 
   const inr = { position: new Vector3(1, 0, 0), velocity: new Vector3(-5, 0, 0), yaw: 0, pitch: 0 }
-  stepFreeFlight(inr, { forward: false, back: false, left: false, right: false, up: false, down: false }, { yaw: 0, pitch: 0 }, 0.016, params)
+  stepFreeFlight(inr, FLIGHT_KEYS, { yaw: 0, pitch: 0 }, 0.016, params)
   assert.ok(Math.abs(inr.position.length() - 9.5) < 1e-9, 'inner bound not enforced')
   assert.ok(inr.velocity.dot(inr.position) >= -1e-9, 'still pushing inward')
 })
 
 test('free flight turns toward the look target with pitch clamped', () => {
   const state = { position: new Vector3(20, 0, 0), velocity: new Vector3(), yaw: 0, pitch: 0 }
-  stepFreeFlight(
-    state,
-    { forward: false, back: false, left: false, right: false, up: false, down: false },
-    { yaw: 1, pitch: 5 },
-    1,
-    { ...FREE_PARAMS, damping: 0, lookRate: 6 },
-  )
+  stepFreeFlight(state, FLIGHT_KEYS, { yaw: 1, pitch: 5 }, 1, { ...FREE_PARAMS, damping: 0, lookRate: 6 })
   assert.ok(state.yaw > 0 && state.yaw < 1, `yaw ${state.yaw}`)
   assert.ok(Math.abs(state.pitch) <= Math.PI / 2 + 1e-9, `pitch ${state.pitch}`)
+})
+
+test('nearest flight body reads signed distance to the surface', () => {
+  // 1.5 units from Aurelia's center: inside the radius, so the reading is
+  // negative — and no other body can beat it (the moon keeps 3.6−1.5−0.34).
+  const anchor = planetPosition('aurelia', 100, new Vector3())
+  const parked = anchor.addScaledVector(anchor.clone().normalize(), -1.5)
+  const near = nearestFlightBody(parked, moonWorldPosition(100, new Vector3()), 100)
+  assert.equal(near.id, 'aurelia')
+  assert.ok(Math.abs(near.distance - -0.5) < 1e-9, `distance ${near.distance}`)
+
+  // At a body's center the reading goes negative: the pilot is inside it.
+  const moon = moonWorldPosition(55, new Vector3())
+  const inside = nearestFlightBody(moon, moon, 55)
+  assert.equal(inside.id, 'moon')
+  assert.ok(Math.abs(inside.distance - -0.34) < 1e-9, `distance ${inside.distance}`)
+})
+
+test('nearest flight body always returns a flyable body', () => {
+  const far = nearestFlightBody(new Vector3(64, 0, 0), new Vector3(), 40)
+  assert.ok(FLIGHT_BODY_IDS.includes(far.id), `unknown id ${far.id}`)
+  assert.ok(Number.isFinite(far.distance))
 })

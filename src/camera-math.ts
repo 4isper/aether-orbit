@@ -1,7 +1,7 @@
 import { MathUtils, Vector3 } from 'three'
-import { cometOrbitPoint } from './comet.ts'
+import { cometOrbitPoint, cometPosition } from './comet.ts'
 import { planetIds, type SceneView } from './planets.ts'
-import { orbitPoint } from './orbits.ts'
+import { orbitPoint, planetPosition } from './orbits.ts'
 
 export const PLANET_VIEW_DISTANCE = 9
 export const STAR_VIEW_DISTANCE = 11.5
@@ -133,6 +133,8 @@ export type FreeFlightInput = {
   right: boolean
   up: boolean
   down: boolean
+  /** Shift is held: thrust and the speed cap both scale by params.boost. */
+  boost?: boolean
 }
 
 export type FreeFlightState = {
@@ -149,6 +151,8 @@ export type FreeFlightParams = {
   minRadius: number
   maxRadius: number
   lookRate: number
+  /** Thrust and cap multiplier while the boost key is held. */
+  boost?: number
 }
 
 const MAX_PITCH = Math.PI / 2 - 0.01
@@ -171,7 +175,9 @@ export function stepFreeFlight(
   const rightX = Math.cos(state.yaw)
   const rightZ = -Math.sin(state.yaw)
 
-  const thrust = params.accel * delta
+  const boosting = Boolean(input.boost)
+  const boostScale = boosting ? params.boost ?? 1 : 1
+  const thrust = params.accel * delta * boostScale
   if (input.forward) {
     state.velocity.x += forwardX * thrust
     state.velocity.y += forwardY * thrust
@@ -195,8 +201,9 @@ export function stepFreeFlight(
 
   const decay = Math.exp(-params.damping * delta)
   state.velocity.multiplyScalar(decay)
-  if (state.velocity.length() > params.maxSpeed) {
-    state.velocity.setLength(params.maxSpeed)
+  const cap = params.maxSpeed * boostScale
+  if (state.velocity.length() > cap) {
+    state.velocity.setLength(cap)
   }
 
   state.position.addScaledVector(state.velocity, delta)
@@ -216,6 +223,54 @@ export function stepFreeFlight(
 }
 
 export type OverviewRotation = { position: Vector3; up: Vector3 }
+
+/**
+ * Scene-space surface radii of the flyable bodies, mirroring the mesh
+ * geometry of the components (star photosphere 2.35, planets 2 × their
+ * group scale, moon 0.34, comet 0.14). The flight HUD reports how far the
+ * pilot is from each surface; compact-screen scales are ignored as noise.
+ */
+export const FLIGHT_BODY_RADII = {
+  star: 2.35,
+  aurelia: 2,
+  cinder: 1.84,
+  vesper: 2.16,
+  moon: 0.34,
+  comet: 0.14,
+} as const
+
+export type FlightBodyId = Exclude<SceneView, 'system'>
+
+export const FLIGHT_BODY_IDS: FlightBodyId[] = ['star', 'aurelia', 'cinder', 'vesper', 'moon', 'comet']
+
+const nearestScratch = new Vector3()
+
+/**
+ * The body whose surface is closest to a free-flight position, with the
+ * signed distance to that surface (negative means the pilot is inside it).
+ * The moon's live world position comes in from the scene graph; every other
+ * center is derived from the shared simulation time.
+ */
+export function nearestFlightBody(
+  position: Vector3,
+  moonPosition: Vector3,
+  time: number,
+): { id: FlightBodyId; distance: number } {
+  let bestId: FlightBodyId = 'star'
+  let bestDistance = Infinity
+  for (const id of FLIGHT_BODY_IDS) {
+    if (id === 'star') nearestScratch.set(0, 0, 0)
+    else if (id === 'moon') nearestScratch.copy(moonPosition)
+    else if (id === 'comet') cometPosition(time, nearestScratch)
+    else planetPosition(id, time, nearestScratch)
+    const distance = position.distanceTo(nearestScratch) - FLIGHT_BODY_RADII[id]
+    if (distance < bestDistance) {
+      bestDistance = distance
+      bestId = id
+    }
+  }
+  return { id: bestId, distance: bestDistance }
+}
 
 const OVERVIEW_MIN_ELEVATION = -0.12
 const OVERVIEW_MAX_ELEVATION = 1.1

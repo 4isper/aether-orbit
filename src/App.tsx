@@ -2,6 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
 import { SceneErrorBoundary } from './SceneErrorBoundary'
 import { bodies, planetIds, type SceneView } from './planets'
 import type { TransitAnnouncement } from './components/SpaceScene'
+import type { FlightTelemetry } from './components/CameraRig'
 import { parsePose, poseParams, type CameraPose } from './camera-math'
 import { readStoredLocale, storeLocale, t, type Locale, type StringKey } from './strings'
 import { isAmbienceOn, readStoredAmbience, setAmbience, storeAmbience } from './audio'
@@ -118,6 +119,10 @@ function App() {
   }, [])
   const handleTransit = useCallback((announcement: TransitAnnouncement | null) => {
     setTransit(announcement)
+  }, [])
+  const [flightInfo, setFlightInfo] = useState<FlightTelemetry | null>(null)
+  const handleFlightTelemetry = useCallback((telemetry: FlightTelemetry) => {
+    setFlightInfo(telemetry)
   }, [])
   const seekToTransit = useCallback(() => {
     if (!transit) return
@@ -291,6 +296,7 @@ function App() {
                 onSharePose={handleSharePose}
                 onSelect={travelTo}
                 onTransit={handleTransit}
+                onFlightTelemetry={handleFlightTelemetry}
               />
             </Suspense>
           </SceneErrorBoundary>
@@ -478,6 +484,20 @@ function App() {
             <span className="sr-only">{ready ? overview ? t(locale, 'overviewHint') : t(locale, 'onOrbit', { name: currentName }) : t(locale, 'loader')}</span>
           )}
         </div>
+
+        {freeFlight && flightInfo && (
+          <div className="flight-hud" aria-hidden="true">
+            <div>
+              <span>{t(locale, 'hudSpeed')}</span>
+              <strong>{flightInfo.speed.toFixed(1)} <small>{t(locale, 'hudUnit')}</small></strong>
+            </div>
+            <div>
+              <span>{t(locale, 'hudNearest', { name: bodies[flightInfo.nearestId].name })}</span>
+              <strong>{flightInfo.nearestDistance.toFixed(1)} <small>{t(locale, 'hudUnit')}</small></strong>
+            </div>
+            {flightInfo.boosting && <div className="flight-hud-boost">{t(locale, 'hudBoost')}</div>}
+          </div>
+        )}
 
         {body ? (
           <>
