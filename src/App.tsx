@@ -1,17 +1,23 @@
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
 import { SceneErrorBoundary } from './SceneErrorBoundary'
 import { bodies, planetIds, type SceneView } from './planets'
-import type { EventAnnouncement, EventKind } from './components/SpaceScene'
+import type { EventAnnouncement } from './components/SpaceScene'
 import type { FlightTelemetry } from './components/CameraRig'
 import { parsePose, type CameraPose } from './camera-math'
 import { deepLinkUrl, parseTimeParam } from './deep-link'
-import { readStoredLocale, storeLocale, t, type Locale, type StringKey } from './strings'
+import { readStoredLocale, storeLocale, t, type Locale } from './strings'
 import { eventCueTransition, isAmbienceOn, playEventCue, readStoredAmbience, setAmbience, setBoost, storeAmbience } from './audio'
+import { BodyPanel } from './components/interface/BodyPanel'
+import { HelpDialog } from './components/interface/HelpDialog'
+import { OrbitMark } from './components/interface/OrbitMark'
+import { PlanetNav } from './components/interface/PlanetNav'
+import { SystemPanel } from './components/interface/SystemPanel'
+import { TimeControls } from './components/interface/TimeControls'
+import { TopBar } from './components/interface/TopBar'
 import './App.css'
 
 const SceneCanvas = lazy(() => import('./SceneCanvas'))
 
-const SPEED_OPTIONS = [0.5, 1, 2, 4]
 const TOUR_STOPS: SceneView[] = ['aurelia', 'cinder', 'vesper', 'comet', 'star', 'system']
 const TOUR_DWELL_MS = 7000
 const SCENE_VIEWS: SceneView[] = [...planetIds, 'star', 'comet', 'moon', 'system']
@@ -32,37 +38,6 @@ function readInitialTime(): number | null {
   return parseTimeParam(new URLSearchParams(window.location.search))
 }
 
-function formatSpeed(speed: number) {
-  return speed === 0.5 ? '½' : String(speed)
-}
-
-/** The event chip's label, one string per kind of sky moment; a conjunction
- * names its pair, which the announcing view already knows. */
-function eventLabel(kind: EventKind, view: SceneView): StringKey {
-  if (kind === 'transit') return 'eventTransit'
-  if (kind === 'eclipse') return 'eventEclipse'
-  if (kind === 'perihelion') return 'eventPerihelion'
-  return view === 'cinder' ? 'eventConjunctionVesper' : 'eventConjunctionAurelia'
-}
-
-function formatDuration(seconds: number, locale: Locale) {
-  const m = Math.floor(seconds / 60)
-  const s = Math.round(seconds % 60)
-  return m > 0
-    ? t(locale, 'eventDuration', { m, s })
-    : t(locale, 'eventSeconds', { s })
-}
-
-/** Rows of the "?" help dialog, in the order users will scan them. */
-const SHORTCUT_ROWS: Array<{ keys: string; label: StringKey }> = [
-  { keys: '1–7', label: 'shortcutViews' },
-  { keys: 'Space', label: 'shortcutPause' },
-  { keys: 'WASD', label: 'shortcutFree' },
-  { keys: 'R', label: 'shortcutReset' },
-  { keys: 'H', label: 'shortcutCinema' },
-  { keys: '?', label: 'shortcutHelp' },
-]
-
 function detectWebGLSupport() {
   try {
     const canvas = document.createElement('canvas')
@@ -73,16 +48,6 @@ function detectWebGLSupport() {
   } catch {
     return false
   }
-}
-
-function OrbitMark({ className = '' }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 40 40" fill="none" aria-hidden="true">
-      <circle cx="20" cy="20" r="5.5" stroke="currentColor" strokeWidth="1.2" />
-      <ellipse cx="20" cy="20" rx="17" ry="8.5" transform="rotate(-35 20 20)" stroke="currentColor" strokeWidth="1" />
-      <circle cx="32.5" cy="10.5" r="1.8" fill="currentColor" />
-    </svg>
-  )
 }
 
 function useReducedMotion() {
@@ -151,14 +116,6 @@ function App() {
     // the leap still reproduces the frame; the pose is the last shared one.
     window.history.replaceState(null, '', deepLinkUrl(activeView, poseRef.current, event.peakAt))
   }, [event, activeView])
-  const travelTo = useCallback((next: SceneView) => {
-    if (!ready) return
-    setTour(false)
-    // Navigation always ends free flight; the rig flies the usual arc there.
-    setFreeFlight(false)
-    if (travelling || next === activeView) return
-    setDestination(next)
-  }, [ready, travelling, activeView])
   const [paused, setPaused] = useState(false)
   const [speed, setSpeed] = useState(1)
   const [reversed, setReversed] = useState(false)
@@ -169,6 +126,15 @@ function App() {
   const [help, setHelp] = useState(false)
   const [tabVisible, setTabVisible] = useState(() => !document.hidden)
   const timeScale = paused ? 0 : reversed ? -speed : speed
+
+  const travelTo = useCallback((next: SceneView) => {
+    if (!ready) return
+    setTour(false)
+    // Navigation always ends free flight; the rig flies the usual arc there.
+    setFreeFlight(false)
+    if (travelling || next === activeView) return
+    setDestination(next)
+  }, [ready, travelling, activeView])
 
   // The boost hum follows the pilot's foot, not the render loop.
   const boosting = Boolean(freeFlight && flightInfo?.boosting)
@@ -299,7 +265,7 @@ function App() {
       {webglSupported && (
         <div className="scene">
           <SceneErrorBoundary locale={locale}>
-              <Suspense fallback={null}>
+            <Suspense fallback={null}>
               <SceneCanvas
                 label={travelling
                   ? t(locale, 'flightLabel', { from: currentName, to: destinationName })
@@ -312,12 +278,12 @@ function App() {
                           ? 'moonSceneAria'
                           : 'planetSceneAria', { name: body.copy[locale].label })
                     : t(locale, 'systemAria')}
-              activeView={activeView}
-              destination={destination}
-              initialView={initialView}
-              initialPose={initialPose}
-              initialTime={initialTime}
-              timeScale={timeScale}
+                activeView={activeView}
+                destination={destination}
+                initialView={initialView}
+                initialPose={initialPose}
+                initialTime={initialTime}
+                timeScale={timeScale}
                 locale={locale}
                 reducedMotion={reducedMotion}
                 freeFlight={freeFlight}
@@ -334,178 +300,41 @@ function App() {
       )}
 
       <div className="interface" inert={(!webglSupported || cinema) || undefined}>
-        <header className="topbar reveal">
-          <div className="brand">
-            <OrbitMark className="brand-mark" />
-            <span>AETHER</span>
-          </div>
-          <div className="scene-status">
-            <span className="status-dot" />
-            <span>{travelling ? t(locale, 'inFlight') : freeFlight ? t(locale, 'freeFlightStatus') : overview ? t(locale, 'systemOverview') : t(locale, 'simActive')}</span>
-            <span className="status-code">{body ? `SC—${body.code}` : 'SYS—01'}</span>
-          </div>
-          <button
-            type="button"
-            className="locale-toggle"
-            aria-label={t(locale, 'localeSwitch')}
-            onClick={toggleLocale}
-          >
-            <span className={locale === 'ru' ? 'is-active' : ''}>RU</span>
-            <span className={locale === 'en' ? 'is-active' : ''}>EN</span>
-          </button>
-        </header>
-
-        <nav className="planet-nav reveal" aria-label={t(locale, 'navLabel')} aria-busy={travelling}>
-          <button
-            type="button"
-            className="planet-link system-link"
-            aria-pressed={overview}
-            aria-label={t(locale, 'systemOverview')}
-            disabled={!ready || travelling}
-            onClick={() => travelTo('system')}
-          >
-            <OrbitMark className="system-icon" />
-            {t(locale, 'systemOverviewLabel')}
-          </button>
-          <button
-            type="button"
-            className="planet-link tour-link"
-            aria-pressed={tour}
-            aria-label={tour ? t(locale, 'tourStop') : t(locale, 'tourStart')}
-            disabled={!ready}
-            onClick={() => setTour((value) => !value)}
-          >
-            {t(locale, 'tour')}
-          </button>
-          <button
-            type="button"
-            className="planet-link tour-link"
-            aria-pressed={freeFlight}
-            aria-label={freeFlight ? t(locale, 'freeFlightStop') : t(locale, 'freeFlightStart')}
-            disabled={!ready || travelling}
-            onClick={() => {
-              setTour(false)
-              setFreeFlight((value) => !value)
-            }}
-          >
-            {t(locale, 'freeFlight')}
-          </button>
-          <button
-            type="button"
-            className="planet-link planet-link--star"
-            aria-pressed={isStar}
-            aria-label={t(locale, 'flyToStar', { name: bodies.star.name })}
-            disabled={!ready || travelling}
-            onClick={() => travelTo('star')}
-          >
-            <span className="planet-dot" aria-hidden="true" />
-            <span className="planet-number">{bodies.star.code}</span>
-            {bodies.star.name}
-          </button>
-          {planetIds.map((id) => (
-            <button
-              key={id}
-              type="button"
-              className={`planet-link planet-link--${id}`}
-              aria-pressed={activeView === id}
-              aria-label={t(locale, 'flyToPlanet', { name: bodies[id].name })}
-              disabled={!ready || travelling}
-              onClick={() => travelTo(id)}
-            >
-              <span className="planet-dot" aria-hidden="true" />
-              <span className="planet-number">{bodies[id].code}</span>
-              {bodies[id].name}
-            </button>
-          ))}
-          <button
-            type="button"
-            className="planet-link planet-link--moon"
-            aria-pressed={activeView === 'moon'}
-            aria-label={t(locale, 'flyToMoon', { name: bodies.moon.name })}
-            disabled={!ready || travelling}
-            onClick={() => travelTo('moon')}
-          >
-            <span className="planet-dot" aria-hidden="true" />
-            <span className="planet-number">{bodies.moon.code}</span>
-            {bodies.moon.name}
-          </button>
-          <button
-            type="button"
-            className="planet-link planet-link--comet"
-            aria-pressed={activeView === 'comet'}
-            aria-label={t(locale, 'flyToComet', { name: bodies.comet.name })}
-            disabled={!ready || travelling}
-            onClick={() => travelTo('comet')}
-          >
-            <span className="planet-dot" aria-hidden="true" />
-            <span className="planet-number">{bodies.comet.code}</span>
-            {bodies.comet.name}
-          </button>
-        </nav>
-
-        <div className="time-controls reveal" role="group" aria-label={t(locale, 'timeControls')}>
-          <button
-            type="button"
-            className="time-button"
-            aria-pressed={paused}
-            aria-label={paused ? t(locale, 'resume') : t(locale, 'pause')}
-            disabled={!ready}
-            onClick={() => setPaused((value) => !value)}
-          >
-            {paused ? (
-              <svg viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                <path d="M3 1.4v9.2L10.2 6z" fill="currentColor" />
-              </svg>
-            ) : (
-              <svg viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                <rect x="2.4" y="1.8" width="2.4" height="8.4" fill="currentColor" />
-                <rect x="7.2" y="1.8" width="2.4" height="8.4" fill="currentColor" />
-              </svg>
-            )}
-          </button>
-          <button
-            type="button"
-            className="time-button"
-            aria-pressed={reversed}
-            aria-label={reversed ? t(locale, 'unreverse') : t(locale, 'reverse')}
-            disabled={!ready}
-            onClick={() => setReversed((value) => !value)}
-          >
-            <svg viewBox="0 0 12 12" fill="none" aria-hidden="true">
-              <path d="M6.4 1.6v8.8L1.6 6z" fill="currentColor" />
-              <path d="M11 1.6v8.8L6.2 6z" fill="currentColor" />
-            </svg>
-          </button>
-          <div className="speed-group" role="group" aria-label={t(locale, 'speedGroup')}>
-            {SPEED_OPTIONS.map((option) => (
-              <button
-                key={option}
-                type="button"
-                className="time-button speed-option"
-                aria-pressed={speed === option}
-                aria-label={t(locale, 'speed', { value: formatSpeed(option) })}
-                disabled={!ready}
-                onClick={() => setSpeed(option)}
-              >
-                <strong>×{formatSpeed(option)}</strong>
-              </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            className="time-button"
-            aria-pressed={sound}
-            aria-label={t(locale, sound ? 'ambienceOff' : 'ambienceOn')}
-            disabled={!ready}
-            onClick={toggleSound}
-          >
-            <svg viewBox="0 0 16 12" fill="none" aria-hidden="true">
-              <path d="M2 4.6v2.8h2.2L7 9.6V2.4L4.2 4.6H2z" fill="currentColor" />
-              <path d="M9.6 3.4c1.5 1.4 1.5 3.8 0 5.2" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
-              <path d="M11.8 1.8c2.5 2.3 2.5 6.1 0 8.4" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
-            </svg>
-          </button>
-        </div>
+        <TopBar
+          locale={locale}
+          travelling={travelling}
+          freeFlight={freeFlight}
+          overview={overview}
+          bodyCode={body ? body.code : null}
+          onToggleLocale={toggleLocale}
+        />
+        <PlanetNav
+          locale={locale}
+          ready={ready}
+          travelling={travelling}
+          overview={overview}
+          activeView={activeView}
+          tour={tour}
+          freeFlight={freeFlight}
+          onTravel={travelTo}
+          onToggleTour={() => setTour((value) => !value)}
+          onToggleFreeFlight={() => {
+            setTour(false)
+            setFreeFlight((value) => !value)
+          }}
+        />
+        <TimeControls
+          locale={locale}
+          ready={ready}
+          paused={paused}
+          speed={speed}
+          reversed={reversed}
+          sound={sound}
+          onPause={() => setPaused((value) => !value)}
+          onReverse={() => setReversed((value) => !value)}
+          onSpeed={setSpeed}
+          onToggleSound={toggleSound}
+        />
 
         <div className="flight-status" role="status" aria-live="polite" aria-atomic="true">
           {travelling ? (
@@ -530,109 +359,21 @@ function App() {
         )}
 
         {body ? (
-          <>
-            <section className="intro reveal" aria-labelledby="scene-title" aria-hidden={travelling}>
-              <p className="eyebrow"><span />{body.name} / {activeView === 'star' ? t(locale, 'orbitOfStar') : activeView === 'cinder' ? t(locale, 'worldDesert') : activeView === 'vesper' ? t(locale, 'worldIce') : activeView === 'comet' ? t(locale, 'worldComet') : activeView === 'moon' ? t(locale, 'worldMoon') : t(locale, 'worldExo')}</p>
-              <h1 id="scene-title">
-                <span>{body.copy[locale].title[0]}</span>
-                <em>{body.copy[locale].title[1]}</em>
-              </h1>
-              <p className="intro-copy">
-                {body.copy[locale].description[0]}<br />
-                {body.copy[locale].description[1]}
-              </p>
-            </section>
-
-            <aside className="telemetry reveal" aria-label={t(locale, 'bodyTelemetry')} aria-hidden={travelling}>
-              <div className="telemetry-item">
-                <span className="telemetry-label">{t(locale, 'radius')}</span>
-                <strong>{body.radius} <small>{isStar ? 'R☉' : 'R⊕'}</small></strong>
-              </div>
-              <span className="telemetry-divider" />
-              <div className="telemetry-item">
-                <span className="telemetry-label">{body.copy[locale].metricLabel}</span>
-                <strong>{body.metricValue} <small>{body.copy[locale].metricUnit}</small></strong>
-              </div>
-              <span className="telemetry-divider" />
-              <div className="telemetry-item telemetry-item--facts">
-                <span className="telemetry-label">{t(locale, 'observations')}</span>
-                {body.copy[locale].facts.map((fact) => (
-                  <span className="telemetry-fact" key={fact}>{fact}</span>
-                ))}
-              </div>
-            </aside>
-
-            {event && body && !travelling && (
-              <div className="event-chip reveal" role="status">
-                <span className="event-label">
-                  {t(locale, eventLabel(event.kind, activeView))}
-                </span>
-                <strong>
-                  {event.inProgress
-                    ? t(locale, 'eventNow')
-                    : t(locale, 'eventIn', { time: formatDuration(event.seconds, locale) })}
-                </strong>
-                <button type="button" className="event-go" onClick={seekToEvent} disabled={!ready}>
-                  {t(locale, 'eventGo')}
-                </button>
-              </div>
-            )}
-
-            <div className="control-hint reveal" aria-hidden="true">
-              <svg viewBox="0 0 24 32" fill="none">
-                <rect x="4.5" y="2.5" width="15" height="25" rx="7.5" stroke="currentColor" />
-                <path d="M12 7v5" stroke="currentColor" strokeLinecap="round" />
-              </svg>
-              <div>
-                <span>{t(locale, 'exploreOrbit')}</span>
-                <small>{t(locale, 'exploreHint')}</small>
-              </div>
-            </div>
-
-            <div className="view-actions reveal">
-              <button className="reset-view" type="button" onClick={resetView} disabled={!ready || travelling} aria-label={t(locale, 'resetCamera')}>
-                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path d="M4.8 8.2A8 8 0 1 1 4 14" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-                  <path d="M4.8 3.8v4.4h4.4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                <span>{t(locale, 'resetCameraShort')}</span>
-              </button>
-              <span className="view-actions-divider" aria-hidden="true" />
-              <button className="reset-view" type="button" onClick={saveFrame} disabled={!ready} aria-label={t(locale, 'saveFrame')}>
-                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <rect x="3.5" y="6" width="17" height="13" rx="2.5" stroke="currentColor" strokeWidth="1.3" />
-                  <circle cx="12" cy="12.5" r="3.4" stroke="currentColor" strokeWidth="1.3" />
-                  <path d="M9 6l1.2-2h3.6L15 6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                <span>{t(locale, 'saveFrameShort')}</span>
-              </button>
-              <span className="view-actions-divider" aria-hidden="true" />
-              <button
-                className="reset-view"
-                type="button"
-                onClick={shareFrame}
-                disabled={!ready}
-                aria-label={t(locale, copied ? 'linkCopied' : 'shareFrame')}
-              >
-                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <circle cx="6" cy="12" r="2.4" stroke="currentColor" strokeWidth="1.3" />
-                  <circle cx="17" cy="5.5" r="2.4" stroke="currentColor" strokeWidth="1.3" />
-                  <circle cx="17" cy="18.5" r="2.4" stroke="currentColor" strokeWidth="1.3" />
-                  <path d="M8.1 10.9l6.8-4M8.1 13.1l6.8 4" stroke="currentColor" strokeWidth="1.3" />
-                </svg>
-                <span>{copied ? t(locale, 'linkCopied') : t(locale, 'shareFrameShort')}</span>
-              </button>
-            </div>
-          </>
+          <BodyPanel
+            body={body}
+            activeView={activeView}
+            locale={locale}
+            travelling={travelling}
+            ready={ready}
+            event={event}
+            onSeekEvent={seekToEvent}
+            onReset={resetView}
+            onSaveFrame={saveFrame}
+            onShare={shareFrame}
+            copied={copied}
+          />
         ) : (
-          <>
-            <section className="system-intro reveal" aria-labelledby="scene-title" aria-hidden={travelling}>
-              <p className="eyebrow">{t(locale, 'threeWorlds')}</p>
-              <h1 id="scene-title">{t(locale, 'systemOverview')}</h1>
-              <p>{t(locale, 'choosePlanet')}</p>
-            </section>
-            <p className="system-note reveal" aria-hidden={travelling}>{t(locale, 'orbitsNote')}</p>
-          </>
+          <SystemPanel locale={locale} travelling={travelling} />
         )}
 
         <footer className="footer reveal">
@@ -649,37 +390,7 @@ function App() {
         </footer>
       </div>
 
-      {help && (
-        <div
-          className="shortcuts-overlay"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="shortcuts-title"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setHelp(false)
-          }}
-        >
-          <div className="shortcuts-card">
-            <button
-              type="button"
-              className="shortcuts-close"
-              aria-label={t(locale, 'shortcutsClose')}
-              onClick={() => setHelp(false)}
-            >
-              ×
-            </button>
-            <h2 id="shortcuts-title">{t(locale, 'shortcutsTitle')}</h2>
-            <dl className="shortcuts-list">
-              {SHORTCUT_ROWS.map((row) => (
-                <div className="shortcuts-row" key={row.label}>
-                  <dt>{t(locale, row.label)}</dt>
-                  <dd><kbd>{row.keys}</kbd></dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-        </div>
-      )}
+      {help && <HelpDialog locale={locale} onClose={() => setHelp(false)} />}
 
       <div className="loader" aria-hidden={ready}>
         <div className="loader-inner">
