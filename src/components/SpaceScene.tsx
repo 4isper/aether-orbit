@@ -14,6 +14,7 @@ import { Vesper } from './Vesper'
 import { Starfield } from './Starfield'
 import { Meteors } from './Meteors'
 import { Trojan } from './Trojan'
+import { FlightMarkers } from './FlightMarkers'
 import { SystemOverview } from './SystemOverview'
 import { planetIds, type PlanetId, type SceneView } from '../planets'
 import { planetPosition } from '../orbits'
@@ -257,6 +258,8 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
         timeRef={orbitTime}
         moonWorldRef={moonWorld}
       />
+      {/* Names in the void: only while the pilot is detached and flying. */}
+      {freeFlight && <FlightMarkers timeRef={orbitTime} moonWorldRef={moonWorld} />}
       {overview && <SystemOverview onSelect={selectBody} timeRef={orbitTime} locale={locale} />}
       <SceneReady onReady={onReady} />
       <EffectComposer multisampling={0} enabled={!lowEnd}>

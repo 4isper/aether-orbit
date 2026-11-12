@@ -882,6 +882,29 @@ h1 > em {
   border-top-color: rgba(143, 163, 196, 0.35);
 }
 
+/* Names in the void: flight markers answer distant points of light. */
+.flight-marker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(199, 214, 223, 0.72);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.flight-marker::before {
+  content: '';
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+
 /* The trojan's quiet tag on the overview: named, but not a destination. */
 .system-tag {
   display: inline-block;

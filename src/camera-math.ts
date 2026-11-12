@@ -246,10 +246,26 @@ export const FLIGHT_BODY_IDS: FlightBodyId[] = ['star', 'aurelia', 'cinder', 've
 const nearestScratch = new Vector3()
 
 /**
+ * World position of a flyable body at simulation time. The moon's live
+ * world position comes in from the scene graph; every other center derives
+ * from the shared clock — one source for the HUD's nearest reading and the
+ * flight markers alike.
+ */
+export function flightBodyPosition(
+  id: FlightBodyId,
+  moonPosition: Vector3,
+  time: number,
+  target: Vector3,
+): Vector3 {
+  if (id === 'star') return target.set(0, 0, 0)
+  if (id === 'moon') return target.copy(moonPosition)
+  if (id === 'comet') return cometPosition(time, target)
+  return planetPosition(id, time, target)
+}
+
+/**
  * The body whose surface is closest to a free-flight position, with the
  * signed distance to that surface (negative means the pilot is inside it).
- * The moon's live world position comes in from the scene graph; every other
- * center is derived from the shared simulation time.
  */
 export function nearestFlightBody(
   position: Vector3,
@@ -259,11 +275,7 @@ export function nearestFlightBody(
   let bestId: FlightBodyId = 'star'
   let bestDistance = Infinity
   for (const id of FLIGHT_BODY_IDS) {
-    if (id === 'star') nearestScratch.set(0, 0, 0)
-    else if (id === 'moon') nearestScratch.copy(moonPosition)
-    else if (id === 'comet') cometPosition(time, nearestScratch)
-    else planetPosition(id, time, nearestScratch)
-    const distance = position.distanceTo(nearestScratch) - FLIGHT_BODY_RADII[id]
+    const distance = position.distanceTo(flightBodyPosition(id, moonPosition, time, nearestScratch)) - FLIGHT_BODY_RADII[id]
     if (distance < bestDistance) {
       bestDistance = distance
       bestId = id

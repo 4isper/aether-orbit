@@ -5,6 +5,7 @@ import {
   clampPose,
   orbitOffset,
   computeOverviewPose,
+  flightBodyPosition,
   nearestFlightBody,
   parsePose,
   poseParams,
@@ -22,6 +23,7 @@ import {
 } from './camera-math.ts'
 import { planetIds } from './planets.ts'
 import { planetPosition } from './orbits.ts'
+import { cometPosition } from './comet.ts'
 import { moonWorldPosition } from './eclipse.ts'
 
 const center = new Vector3(-1.8, 0.5, 0)
@@ -300,4 +302,20 @@ test('nearest flight body always returns a flyable body', () => {
   const far = nearestFlightBody(new Vector3(64, 0, 0), new Vector3(), 40)
   assert.ok(FLIGHT_BODY_IDS.includes(far.id), `unknown id ${far.id}`)
   assert.ok(Number.isFinite(far.distance))
+})
+
+test('flight body positions match the scene graph for every body', () => {
+  const moonWorld = moonWorldPosition(140, new Vector3())
+  for (const id of FLIGHT_BODY_IDS) {
+    const position = flightBodyPosition(id, moonWorld, 140, new Vector3())
+    if (id === 'star') {
+      assert.equal(position.length(), 0, 'the star sits at the origin')
+    } else if (id === 'moon') {
+      assert.equal(position.distanceTo(moonWorld), 0, 'the moon rides its live world position')
+    } else if (id === 'comet') {
+      assert.equal(position.distanceTo(cometPosition(140, new Vector3())), 0)
+    } else {
+      assert.equal(position.distanceTo(planetPosition(id, 140, new Vector3())), 0)
+    }
+  }
 })
