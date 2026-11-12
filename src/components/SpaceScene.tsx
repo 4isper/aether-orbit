@@ -12,6 +12,7 @@ import { Star } from './Star'
 import { Cinder } from './Cinder'
 import { Vesper } from './Vesper'
 import { Starfield } from './Starfield'
+import { Meteors } from './Meteors'
 import { SystemOverview } from './SystemOverview'
 import { planetIds, type PlanetId, type SceneView } from '../planets'
 import { planetPosition } from '../orbits'
@@ -179,6 +180,8 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
       <color attach="background" args={['#010205']} />
       <Backdrop />
       <Starfield reducedMotion={reducedMotion} timeScale={timeScale} />
+      {/* Meteors are motion — the reduced-motion promise means none at all. */}
+      {!reducedMotion && <Meteors timeScale={timeScale} />}
       <Belt timeRef={orbitTime} />
       <Comet timeRef={orbitTime} />
       <group {...starEvents}>
