@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
 import { SceneErrorBoundary } from './SceneErrorBoundary'
 import { bodies, planetIds, type SceneView } from './planets'
 import { parsePose, poseParams, type CameraPose } from './camera-math'
@@ -131,6 +131,27 @@ function App() {
       detail: { name: `aether-${activeView === 'system' ? 'system' : activeView}.png` },
     }))
   }, [activeView])
+  const [copied, setCopied] = useState(false)
+  const copiedTimer = useRef(0)
+  const shareFrame = useCallback(() => {
+    // The address bar already carries the current view and camera pose, kept
+    // fresh by the camera rig, so the URL alone is enough to reproduce a view.
+    const url = window.location.href
+    const markCopied = () => {
+      setCopied(true)
+      window.clearTimeout(copiedTimer.current)
+      copiedTimer.current = window.setTimeout(() => setCopied(false), 2400)
+    }
+    if (navigator.canShare?.({ url })) {
+      navigator.share({ url, title: document.title })
+        .catch((error: unknown) => {
+          if ((error as DOMException)?.name === 'AbortError') return
+          navigator.clipboard?.writeText(url).then(markCopied).catch(() => {})
+        })
+    } else {
+      navigator.clipboard?.writeText(url).then(markCopied).catch(() => {})
+    }
+  }, [])
 
   useEffect(() => {
     const onVisibilityChange = () => setTabVisible(!document.hidden)
@@ -394,6 +415,22 @@ function App() {
                   <path d="M9 6l1.2-2h3.6L15 6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
                 <span>{t(locale, 'saveFrameShort')}</span>
+              </button>
+              <span className="view-actions-divider" aria-hidden="true" />
+              <button
+                className="reset-view"
+                type="button"
+                onClick={shareFrame}
+                disabled={!ready}
+                aria-label={t(locale, copied ? 'linkCopied' : 'shareFrame')}
+              >
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <circle cx="6" cy="12" r="2.4" stroke="currentColor" strokeWidth="1.3" />
+                  <circle cx="17" cy="5.5" r="2.4" stroke="currentColor" strokeWidth="1.3" />
+                  <circle cx="17" cy="18.5" r="2.4" stroke="currentColor" strokeWidth="1.3" />
+                  <path d="M8.1 10.9l6.8-4M8.1 13.1l6.8 4" stroke="currentColor" strokeWidth="1.3" />
+                </svg>
+                <span>{copied ? t(locale, 'linkCopied') : t(locale, 'shareFrameShort')}</span>
               </button>
             </div>
           </>
