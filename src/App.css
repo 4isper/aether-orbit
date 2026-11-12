@@ -882,6 +882,20 @@ h1 > em {
   border-top-color: rgba(143, 163, 196, 0.35);
 }
 
+/* The trojan's quiet tag on the overview: named, but not a destination. */
+.system-tag {
+  display: inline-block;
+  padding: 3px 9px;
+  border-top: 1px solid rgba(174, 205, 224, 0.35);
+  color: rgba(199, 214, 223, 0.75);
+  background: rgba(1, 2, 5, 0.35);
+  font-size: 8px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transform: translateY(14px);
+}
+
 .system-label > span {
   font-size: 12px;
   letter-spacing: 0.12em;

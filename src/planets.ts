@@ -11,7 +11,7 @@ export type BodyCopy = {
   description: [string, string]
   metricLabel: string
   metricUnit: string
-  facts: [string, string]
+  facts: readonly string[]
 }
 
 export type BodyInfo = {
@@ -36,7 +36,7 @@ export const planets: Record<PlanetId, BodyInfo> = {
         description: ['На границе света и тени.', 'Новый мир — на расстоянии взгляда.'],
         metricLabel: 'Дистанция',
         metricUnit: 'св. года',
-        facts: ['Авроры у ночных полюсов', 'Транзиты луны по диску Solis'],
+        facts: ['Авроры у ночных полюсов', 'Транзиты луны по диску Solis', 'Троянец впереди на 60° по орбите'],
       },
       en: {
         label: 'Aurelia',
@@ -44,7 +44,7 @@ export const planets: Record<PlanetId, BodyInfo> = {
         description: ['On the border of light and shadow.', 'A new world at the distance of a glance.'],
         metricLabel: 'Distance',
         metricUnit: 'ly',
-        facts: ['Auroras at the night poles', 'Moon transits across Solis'],
+        facts: ['Auroras at the night poles', 'Moon transits across Solis', 'A Trojan 60° ahead along the orbit'],
       },
     },
   },

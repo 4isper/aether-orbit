@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import { Vector3, type Group } from 'three'
 import { bodies, planetIds, planets, type PlanetId } from '../planets'
-import { orbitPoint, planetPosition } from '../orbits'
+import { orbitPoint, planetPosition, trojanPosition } from '../orbits'
 import { cometOrbitPoint, cometPosition } from '../comet'
 import { t, type Locale } from '../strings'
 
@@ -22,6 +22,7 @@ type SystemOverviewProps = {
 export function SystemOverview({ onSelect, timeRef, locale }: SystemOverviewProps) {
   const labelRefs = useRef<Record<PlanetId, Group | null>>({ aurelia: null, cinder: null, vesper: null })
   const cometLabelRef = useRef<Group | null>(null)
+  const trojanLabelRef = useRef<Group | null>(null)
   const scratch = useMemo(() => new Vector3(), [])
   const orbits = useMemo(
     () => planetIds.map((id) => {
@@ -58,12 +59,17 @@ export function SystemOverview({ onSelect, timeRef, locale }: SystemOverviewProp
     () => cometPosition(0, new Vector3()).toArray() as [number, number, number],
     [],
   )
+  const initialTrojanPosition = useMemo(
+    () => trojanPosition(0, new Vector3()).toArray() as [number, number, number],
+    [],
+  )
 
   useFrame(() => {
     for (const id of planetIds) {
       labelRefs.current[id]?.position.copy(planetPosition(id, timeRef.current, scratch))
     }
     cometLabelRef.current?.position.copy(cometPosition(timeRef.current, scratch))
+    trojanLabelRef.current?.position.copy(trojanPosition(timeRef.current, scratch))
   })
 
   return (
@@ -124,6 +130,13 @@ export function SystemOverview({ onSelect, timeRef, locale }: SystemOverviewProp
             <span>{bodies.comet.name}</span>
             <small>{t(locale, 'toComet')}</small>
           </button>
+        </Html>
+      </group>
+      {/* The trojan is a point of light on Aurelia's line: named, not flown
+        * to — the tag just marks the gravity balance it keeps. */}
+      <group ref={trojanLabelRef} position={initialTrojanPosition}>
+        <Html center zIndexRange={[1, 1]} style={{ pointerEvents: 'none' }}>
+          <span className="system-tag">{t(locale, 'trojanTag')}</span>
         </Html>
       </group>
     </>

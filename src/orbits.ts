@@ -21,8 +21,23 @@ export function orbitPoint(id: PlanetId, angle: number, target: Vector3) {
 }
 
 export function planetPosition(id: PlanetId, time: number, target: Vector3) {
-  const { speed, phase } = orbitConfig[id]
-  return orbitPoint(id, phase + time * speed, target)
+  return orbitPoint(id, planetAngle(id, time), target)
+}
+
+/** Angle on a planet's circular orbit at simulation time — the same angle
+ * orbitPoint and planetPosition parametrize. */
+export function planetAngle(id: PlanetId, time: number) {
+  return orbitConfig[id].phase + time * orbitConfig[id].speed
+}
+
+/**
+ * Aurelia's L4 trojan: a captive of the gravity balance, riding the same
+ * orbit sixty degrees ahead of the planet, forever leading it around Solis.
+ */
+export const TROJAN_LEAD_ANGLE = Math.PI / 3
+
+export function trojanPosition(time: number, target: Vector3) {
+  return orbitPoint('aurelia', planetAngle('aurelia', time) + TROJAN_LEAD_ANGLE, target)
 }
 
 /** Orbital period of a planet, in time units. */
