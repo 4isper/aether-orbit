@@ -103,6 +103,9 @@ type SpaceSceneProps = {
   destination: SceneView
   initialView: SceneView
   initialPose?: CameraPose | null
+  /** Restored shared moment: the deep-linked t= parameter, seconds on the
+   * deterministic clock. Everything derived from the clock lands on it. */
+  initialTime?: number | null
   timeScale: number
   locale: Locale
   reducedMotion: boolean
@@ -110,20 +113,20 @@ type SpaceSceneProps = {
   freeFlight: boolean
   onReady: () => void
   onArrive: (view: SceneView) => void
-  onSharePose: (view: SceneView, pose: CameraPose) => void
+  onSharePose: (view: SceneView, pose: CameraPose, time: number) => void
   onSelect: (view: SceneView) => void
   onEvent?: (announcement: EventAnnouncement | null) => void
   onFlightTelemetry?: (telemetry: FlightTelemetry) => void
 }
 
-export function SpaceScene({ activeView, destination, initialView, initialPose, timeScale, locale, reducedMotion, lowEnd = false, freeFlight, onReady, onArrive, onSharePose, onSelect, onEvent, onFlightTelemetry }: SpaceSceneProps) {
+export function SpaceScene({ activeView, destination, initialView, initialPose, initialTime, timeScale, locale, reducedMotion, lowEnd = false, freeFlight, onReady, onArrive, onSharePose, onSelect, onEvent, onFlightTelemetry }: SpaceSceneProps) {
   const gl = useThree((state) => state.gl)
   const [hovered, setHovered] = useState(false)
   const travelling = activeView !== destination
   const overview = activeView === 'system' && !travelling
   useCursor(overview && hovered, 'pointer', travelling ? 'progress' : overview ? 'default' : 'grab', gl.domElement)
 
-  const orbitTime = useRef(0)
+  const orbitTime = useRef(initialTime ?? 0)
   const moonWorld = useRef(new Vector3())
   const groupRefs = useRef<Record<PlanetId, Group | null>>({ aurelia: null, cinder: null, vesper: null })
   const scratch = useMemo(() => new Vector3(), [])

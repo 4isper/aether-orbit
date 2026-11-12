@@ -41,7 +41,7 @@ type CameraRigProps = {
   /** Free-flight mode: the camera detaches from the bodies and flies by hand. */
   freeFlight: boolean
   onArrive: (view: SceneView) => void
-  sharePose?: (view: SceneView, pose: CameraPose) => void
+  sharePose?: (view: SceneView, pose: CameraPose, time: number) => void
   /** Throttled free-flight readout for the HUD (null-capable consumers). */
   onFlightTelemetry?: (telemetry: FlightTelemetry) => void
   timeRef: { current: number }
@@ -526,7 +526,7 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
         || Math.abs(pose.zoom - last.zoom) > 0.05
       ) {
         sharedPose.current = { ...pose }
-        sharePose(currentView.current, pose)
+        sharePose(currentView.current, pose, timeRef.current)
       }
     }
     const introEase = 1 - Math.pow(1 - intro.current, 3)

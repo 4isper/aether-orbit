@@ -3,7 +3,8 @@ import { SceneErrorBoundary } from './SceneErrorBoundary'
 import { bodies, planetIds, type SceneView } from './planets'
 import type { EventAnnouncement } from './components/SpaceScene'
 import type { FlightTelemetry } from './components/CameraRig'
-import { parsePose, poseParams, type CameraPose } from './camera-math'
+import { parsePose, type CameraPose } from './camera-math'
+import { deepLinkUrl, parseTimeParam } from './deep-link'
 import { readStoredLocale, storeLocale, t, type Locale, type StringKey } from './strings'
 import { isAmbienceOn, readStoredAmbience, setAmbience, storeAmbience } from './audio'
 import './App.css'
@@ -26,10 +27,9 @@ function readInitialPose(): CameraPose | null {
   return parsePose(new URLSearchParams(window.location.search))
 }
 
-function urlFor(view: SceneView, pose?: CameraPose) {
-  const suffix = pose ? `?${poseParams(pose)}` : ''
-  if (view === 'aurelia') return suffix ? `/${suffix}` : '/'
-  return pose ? `/?view=${view}&${poseParams(pose)}` : `/?view=${view}`
+/** Deep link support: ?t=… restores the shared simulation moment. */
+function readInitialTime(): number | null {
+  return parseTimeParam(new URLSearchParams(window.location.search))
 }
 
 function formatSpeed(speed: number) {
@@ -94,6 +94,7 @@ function useReducedMotion() {
 function App() {
   const [initialView] = useState(readInitialView)
   const [initialPose] = useState(readInitialPose)
+  const [initialTime] = useState(readInitialTime)
   const [locale, setLocale] = useState<Locale>(readStoredLocale)
   const [ready, setReady] = useState(false)
   const [webglSupported] = useState(detectWebGLSupport)
@@ -112,10 +113,13 @@ function App() {
   const handleReady = useCallback(() => setReady(true), [])
   const handleArrive = useCallback((arrived: SceneView) => {
     setActiveView(arrived)
-    window.history.replaceState(null, '', urlFor(arrived))
+    window.history.replaceState(null, '', deepLinkUrl(arrived))
   }, [])
-  const handleSharePose = useCallback((view: SceneView, pose: CameraPose) => {
-    window.history.replaceState(null, '', urlFor(view, pose))
+  // The last shared framing, so "jump to the event" can keep it in the URL.
+  const poseRef = useRef<CameraPose | null>(initialPose)
+  const handleSharePose = useCallback((view: SceneView, pose: CameraPose, time: number) => {
+    poseRef.current = pose
+    window.history.replaceState(null, '', deepLinkUrl(view, pose, time))
   }, [])
   const handleEvent = useCallback((announcement: EventAnnouncement | null) => {
     setEvent(announcement)
@@ -127,7 +131,10 @@ function App() {
   const seekToEvent = useCallback(() => {
     if (!event) return
     window.dispatchEvent(new CustomEvent('aether:seek', { detail: { time: event.peakAt } }))
-  }, [event])
+    // The address bar carries the jumped-to moment too, so a copy right after
+    // the leap still reproduces the frame; the pose is the last shared one.
+    window.history.replaceState(null, '', deepLinkUrl(activeView, poseRef.current, event.peakAt))
+  }, [event, activeView])
   const travelTo = useCallback((next: SceneView) => {
     if (!ready) return
     setTour(false)
@@ -287,6 +294,7 @@ function App() {
               destination={destination}
               initialView={initialView}
               initialPose={initialPose}
+              initialTime={initialTime}
               timeScale={timeScale}
                 locale={locale}
                 reducedMotion={reducedMotion}

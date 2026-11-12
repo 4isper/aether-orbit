@@ -23,13 +23,14 @@ type SceneCanvasProps = {
   destination: SceneView
   initialView: SceneView
   initialPose?: CameraPose | null
+  initialTime?: number | null
   timeScale: number
   locale: Locale
   reducedMotion: boolean
   freeFlight: boolean
   onReady: () => void
   onArrive: (view: SceneView) => void
-  onSharePose: (view: SceneView, pose: CameraPose) => void
+  onSharePose: (view: SceneView, pose: CameraPose, time: number) => void
   onSelect: (view: SceneView) => void
   onEvent?: (announcement: EventAnnouncement | null) => void
   onFlightTelemetry?: (telemetry: FlightTelemetry) => void
@@ -41,6 +42,7 @@ export default function SceneCanvas({
   destination,
   initialView,
   initialPose,
+  initialTime,
   timeScale,
   locale,
   reducedMotion,
@@ -98,6 +100,7 @@ export default function SceneCanvas({
             destination={destination}
             initialView={initialView}
             initialPose={initialPose}
+            initialTime={initialTime}
             timeScale={timeScale}
             locale={locale}
             reducedMotion={reducedMotion}
