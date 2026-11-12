@@ -66,6 +66,14 @@ const ru = {
   errorBody: 'Произошла ошибка во время инициализации сцены. Перезагрузите страницу — если не поможет, проверьте поддержку WebGL и видеодрайвер.',
   moon: 'Луна',
   localeSwitch: 'Переключить язык интерфейса',
+  shortcutsTitle: 'Горячие клавиши',
+  shortcutsClose: 'Закрыть справку',
+  shortcutViews: 'Aurelia · Cinder · Vesper · Solis · Boreas · обзор',
+  shortcutPause: 'Остановить и возобновить время',
+  shortcutReset: 'Сбросить ракурс',
+  shortcutCinema: 'Режим кино: скрыть интерфейс',
+  shortcutHelp: 'Эта справка',
+  shortcutsHint: 'Клавиши',
 }
 
 export type StringKey = keyof typeof ru
@@ -129,6 +137,14 @@ const en: Record<StringKey, string> = {
   errorBody: 'Something went wrong while initializing the scene. Reload the page - if that does not help, check WebGL support and the graphics driver.',
   moon: 'Moon',
   localeSwitch: 'Switch the interface language',
+  shortcutsTitle: 'Keyboard shortcuts',
+  shortcutsClose: 'Close the shortcuts',
+  shortcutViews: 'Aurelia · Cinder · Vesper · Solis · Boreas · overview',
+  shortcutPause: 'Pause and resume time',
+  shortcutReset: 'Reset the camera pose',
+  shortcutCinema: 'Cinema mode: hide the interface',
+  shortcutHelp: 'This help',
+  shortcutsHint: 'Keys',
 }
 
 export const strings: Record<Locale, Record<StringKey, string>> = { ru, en }

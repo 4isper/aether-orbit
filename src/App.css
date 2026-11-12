@@ -391,6 +391,16 @@ h1 > em {
   color: rgba(202, 218, 227, 0.65);
 }
 
+.footer-keys {
+  white-space: nowrap;
+}
+
+@media (pointer: coarse) {
+  .footer-keys {
+    display: none;
+  }
+}
+
 .footer a:focus-visible {
   outline: 1px solid rgba(174, 205, 224, 0.35);
   outline-offset: 4px;
@@ -853,6 +863,85 @@ h1 > em {
 .webgl-fallback-hint {
   margin-top: 14px;
   color: rgba(199, 214, 223, 0.35);
+}
+
+.shortcuts-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  display: grid;
+  place-items: center;
+  background: rgba(1, 2, 5, 0.78);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.shortcuts-card {
+  position: relative;
+  max-width: 430px;
+  margin: 24px;
+  padding: 26px 30px;
+  border: 1px solid rgba(150, 180, 200, 0.16);
+  background: rgba(4, 8, 14, 0.92);
+  color: rgba(206, 222, 231, 0.62);
+}
+
+.shortcuts-card h2 {
+  margin: 0 0 16px;
+  color: rgba(229, 238, 243, 0.85);
+  font-size: 15px;
+  font-weight: 300;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.shortcuts-list {
+  margin: 0;
+}
+
+.shortcuts-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 24px;
+  padding: 8px 0;
+  border-bottom: 1px dashed rgba(150, 180, 200, 0.12);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+}
+
+.shortcuts-row:last-child {
+  border-bottom: 0;
+}
+
+.shortcuts-row dd {
+  margin: 0;
+}
+
+.shortcuts-row kbd {
+  font: inherit;
+  padding: 2px 8px;
+  border: 1px solid rgba(199, 214, 223, 0.25);
+  border-radius: 3px;
+  color: rgba(229, 238, 243, 0.8);
+  white-space: nowrap;
+}
+
+.shortcuts-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  padding: 4px 8px;
+  border: 0;
+  background: transparent;
+  color: rgba(199, 214, 223, 0.45);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.shortcuts-close:hover {
+  color: rgba(229, 238, 243, 0.8);
 }
 
 .sr-only {

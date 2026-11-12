@@ -2,7 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
 import { SceneErrorBoundary } from './SceneErrorBoundary'
 import { bodies, planetIds, type SceneView } from './planets'
 import { parsePose, poseParams, type CameraPose } from './camera-math'
-import { readStoredLocale, storeLocale, t, type Locale } from './strings'
+import { readStoredLocale, storeLocale, t, type Locale, type StringKey } from './strings'
 import './App.css'
 
 const SceneCanvas = lazy(() => import('./SceneCanvas'))
@@ -32,6 +32,15 @@ function urlFor(view: SceneView, pose?: CameraPose) {
 function formatSpeed(speed: number) {
   return speed === 0.5 ? '½' : String(speed)
 }
+
+/** Rows of the "?" help dialog, in the order users will scan them. */
+const SHORTCUT_ROWS: Array<{ keys: string; label: StringKey }> = [
+  { keys: '1–6', label: 'shortcutViews' },
+  { keys: 'Space', label: 'shortcutPause' },
+  { keys: 'R', label: 'shortcutReset' },
+  { keys: 'H', label: 'shortcutCinema' },
+  { keys: '?', label: 'shortcutHelp' },
+]
 
 function detectWebGLSupport() {
   try {
@@ -106,6 +115,7 @@ function App() {
   const [reversed, setReversed] = useState(false)
   const [tour, setTour] = useState(false)
   const [cinema, setCinema] = useState(false)
+  const [help, setHelp] = useState(false)
   const [tabVisible, setTabVisible] = useState(() => !document.hidden)
   const timeScale = paused ? 0 : reversed ? -speed : speed
 
@@ -164,11 +174,31 @@ function App() {
     const onKey = (event: KeyboardEvent) => {
       const key = event.key.toLowerCase()
       if (key === 'h' || key === 'р') setCinema((value) => !value)
-      if (event.key === 'Escape') setCinema(false)
+      if (event.key === 'Escape') {
+        setCinema(false)
+        setHelp(false)
+      }
+      if (event.key === '?') setHelp((value) => !value)
+      // Space and digits must not hijack an interactive element that has
+      // focus: buttons already activate on Space.
+      const target = event.target as HTMLElement | null
+      const onControl = Boolean(
+        target
+          && (['BUTTON', 'A', 'INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName)
+            || target.isContentEditable),
+      )
+      if (!onControl && event.key === ' ' && !event.repeat) {
+        event.preventDefault()
+        setPaused((value) => !value)
+      }
+      if (!onControl && /^[1-6]$/.test(event.key)) {
+        const view = SCENE_VIEWS[Number(event.key) - 1]
+        if (view) travelTo(view)
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  }, [travelTo])
 
   useEffect(() => {
     if (!tour || !ready || travelling || !tabVisible) return
@@ -455,8 +485,41 @@ function App() {
             CC BY 4.0
           </a>
           <span>{body ? `${body.code} / ${body.name}` : 'SYS / Aether'}</span>
+          <span className="footer-keys">{t(locale, 'shortcutsHint')} · 1–6 · Space · R · H · ?</span>
         </footer>
       </div>
+
+      {help && (
+        <div
+          className="shortcuts-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="shortcuts-title"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setHelp(false)
+          }}
+        >
+          <div className="shortcuts-card">
+            <button
+              type="button"
+              className="shortcuts-close"
+              aria-label={t(locale, 'shortcutsClose')}
+              onClick={() => setHelp(false)}
+            >
+              ×
+            </button>
+            <h2 id="shortcuts-title">{t(locale, 'shortcutsTitle')}</h2>
+            <dl className="shortcuts-list">
+              {SHORTCUT_ROWS.map((row) => (
+                <div className="shortcuts-row" key={row.label}>
+                  <dt>{t(locale, row.label)}</dt>
+                  <dd><kbd>{row.keys}</kbd></dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        </div>
+      )}
 
       <div className="loader" aria-hidden={ready}>
         <div className="loader-inner">
