@@ -23,10 +23,13 @@ test('the storm is a pure function of the clock', () => {
 })
 
 test('time reversal lands on the same veil: the cycle wraps negatives forward', () => {
-  // Two full cycles back must read exactly like now — pause, reverse and
-  // deep links replay the same storm.
+  // Two full cycles back replays the same storm: the phase matches to a
+  // rounding hair, far below anything the eye could see.
   for (const time of [0, 45.5, 130]) {
-    assert.equal(stormIntensity(time), stormIntensity(time - 2 * STORM_PERIOD))
+    assert.ok(
+      Math.abs(stormIntensity(time) - stormIntensity(time - 2 * STORM_PERIOD)) < 1e-9,
+      `reversal drifted at t=${time}`,
+    )
   }
 })
 

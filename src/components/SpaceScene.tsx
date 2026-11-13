@@ -21,6 +21,7 @@ import { planetPosition } from '../orbits'
 import { nextEclipse, nextTransit, type TransitEvent } from '../eclipse'
 import { nextConjunction } from '../conjunction'
 import { nextPerihelion } from '../comet'
+import { nextShower } from '../meteors'
 import { nextStorm } from '../storms'
 import type { CameraPose } from '../camera-math'
 import type { FlightTelemetry } from './CameraRig'
@@ -65,7 +66,7 @@ function ComposerCapture() {
 
 /** What the interface needs to announce an event: which one, a countdown
  * and the absolute peak time the "skip to the moment" button seeks to. */
-export type EventKind = 'transit' | 'eclipse' | 'perihelion' | 'conjunction' | 'storm'
+export type EventKind = 'transit' | 'eclipse' | 'perihelion' | 'conjunction' | 'storm' | 'shower'
 export type EventAnnouncement = {
   kind: EventKind
   seconds: number
@@ -95,13 +96,13 @@ function soonestMoment(moments: (EventAnnouncement | null)[]): EventAnnouncement
   }, null)
 }
 
-/** One event per view, each on the view where the sky actually shows it:
- * the transit shadow belongs to Aurelia's orbit, the eclipse darkens Nox,
- * the periapsis flares on the comet, the conjunctions line up on the views
- * of the outer watcher (Cinder sees Vesper hide behind Solis, Vesper sees
- * Aurelia cross the disc). The desert also owns its own weather: a dust
- * storm competes with the occultation, and the nearer moment wins. */
-function sceneEvent(view: SceneView, now: number): EventAnnouncement | null {
+/** One own event per view, each on the view where the sky actually shows
+ * it: the transit shadow belongs to Aurelia's orbit, the eclipse darkens
+ * Nox, the periapsis flares on the comet, the conjunctions line up on the
+ * views of the outer watcher (Cinder sees Vesper hide behind Solis, Vesper
+ * sees Aurelia cross the disc). The desert also owns its own weather: a
+ * dust storm competes with the occultation, and the nearer moment wins. */
+function viewMoment(view: SceneView, now: number): EventAnnouncement | null {
   const shadowEvent = view === 'aurelia'
     ? nextTransit(now)
     : view === 'moon'
@@ -119,6 +120,15 @@ function sceneEvent(view: SceneView, now: number): EventAnnouncement | null {
   }
   if (view === 'vesper') return announce('conjunction', nextConjunction(view, 'aurelia', now), now)
   return null
+}
+
+/** The chip's moment: the view's own sky plus the shower — the one sky
+ * event that rains on every view — and the nearer of them wins. */
+function sceneEvent(view: SceneView, now: number): EventAnnouncement | null {
+  return soonestMoment([
+    viewMoment(view, now),
+    announce('shower', nextShower(now), now),
+  ])
 }
 
 type SpaceSceneProps = {

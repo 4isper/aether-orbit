@@ -1,7 +1,7 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { AdditiveBlending, Vector3, type BufferAttribute, type ShaderMaterial } from 'three'
-import { meteorAlpha, meteorPhase, meteorPoint } from '../meteors'
+import { SHOWER_SLOTS, meteorAlpha, meteorPhase, meteorPoint, showerIntensity, showerMeteor } from '../meteors'
 
 const meteorVertex = /* glsl */ `
 attribute float aSize;
@@ -29,8 +29,8 @@ void main() {
 }
 `
 
-// Three slots with desynced cycles: usually nothing, occasionally one or two
-// streaks — the sky stays quiet, it just blinks once in a while.
+// Three ambient slots with desynced cycles: usually nothing, occasionally
+// one or two streaks — the sky stays quiet, it just blinks once in a while.
 const SLOTS = [9127, 3313, 7717]
 const TRAIL_SAMPLES = 7
 
@@ -42,11 +42,11 @@ export function Meteors({ timeScale }: { timeScale: number }) {
   const point = useMemo(() => new Vector3(), [])
 
   const buffers = useMemo(() => {
-    const count = SLOTS.length * TRAIL_SAMPLES
+    const count = (SLOTS.length + SHOWER_SLOTS.length) * TRAIL_SAMPLES
     const positions = new Float32Array(count * 3)
     const alphas = new Float32Array(count)
     const sizes = new Float32Array(count)
-    for (let slot = 0; slot < SLOTS.length; slot++) {
+    for (let slot = 0; slot < SLOTS.length + SHOWER_SLOTS.length; slot++) {
       for (let sample = 0; sample < TRAIL_SAMPLES; sample++) {
         sizes[slot * TRAIL_SAMPLES + sample] = 1.6 - (sample / (TRAIL_SAMPLES - 1)) * 1.2
       }
@@ -70,8 +70,8 @@ export function Meteors({ timeScale }: { timeScale: number }) {
     clock.current += Math.min(rawDelta, 0.1) * timeScale
     const positions = positionAttr.array as Float32Array
     const alphas = alphaAttr.array as Float32Array
-    for (let slot = 0; slot < SLOTS.length; slot++) {
-      const phase = meteorPhase(SLOTS[slot], clock.current)
+
+    const fillTrail = (slot: number, phase: ReturnType<typeof meteorPhase>, strength: number) => {
       const trailStep = (phase.life * 0.35) / (TRAIL_SAMPLES - 1)
       const headAge = Math.min(Math.max(phase.age, 0), phase.life)
       for (let sample = 0; sample < TRAIL_SAMPLES; sample++) {
@@ -82,8 +82,21 @@ export function Meteors({ timeScale }: { timeScale: number }) {
         positions[index * 3 + 1] = point.y
         positions[index * 3 + 2] = point.z
         alphas[index] =
-          meteorAlpha(phase.age, phase.life) * (1 - sample / (TRAIL_SAMPLES - 1))
+          strength * meteorAlpha(phase.age, phase.life) * (1 - sample / (TRAIL_SAMPLES - 1))
       }
+    }
+
+    for (let slot = 0; slot < SLOTS.length; slot++) {
+      fillTrail(slot, meteorPhase(SLOTS[slot], clock.current), 1)
+    }
+    // The rain streams from one radiant, thick and thinning with the veil.
+    const rain = showerIntensity(clock.current)
+    for (let slot = 0; slot < SHOWER_SLOTS.length; slot++) {
+      fillTrail(
+        SLOTS.length + slot,
+        showerMeteor(SHOWER_SLOTS[slot], clock.current),
+        rain,
+      )
     }
     positionAttr.needsUpdate = true
     alphaAttr.needsUpdate = true

@@ -373,7 +373,7 @@ function App() {
             copied={copied}
           />
         ) : (
-          <SystemPanel locale={locale} travelling={travelling} />
+          <SystemPanel locale={locale} travelling={travelling} ready={ready} event={event} onSeekEvent={seekToEvent} />
         )}
 
         <footer className="footer reveal">
