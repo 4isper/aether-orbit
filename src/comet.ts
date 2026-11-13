@@ -1,4 +1,5 @@
 import { Vector3 } from 'three'
+import { createKeplerOrbit } from './kepler.ts'
 
 export const cometOrbit = {
   periapsis: 4.6,
@@ -9,37 +10,18 @@ export const cometOrbit = {
   meanAnomalyAtZero: 2.2,
 }
 
-const semiMajor = (cometOrbit.periapsis + cometOrbit.apoapsis) / 2
-const eccentricity = (cometOrbit.apoapsis - cometOrbit.periapsis) / (cometOrbit.apoapsis + cometOrbit.periapsis)
-const meanMotion = (Math.PI * 2) / cometOrbit.period
+const comet = createKeplerOrbit(cometOrbit)
 
 /**
- * Position on the comet's ellipse for a given mean anomaly. Kepler's equation
- * is solved with Newton iterations; eccentricity stays below 0.8 so this
- * converges everywhere.
+ * Position on the comet's ellipse for a given mean anomaly — the shared
+ * Kepler machinery of kepler.ts, aimed at Boreas's elements.
  */
 export function cometOrbitPoint(meanAnomaly: number, target: Vector3) {
-  const normalized = meanAnomaly % (Math.PI * 2)
-  let eccentric = normalized
-  for (let i = 0; i < 10; i++) {
-    eccentric -= (eccentric - eccentricity * Math.sin(eccentric) - normalized)
-      / (1 - eccentricity * Math.cos(eccentric))
-  }
-
-  const planeX = semiMajor * (Math.cos(eccentric) - eccentricity)
-  const planeY = semiMajor * Math.sqrt(1 - eccentricity * eccentricity) * Math.sin(eccentric)
-  const cosW = Math.cos(cometOrbit.argumentOfPeriapsis)
-  const sinW = Math.sin(cometOrbit.argumentOfPeriapsis)
-  const rotatedX = planeX * cosW - planeY * sinW
-  const rotatedY = planeX * sinW + planeY * cosW
-  const cosI = Math.cos(cometOrbit.inclination)
-  const sinI = Math.sin(cometOrbit.inclination)
-
-  return target.set(rotatedX, rotatedY * sinI, rotatedY * cosI)
+  return comet.orbitPoint(meanAnomaly, target)
 }
 
 export function cometPosition(time: number, target: Vector3) {
-  return cometOrbitPoint(cometOrbit.meanAnomalyAtZero + meanMotion * time, target)
+  return comet.position(time, target)
 }
 
 /**
@@ -60,33 +42,13 @@ export type PerihelionEvent = {
   inProgress: boolean
 }
 
-// r = a(1 − e·cosE) crosses PERIHELION_RADIUS at ±E*, swept in mean anomaly
-// by M* = E* − e·sinE* (Kepler's equation, monotone for e < 1). The window is
-// symmetric around the periapsis, so it follows analytically — no scan.
-const windowCosine = (1 - PERIHELION_RADIUS / semiMajor) / eccentricity
-const windowEccentric = Math.acos(Math.max(-1, Math.min(1, windowCosine)))
-const windowMean = windowEccentric - eccentricity * Math.sin(windowEccentric)
-const WINDOW_HALF = windowMean / meanMotion
-
-function TWO_PI_MOD(angle: number) {
-  return ((angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)
-}
-
 /**
  * The next periapsis passage at or after `now`, with the blaze window around
  * it. Pure arithmetic on the orbit constants: perihelia repeat on the period,
  * so the scan machinery of eclipse.ts would be wasted here.
  */
 export function nextPerihelion(now: number): PerihelionEvent {
-  const meanNow = cometOrbit.meanAnomalyAtZero + meanMotion * now
-  const delta = TWO_PI_MOD(-meanNow) / meanMotion
-  const peak = now + delta
-  return {
-    entry: peak - WINDOW_HALF,
-    peak,
-    exit: peak + WINDOW_HALF,
-    inProgress: now >= peak - WINDOW_HALF && now <= peak + WINDOW_HALF,
-  }
+  return comet.periapsisWindow(PERIHELION_RADIUS, now)
 }
 
 const scratchAntiSun = new Vector3()

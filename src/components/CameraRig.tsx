@@ -4,6 +4,7 @@ import { MathUtils, Vector3, type PerspectiveCamera } from 'three'
 import { type SceneView } from '../planets'
 import { beltAnchorPosition, planetPosition } from '../orbits'
 import { cometPosition } from '../comet'
+import { erebusPosition } from '../erebus'
 import {
   clampPose,
   computeOverviewPose,
@@ -427,6 +428,8 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
           // The belt has no body: the camera settles onto a drifting anchor
           // that rides the middle ring with the rocks around it.
           beltAnchorPosition(time, journey.endLook)
+        } else if (destination === 'erebus') {
+          erebusPosition(time, journey.endLook)
         } else {
           planetPosition(destination, time, journey.endLook)
         }
@@ -556,6 +559,8 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
       scratch.copy(moonWorldRef.current)
     } else if (currentView.current === 'belt') {
       beltAnchorPosition(time, scratch)
+    } else if (currentView.current === 'erebus') {
+      erebusPosition(time, scratch)
     } else {
       planetPosition(currentView.current, time, scratch)
     }

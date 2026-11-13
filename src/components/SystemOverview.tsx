@@ -5,6 +5,7 @@ import { Vector3, type Group } from 'three'
 import { bodies, planetIds, planets, type PlanetId } from '../planets'
 import { orbitPoint, planetPosition, trojanPosition } from '../orbits'
 import { cometOrbitPoint, cometPosition } from '../comet'
+import { erebusOrbitPoint, erebusPosition } from '../erebus'
 import { t, type Locale } from '../strings'
 
 const guideColors: Record<PlanetId, string> = {
@@ -14,7 +15,7 @@ const guideColors: Record<PlanetId, string> = {
 }
 
 type SystemOverviewProps = {
-  onSelect: (id: PlanetId | 'comet') => void
+  onSelect: (id: PlanetId | 'comet' | 'erebus') => void
   timeRef: { current: number }
   locale: Locale
 }
@@ -22,6 +23,7 @@ type SystemOverviewProps = {
 export function SystemOverview({ onSelect, timeRef, locale }: SystemOverviewProps) {
   const labelRefs = useRef<Record<PlanetId, Group | null>>({ aurelia: null, cinder: null, vesper: null })
   const cometLabelRef = useRef<Group | null>(null)
+  const erebusLabelRef = useRef<Group | null>(null)
   const trojanLabelRef = useRef<Group | null>(null)
   const scratch = useMemo(() => new Vector3(), [])
   const orbits = useMemo(
@@ -51,12 +53,27 @@ export function SystemOverview({ onSelect, timeRef, locale }: SystemOverviewProp
     }
     return points
   }, [])
+  const erebusOrbitLine = useMemo(() => {
+    const points = new Float32Array(160 * 3)
+    const scratch = new Vector3()
+    for (let i = 0; i < 160; i++) {
+      erebusOrbitPoint((i / 160) * Math.PI * 2, scratch)
+      points[i * 3] = scratch.x
+      points[i * 3 + 1] = scratch.y
+      points[i * 3 + 2] = scratch.z
+    }
+    return points
+  }, [])
   const initialPositions = useMemo(
     () => planetIds.map((id) => planetPosition(id, 0, new Vector3()).toArray() as [number, number, number]),
     [],
   )
   const initialCometPosition = useMemo(
     () => cometPosition(0, new Vector3()).toArray() as [number, number, number],
+    [],
+  )
+  const initialErebusPosition = useMemo(
+    () => erebusPosition(0, new Vector3()).toArray() as [number, number, number],
     [],
   )
   const initialTrojanPosition = useMemo(
@@ -69,6 +86,7 @@ export function SystemOverview({ onSelect, timeRef, locale }: SystemOverviewProp
       labelRefs.current[id]?.position.copy(planetPosition(id, timeRef.current, scratch))
     }
     cometLabelRef.current?.position.copy(cometPosition(timeRef.current, scratch))
+    erebusLabelRef.current?.position.copy(erebusPosition(timeRef.current, scratch))
     trojanLabelRef.current?.position.copy(trojanPosition(timeRef.current, scratch))
   })
 
@@ -95,6 +113,17 @@ export function SystemOverview({ onSelect, timeRef, locale }: SystemOverviewProp
           color="#8fa3b8"
           transparent
           opacity={0.22}
+          depthWrite={false}
+        />
+      </lineLoop>
+      <lineLoop>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[erebusOrbitLine, 3]} />
+        </bufferGeometry>
+        <lineBasicMaterial
+          color="#7d8ba0"
+          transparent
+          opacity={0.18}
           depthWrite={false}
         />
       </lineLoop>
@@ -129,6 +158,20 @@ export function SystemOverview({ onSelect, timeRef, locale }: SystemOverviewProp
             <small>{bodies.comet.code}</small>
             <span>{bodies.comet.name}</span>
             <small>{t(locale, 'toComet')}</small>
+          </button>
+        </Html>
+      </group>
+      <group ref={erebusLabelRef} position={initialErebusPosition}>
+        <Html center zIndexRange={[1, 1]} style={{ pointerEvents: 'none' }}>
+          <button
+            type="button"
+            className="system-label system-label--erebus"
+            aria-label={t(locale, 'explorePlanet', { name: bodies.erebus.name })}
+            onClick={() => onSelect('erebus')}
+          >
+            <small>{bodies.erebus.code}</small>
+            <span>{bodies.erebus.name}</span>
+            <small>{t(locale, 'toOrbit')}</small>
           </button>
         </Html>
       </group>

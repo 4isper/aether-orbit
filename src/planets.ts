@@ -1,7 +1,7 @@
 import type { Locale } from './strings'
 
 export type PlanetId = 'aurelia' | 'cinder' | 'vesper'
-export type SceneView = PlanetId | 'system' | 'star' | 'comet' | 'moon' | 'belt'
+export type SceneView = PlanetId | 'system' | 'star' | 'comet' | 'moon' | 'belt' | 'erebus'
 export const planetIds: PlanetId[] = ['aurelia', 'cinder', 'vesper']
 
 /** Locale-bound copy of a body: what the interface says about it. */
@@ -198,6 +198,31 @@ export const beltInfo: BodyInfo = {
   },
 }
 
+export const erebusInfo: BodyInfo = {
+  name: 'Erebus',
+  code: '006',
+  radius: '0.98',
+  metricValue: '520',
+  copy: {
+    ru: {
+      label: 'Эреб',
+      title: ['Дальний', 'сторож'],
+      description: ['Мир, который редко подходит близко.', 'Большую часть года — во тьме за поясом.'],
+      metricLabel: 'Год',
+      metricUnit: 'сут',
+      facts: ['Наклонная орбита за Vesper', 'У перицентра ныряет внутрь орбиты Веспера', 'Мороз на тёмном реголите'],
+    },
+    en: {
+      label: 'Erebus',
+      title: ['The far', 'sentinel'],
+      description: ['A world that rarely comes close.', 'Most of its year is spent dark, past the belt.'],
+      metricLabel: 'Year',
+      metricUnit: 'days',
+      facts: ['Tilted orbit beyond Vesper', 'Dips inside Vesper at periapsis', 'Frost over dark regolith'],
+    },
+  },
+}
+
 /** Telemetry for every flyable destination except the system overview. */
 export const bodies: Record<Exclude<SceneView, 'system'>, BodyInfo> = {
   ...planets,
@@ -205,4 +230,5 @@ export const bodies: Record<Exclude<SceneView, 'system'>, BodyInfo> = {
   comet: cometInfo,
   moon: moonInfo,
   belt: beltInfo,
+  erebus: erebusInfo,
 }

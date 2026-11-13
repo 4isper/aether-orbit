@@ -3,7 +3,7 @@ import { t, type Locale, type StringKey } from '../../strings'
 
 /** Rows of the "?" help dialog, in the order users will scan them. */
 const SHORTCUT_ROWS: Array<{ keys: string; label: StringKey }> = [
-  { keys: '1–8', label: 'shortcutViews' },
+  { keys: '1–9', label: 'shortcutViews' },
   { keys: 'Space', label: 'shortcutPause' },
   { keys: 'WASD', label: 'shortcutFree' },
   { keys: 'R', label: 'shortcutReset' },

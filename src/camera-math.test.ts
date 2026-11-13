@@ -24,6 +24,7 @@ import {
 import { planetIds } from './planets.ts'
 import { planetPosition } from './orbits.ts'
 import { cometPosition } from './comet.ts'
+import { erebusPosition } from './erebus.ts'
 import { moonWorldPosition } from './eclipse.ts'
 
 const center = new Vector3(-1.8, 0.5, 0)
@@ -314,6 +315,8 @@ test('flight body positions match the scene graph for every body', () => {
       assert.equal(position.distanceTo(moonWorld), 0, 'the moon rides its live world position')
     } else if (id === 'comet') {
       assert.equal(position.distanceTo(cometPosition(140, new Vector3())), 0)
+    } else if (id === 'erebus') {
+      assert.equal(position.distanceTo(erebusPosition(140, new Vector3())), 0)
     } else {
       assert.equal(position.distanceTo(planetPosition(id, 140, new Vector3())), 0)
     }

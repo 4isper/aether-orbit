@@ -102,7 +102,8 @@ test('nextPerihelion lands on the periapsis, strictly ahead', () => {
 
 test('perihelion repeats on the orbit period', () => {
   const first = nextPerihelion(0)
-  const second = nextPerihelion(first.peak + 1)
+  // The next lap is announced once the current blaze window has closed.
+  const second = nextPerihelion(first.exit + 1)
   assert.ok(Math.abs(second.peak - first.peak - cometOrbit.period) < 1e-6, `period drift ${second.peak - first.peak}`)
 })
 
@@ -118,4 +119,13 @@ test('the perihelion window matches the comet actually blazing', () => {
   const after = cometPosition(event.exit + 0.3, new Vector3()).length()
   assert.ok(before > PERIHELION_RADIUS, `before radius ${before}`)
   assert.ok(after > PERIHELION_RADIUS, `after radius ${after}`)
+})
+
+test('the blaze window stays "now" through its second half', () => {
+  const event = nextPerihelion(0)
+  // One second past the peak the comet is still burning: the announcement
+  // must not jump to the next lap's window.
+  const after = nextPerihelion(event.peak + 1)
+  assert.ok(after.inProgress, 'the second half of the blaze window went dark')
+  assert.ok(after.peak < event.peak + 5, 'the peak walked a lap away from the fire')
 })

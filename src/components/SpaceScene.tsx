@@ -7,6 +7,7 @@ import { Backdrop } from './Backdrop'
 import { Belt } from './Belt'
 import { CameraRig } from './CameraRig'
 import { Comet } from './Comet'
+import { Erebus } from './Erebus'
 import { Planet } from './Planet'
 import { Star } from './Star'
 import { Cinder } from './Cinder'
@@ -21,6 +22,7 @@ import { planetPosition } from '../orbits'
 import { nextEclipse, nextTransit, type TransitEvent } from '../eclipse'
 import { nextConjunction } from '../conjunction'
 import { nextPerihelion } from '../comet'
+import { nextErebusPeriapsis } from '../erebus'
 import { nextShower } from '../meteors'
 import { nextStorm } from '../storms'
 import type { CameraPose } from '../camera-math'
@@ -112,6 +114,8 @@ function viewMoment(view: SceneView, now: number): EventAnnouncement | null {
     return announce(view === 'aurelia' ? 'transit' : 'eclipse', shadowEvent, now)
   }
   if (view === 'comet') return announce('perihelion', nextPerihelion(now), now)
+  // The dwarf's plunge past Vesper: rare, so the chip waits for it long.
+  if (view === 'erebus') return announce('perihelion', nextErebusPeriapsis(now), now)
   if (view === 'cinder') {
     return soonestMoment([
       announce('storm', nextStorm(now), now),
@@ -262,6 +266,7 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
       <group ref={(node) => { groupRefs.current.vesper = node }} position={initialPositions[2]} {...planetEvents('vesper')}>
         <Vesper reducedMotion={reducedMotion} timeScale={timeScale} timeRef={orbitTime} />
       </group>
+      <Erebus reducedMotion={reducedMotion} timeScale={timeScale} timeRef={orbitTime} />
       <CameraRig
         initialView={initialView}
         initialPose={initialPose}

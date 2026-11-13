@@ -7,7 +7,7 @@ import type { SceneView } from '../../planets'
 function eventLabel(kind: EventAnnouncement['kind'], view: SceneView): StringKey {
   if (kind === 'transit') return 'eventTransit'
   if (kind === 'eclipse') return 'eventEclipse'
-  if (kind === 'perihelion') return 'eventPerihelion'
+  if (kind === 'perihelion') return view === 'erebus' ? 'eventPerihelionErebus' : 'eventPerihelion'
   if (kind === 'storm') return 'eventStorm'
   if (kind === 'shower') return 'eventShower'
   return view === 'cinder' ? 'eventConjunctionVesper' : 'eventConjunctionAurelia'

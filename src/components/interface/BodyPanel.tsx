@@ -10,6 +10,7 @@ function worldEyebrow(view: SceneView, locale: Locale) {
   if (view === 'comet') return t(locale, 'worldComet')
   if (view === 'moon') return t(locale, 'worldMoon')
   if (view === 'belt') return t(locale, 'worldBelt')
+  if (view === 'erebus') return t(locale, 'worldErebus')
   return t(locale, 'worldExo')
 }
 

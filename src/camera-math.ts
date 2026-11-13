@@ -1,5 +1,6 @@
 import { MathUtils, Vector3 } from 'three'
 import { cometOrbitPoint, cometPosition } from './comet.ts'
+import { erebusPosition } from './erebus.ts'
 import { planetIds, type SceneView } from './planets.ts'
 import { orbitPoint, planetPosition } from './orbits.ts'
 
@@ -9,6 +10,10 @@ export const PLANET_VIEW_DISTANCE = 9
 export const BELT_VIEW_DISTANCE = 5.5
 export const BELT_MIN_ZOOM = 3.6
 export const BELT_MAX_ZOOM = 9
+/** Erebus is a small cold dwarf: the camera hangs close, like at the comet. */
+export const EREBUS_VIEW_DISTANCE = 4.5
+export const EREBUS_MIN_ZOOM = 3.2
+export const EREBUS_MAX_ZOOM = 8
 export const STAR_VIEW_DISTANCE = 11.5
 export const COMET_VIEW_DISTANCE = 3.4
 export const MOON_VIEW_DISTANCE = 1.7
@@ -74,6 +79,7 @@ export function viewZoomBounds(view: SceneView) {
   if (view === 'comet') return { distance: COMET_VIEW_DISTANCE, min: COMET_MIN_ZOOM, max: COMET_MAX_ZOOM }
   if (view === 'moon') return { distance: MOON_VIEW_DISTANCE, min: MOON_MIN_ZOOM, max: MOON_MAX_ZOOM }
   if (view === 'belt') return { distance: BELT_VIEW_DISTANCE, min: BELT_MIN_ZOOM, max: BELT_MAX_ZOOM }
+  if (view === 'erebus') return { distance: EREBUS_VIEW_DISTANCE, min: EREBUS_MIN_ZOOM, max: EREBUS_MAX_ZOOM }
   return { distance: PLANET_VIEW_DISTANCE, min: MIN_ZOOM, max: MAX_ZOOM }
 }
 
@@ -243,13 +249,14 @@ export const FLIGHT_BODY_RADII = {
   vesper: 2.16,
   moon: 0.34,
   comet: 0.14,
+  erebus: 0.55,
 } as const
 
 /** A body the free-flight HUD tracks: every solid destination. The belt is
  * a ring of rocks without a surface, so it is not one of them. */
 export type FlightBodyId = Exclude<SceneView, 'system' | 'belt'>
 
-export const FLIGHT_BODY_IDS: FlightBodyId[] = ['star', 'aurelia', 'cinder', 'vesper', 'moon', 'comet']
+export const FLIGHT_BODY_IDS: FlightBodyId[] = ['star', 'aurelia', 'cinder', 'vesper', 'moon', 'comet', 'erebus']
 
 const nearestScratch = new Vector3()
 
@@ -268,6 +275,7 @@ export function flightBodyPosition(
   if (id === 'star') return target.set(0, 0, 0)
   if (id === 'moon') return target.copy(moonPosition)
   if (id === 'comet') return cometPosition(time, target)
+  if (id === 'erebus') return erebusPosition(time, target)
   return planetPosition(id, time, target)
 }
 

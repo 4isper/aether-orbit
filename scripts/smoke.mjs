@@ -22,7 +22,7 @@ const MIME = {
   '.jpg': 'image/jpeg',
   '.txt': 'text/plain',
 }
-const VIEWS = ['star', 'aurelia', 'cinder', 'vesper', 'belt', 'comet', 'moon', 'system']
+const VIEWS = ['star', 'aurelia', 'cinder', 'vesper', 'belt', 'comet', 'erebus', 'moon', 'system']
 const VIEW_SETTLE_MS = 4000
 
 const server = createServer(async (request, response) => {

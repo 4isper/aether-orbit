@@ -123,6 +123,18 @@ export function PlanetNav({
         <span className="planet-number">{bodies.belt.code}</span>
         {bodies.belt.name}
       </button>
+      <button
+        type="button"
+        className="planet-link planet-link--erebus"
+        aria-pressed={activeView === 'erebus'}
+        aria-label={t(locale, 'flyToErebus')}
+        disabled={disabled}
+        onClick={() => onTravel('erebus')}
+      >
+        <span className="planet-dot" aria-hidden="true" />
+        <span className="planet-number">{bodies.erebus.code}</span>
+        {bodies.erebus.name}
+      </button>
     </nav>
   )
 }

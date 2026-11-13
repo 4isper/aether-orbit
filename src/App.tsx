@@ -18,9 +18,9 @@ import './App.css'
 
 const SceneCanvas = lazy(() => import('./SceneCanvas'))
 
-const TOUR_STOPS: SceneView[] = ['aurelia', 'cinder', 'vesper', 'belt', 'comet', 'star', 'system']
+const TOUR_STOPS: SceneView[] = ['aurelia', 'cinder', 'vesper', 'belt', 'comet', 'erebus', 'star', 'system']
 const TOUR_DWELL_MS = 7000
-const SCENE_VIEWS: SceneView[] = [...planetIds, 'star', 'comet', 'moon', 'belt', 'system']
+const SCENE_VIEWS: SceneView[] = [...planetIds, 'star', 'comet', 'moon', 'belt', 'erebus', 'system']
 
 /** Deep link support: ?view=vesper opens the scene already on that orbit. */
 function readInitialView(): SceneView {
@@ -238,7 +238,7 @@ function App() {
         event.preventDefault()
         setPaused((value) => !value)
       }
-      if (!onControl && /^[1-8]$/.test(event.key)) {
+      if (!onControl && /^[1-9]$/.test(event.key)) {
         const view = SCENE_VIEWS[Number(event.key) - 1]
         if (view) travelTo(view)
       }
@@ -386,7 +386,7 @@ function App() {
             CC BY 4.0
           </a>
           <span>{body ? `${body.code} / ${body.name}` : 'SYS / Aether'}</span>
-          <span className="footer-keys">{t(locale, 'shortcutsHint')} · 1–8 · Space · R · H · ?</span>
+          <span className="footer-keys">{t(locale, 'shortcutsHint')} · 1–9 · Space · R · H · ?</span>
         </footer>
       </div>
 

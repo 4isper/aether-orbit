@@ -654,6 +654,11 @@ h1 > em {
   box-shadow: 0 0 9px rgba(160, 138, 112, 0.16);
 }
 
+.planet-link--erebus .planet-dot {
+  background: radial-gradient(circle at 30% 30%, #c5ccd6, #5c6b80 48%, #171d27 75%);
+  box-shadow: 0 0 9px rgba(120, 138, 165, 0.16);
+}
+
 .experience[data-view="star"] h1 > em {
   color: #e2b98a;
 }
@@ -885,6 +890,11 @@ h1 > em {
 .system-label--comet {
   color: #bcc9dc;
   border-top-color: rgba(143, 163, 196, 0.35);
+}
+
+.system-label--erebus {
+  color: #b8c2cf;
+  border-top-color: rgba(120, 138, 165, 0.35);
 }
 
 /* Names in the void: flight markers answer distant points of light. */
