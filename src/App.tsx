@@ -5,6 +5,7 @@ import type { EventAnnouncement } from './components/SpaceScene'
 import type { FlightTelemetry } from './components/CameraRig'
 import { parsePose, type CameraPose } from './camera-math'
 import { deepLinkUrl, parseTimeParam } from './deep-link'
+import { loadSession, saveSession } from './session'
 import { readStoredLocale, storeLocale, t, type Locale } from './strings'
 import { eventCueTransition, isAmbienceOn, playEventCue, readStoredAmbience, setAmbience, setBoost, storeAmbience } from './audio'
 import { BodyPanel } from './components/interface/BodyPanel'
@@ -22,20 +23,34 @@ const TOUR_STOPS: SceneView[] = ['aurelia', 'cinder', 'vesper', 'belt', 'comet',
 const TOUR_DWELL_MS = 7000
 const SCENE_VIEWS: SceneView[] = [...planetIds, 'star', 'comet', 'moon', 'belt', 'erebus', 'system']
 
-/** Deep link support: ?view=vesper opens the scene already on that orbit. */
+/** Deep link support: ?view=vesper opens the scene already on that orbit.
+ * Without a named view the last session speaks: the visitor returns to
+ * where they left off, like the locale and the ambience do. */
 function readInitialView(): SceneView {
   const param = new URLSearchParams(window.location.search).get('view')
-  return SCENE_VIEWS.includes(param as SceneView) ? (param as SceneView) : 'aurelia'
+  if (SCENE_VIEWS.includes(param as SceneView)) return param as SceneView
+  return loadSession(window.localStorage, SCENE_VIEWS)?.view ?? 'aurelia'
 }
 
-/** Deep link support: ?yaw=…&pitch=…&zoom=… restores the saved camera pose. */
+/** Deep link support: ?yaw=…&pitch=…&zoom=… restores the saved camera pose.
+ * A pose only pairs with a restored view — a deep link that names a body
+ * but no pose starts fresh, not with another body's framing. */
 function readInitialPose(): CameraPose | null {
-  return parsePose(new URLSearchParams(window.location.search))
+  const params = new URLSearchParams(window.location.search)
+  const pose = parsePose(params)
+  if (pose) return pose
+  if (params.get('view')) return null
+  return loadSession(window.localStorage, SCENE_VIEWS)?.pose ?? null
 }
 
-/** Deep link support: ?t=… restores the shared simulation moment. */
+/** Deep link support: ?t=… restores the shared simulation moment, with the
+ * same rule: only alongside a restored view. */
 function readInitialTime(): number | null {
-  return parseTimeParam(new URLSearchParams(window.location.search))
+  const params = new URLSearchParams(window.location.search)
+  const time = parseTimeParam(params)
+  if (time !== null) return time
+  if (params.get('view')) return null
+  return loadSession(window.localStorage, SCENE_VIEWS)?.time ?? null
 }
 
 function detectWebGLSupport() {
@@ -88,12 +103,16 @@ function App() {
   const handleArrive = useCallback((arrived: SceneView) => {
     setActiveView(arrived)
     window.history.replaceState(null, '', deepLinkUrl(arrived))
+    // The session remembers the view the moment the camera lands.
+    saveSession(window.localStorage, { view: arrived })
   }, [])
   // The last shared framing, so "jump to the event" can keep it in the URL.
   const poseRef = useRef<CameraPose | null>(initialPose)
   const handleSharePose = useCallback((view: SceneView, pose: CameraPose, time: number) => {
     poseRef.current = pose
     window.history.replaceState(null, '', deepLinkUrl(view, pose, time))
+    // The session remembers the framing and the moment at the same cadence.
+    saveSession(window.localStorage, { pose, time })
   }, [])
   const [flightInfo, setFlightInfo] = useState<FlightTelemetry | null>(null)
   const handleFlightTelemetry = useCallback((telemetry: FlightTelemetry) => {
@@ -126,6 +145,13 @@ function App() {
   const [help, setHelp] = useState(false)
   const [tabVisible, setTabVisible] = useState(() => !document.hidden)
   const timeScale = paused ? 0 : reversed ? -speed : speed
+
+  useEffect(() => {
+    // The opening view is where the session resumes from: remember it right
+    // away, even if the pilot never moves the camera (no arrival fires for
+    // the view the page opened on).
+    saveSession(window.localStorage, { view: initialView })
+  }, [initialView])
 
   const travelTo = useCallback((next: SceneView) => {
     if (!ready) return

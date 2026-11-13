@@ -116,9 +116,11 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
   const compOffset = useMemo(() => new Vector3(), [])
   const shareTimer = useRef(0)
   const sharedPose = useRef({ yaw: NaN, pitch: NaN, zoom: NaN })
-  // Set when the time scrub moves the clock: the next share window carries
-  // the new moment into the URL even with a still camera.
-  const scrubbed = useRef(false)
+  // Set when a URL share is owed for a reason other than a moving camera:
+  // the first load (no flight ever completes for the opening view), an
+  // arrival, or the time scrub winding the clock. The next share window
+  // carries the framing and the moment even with a still camera.
+  const pendingShare = useRef(true)
   const flightInfoTimer = useRef(0)
   const flightInfoSent = useRef<FlightTelemetry | null>(null)
   const flight = useRef({
@@ -352,7 +354,7 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
     // The time scrub wound the clock without moving the camera: one URL
     // share must still carry the new moment.
     const onScrub = () => {
-      scrubbed.current = true
+      pendingShare.current = true
     }
     window.addEventListener('keydown', onKeyDownMove)
     window.addEventListener('keyup', onKeyUpMove)
@@ -462,6 +464,9 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
       if (progress === 1) {
         journey.active = false
         currentView.current = destination
+        // The arrival itself is a share-worthy moment: the address and the
+        // session learn the framing and the clock within the next window.
+        pendingShare.current = true
         onArrive(destination)
       }
       return
@@ -541,9 +546,9 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
         Math.abs(pose.yaw - last.yaw) > 0.004
         || Math.abs(pose.pitch - last.pitch) > 0.004
         || Math.abs(pose.zoom - last.zoom) > 0.05
-        || scrubbed.current
+        || pendingShare.current
       ) {
-        scrubbed.current = false
+        pendingShare.current = false
         sharedPose.current = { ...pose }
         sharePose(currentView.current, pose, timeRef.current)
       }

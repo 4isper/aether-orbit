@@ -33,6 +33,7 @@ An interactive space scene in the browser: three fictional worlds, cinematic fli
 - **RU / EN** — the interface ships in two languages, a switch in the header, the choice persists between visits.
 - **Keyboard shortcuts** — `Space` pauses time, `1–7` jump to views, `?` opens a shortcut cheat-sheet.
 - **Share button** — copies a link to the exact view, camera pose and simulation moment (`?view=`, `?yaw=&pitch=&zoom=`, `?t=` — the URL contract lives in `deep-link.ts`); the deterministic clock means the link reproduces the sky, not just the framing, and jumping to an event writes the leap target into the address.
+- **Visit restore** — like the locale and the ambience, the last session lives in localStorage (`session.ts`): returning to a bare address opens the scene on the same view, with the same camera pose and moment. Explicit link parameters always win — they override the session piece by piece.
 - **Adaptive quality** — canvas resolution steps between 0.85 and 1.75 DPR based on sustained FPS; the DOM interface stays crisp.
 - **PWA** — the app installs to a home screen and keeps working offline: a manifest and a small service worker cache the shell, hashed chunks and textures (shell network-first, assets cache-first). Registered in production builds only.
 - **Careful-motion mode** — with `prefers-reduced-motion` flights are instant, rotation and star twinkle are disabled.
