@@ -180,6 +180,10 @@ function App() {
       : 'Aether — The Quiet Orbit'
   }, [locale])
   const resetView = useCallback(() => window.dispatchEvent(new Event('aether:reset')), [])
+  // The time scrub's jog wheel: relative nudges land on the shared clock.
+  const scrubTime = useCallback((delta: number) => {
+    window.dispatchEvent(new CustomEvent('aether:scrub', { detail: { delta } }))
+  }, [])
   const saveFrame = useCallback(() => {
     // The scene renders the composed frame and reads it back itself: the
     // drawing buffer is not preserved between frames.
@@ -334,6 +338,7 @@ function App() {
           onReverse={() => setReversed((value) => !value)}
           onSpeed={setSpeed}
           onToggleSound={toggleSound}
+          onScrub={scrubTime}
         />
 
         <div className="flight-status" role="status" aria-live="polite" aria-atomic="true">

@@ -759,6 +759,64 @@ h1 > em {
   letter-spacing: 0.06em;
 }
 
+/* The jog wheel: a quiet track that widens to hold the thumb's play. */
+.time-scrub {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 128px;
+  height: 44px;
+  margin: 0 6px;
+  background: transparent;
+  cursor: ew-resize;
+  pointer-events: auto;
+}
+
+.time-scrub::-webkit-slider-runnable-track {
+  height: 2px;
+  border-radius: 1px;
+  background: linear-gradient(
+    90deg,
+    rgba(122, 169, 199, 0.06),
+    rgba(122, 169, 199, 0.42) 50%,
+    rgba(122, 169, 199, 0.06)
+  );
+}
+
+.time-scrub::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 9px;
+  height: 9px;
+  margin-top: -3.5px;
+  border-radius: 50%;
+  background: #a9c6d8;
+  box-shadow: 0 0 7px rgba(137, 188, 219, 0.45);
+}
+
+.time-scrub::-moz-range-track {
+  height: 2px;
+  border-radius: 1px;
+  background: linear-gradient(
+    90deg,
+    rgba(122, 169, 199, 0.06),
+    rgba(122, 169, 199, 0.42) 50%,
+    rgba(122, 169, 199, 0.06)
+  );
+}
+
+.time-scrub::-moz-range-thumb {
+  width: 9px;
+  height: 9px;
+  border: 0;
+  border-radius: 50%;
+  background: #a9c6d8;
+  box-shadow: 0 0 7px rgba(137, 188, 219, 0.45);
+}
+
+.time-scrub:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
 .speed-option[aria-pressed="true"] {
   border-bottom-color: rgba(184, 207, 222, 0.4);
   color: #d1e0e9;

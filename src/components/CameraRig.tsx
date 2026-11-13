@@ -116,6 +116,9 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
   const compOffset = useMemo(() => new Vector3(), [])
   const shareTimer = useRef(0)
   const sharedPose = useRef({ yaw: NaN, pitch: NaN, zoom: NaN })
+  // Set when the time scrub moves the clock: the next share window carries
+  // the new moment into the URL even with a still camera.
+  const scrubbed = useRef(false)
   const flightInfoTimer = useRef(0)
   const flightInfoSent = useRef<FlightTelemetry | null>(null)
   const flight = useRef({
@@ -346,9 +349,15 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
       // A lost focus must not leave a stuck key thrusting forever.
       free.current.keys.clear()
     }
+    // The time scrub wound the clock without moving the camera: one URL
+    // share must still carry the new moment.
+    const onScrub = () => {
+      scrubbed.current = true
+    }
     window.addEventListener('keydown', onKeyDownMove)
     window.addEventListener('keyup', onKeyUpMove)
     window.addEventListener('blur', onWindowBlur)
+    window.addEventListener('aether:scrub', onScrub)
 
     return () => {
       element.removeEventListener('pointerdown', onPointerDown)
@@ -361,6 +370,7 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
       window.removeEventListener('keydown', onKeyDownMove)
       window.removeEventListener('keyup', onKeyUpMove)
       window.removeEventListener('blur', onWindowBlur)
+      window.removeEventListener('aether:scrub', onScrub)
     }
   }, [gl])
 
@@ -531,7 +541,9 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
         Math.abs(pose.yaw - last.yaw) > 0.004
         || Math.abs(pose.pitch - last.pitch) > 0.004
         || Math.abs(pose.zoom - last.zoom) > 0.05
+        || scrubbed.current
       ) {
+        scrubbed.current = false
         sharedPose.current = { ...pose }
         sharePose(currentView.current, pose, timeRef.current)
       }

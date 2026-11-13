@@ -183,8 +183,19 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
       const time = (event as CustomEvent<{ time?: number }>).detail?.time
       if (Number.isFinite(time)) orbitTime.current = time as number
     }
+    // The time scrub's jog wheel: relative nudges around the current moment,
+    // so the interface never needs the absolute clock to scrub. The URL
+    // share picks the new moment up in CameraRig, which owns the pose.
+    const onScrub = (event: Event) => {
+      const delta = (event as CustomEvent<{ delta?: number }>).detail?.delta
+      if (Number.isFinite(delta)) orbitTime.current += delta as number
+    }
     window.addEventListener('aether:seek', onSeek)
-    return () => window.removeEventListener('aether:seek', onSeek)
+    window.addEventListener('aether:scrub', onScrub)
+    return () => {
+      window.removeEventListener('aether:seek', onSeek)
+      window.removeEventListener('aether:scrub', onScrub)
+    }
   }, [])
 
   useFrame((_, rawDelta) => {

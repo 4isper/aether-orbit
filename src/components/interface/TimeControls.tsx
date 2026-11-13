@@ -1,12 +1,16 @@
+import { useRef, useState } from 'react'
 import { t, type Locale } from '../../strings'
 
 const SPEED_OPTIONS = [0.5, 1, 2, 4]
+
+/** The jog wheel's reach: half a moon-month in either direction. */
+const SCRUB_REACH = 45
 
 function formatSpeed(speed: number) {
   return speed === 0.5 ? '½' : String(speed)
 }
 
-/** The clock: pause, reverse, speed, and the ambience switch. */
+/** The clock: pause, reverse, speed, the time scrub and the ambience switch. */
 export function TimeControls({
   locale,
   ready,
@@ -18,6 +22,7 @@ export function TimeControls({
   onReverse,
   onSpeed,
   onToggleSound,
+  onScrub,
 }: {
   locale: Locale
   ready: boolean
@@ -29,7 +34,22 @@ export function TimeControls({
   onReverse: () => void
   onSpeed: (speed: number) => void
   onToggleSound: () => void
+  onScrub: (delta: number) => void
 }) {
+  // The scrub is a jog wheel: it reads as an offset from the moment the
+  // drag started, and it re-centers on release — the clock always flows on
+  // from wherever the scrub left it.
+  const grabbed = useRef(0)
+  const [thumb, setThumb] = useState(0)
+  const scrub = (value: number) => {
+    onScrub(value - grabbed.current)
+    grabbed.current = value
+    setThumb(value)
+  }
+  const release = () => {
+    grabbed.current = 0
+    setThumb(0)
+  }
   return (
     <div className="time-controls reveal" role="group" aria-label={t(locale, 'timeControls')}>
       <button
@@ -79,6 +99,21 @@ export function TimeControls({
           </button>
         ))}
       </div>
+      <input
+        type="range"
+        className="time-scrub"
+        min={-SCRUB_REACH}
+        max={SCRUB_REACH}
+        step={0.25}
+        value={thumb}
+        aria-label={t(locale, 'scrubLabel')}
+        title={t(locale, 'scrubLabel')}
+        disabled={!ready}
+        onChange={(event) => scrub(Number(event.target.value))}
+        onPointerUp={release}
+        onBlur={release}
+        onKeyUp={release}
+      />
       <button
         type="button"
         className="time-button"
