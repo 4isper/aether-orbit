@@ -9,6 +9,7 @@ import { loadSession, saveSession } from './session'
 import { readStoredLocale, storeLocale, t, type Locale } from './strings'
 import { eventCueTransition, isAmbienceOn, playEventCue, readStoredAmbience, setAmbience, setBoost, storeAmbience } from './audio'
 import { BodyPanel } from './components/interface/BodyPanel'
+import { eventLabel, formatDuration } from './components/interface/event-copy'
 import { HelpDialog } from './components/interface/HelpDialog'
 import { OrbitMark } from './components/interface/OrbitMark'
 import { PlanetNav } from './components/interface/PlanetNav'
@@ -422,6 +423,26 @@ function App() {
       </div>
 
       {help && <HelpDialog locale={locale} onClose={() => setHelp(false)} />}
+
+      {/* Cinema mode hides the interface, but the sky keeps talking: a quiet
+        * toast carries the announcement until the moment ends. Lives outside
+        * the inert interface, never takes a click. */}
+      <div
+        className={`cinema-toast ${cinema && event && !travelling ? 'is-visible' : ''}`}
+        role="status"
+        aria-hidden={!cinema || !event || travelling || undefined}
+      >
+        {event && (
+          <>
+            <span>{t(locale, eventLabel(event.kind, activeView))}</span>
+            <strong>
+              {event.inProgress
+                ? t(locale, 'eventNow')
+                : t(locale, 'eventIn', { time: formatDuration(event.seconds, locale) })}
+            </strong>
+          </>
+        )}
+      </div>
 
       <div className="loader" aria-hidden={ready}>
         <div className="loader-inner">
