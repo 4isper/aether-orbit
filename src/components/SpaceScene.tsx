@@ -18,9 +18,10 @@ import { FlightMarkers } from './FlightMarkers'
 import { SystemOverview } from './SystemOverview'
 import { planetIds, type PlanetId, type SceneView } from '../planets'
 import { planetPosition } from '../orbits'
-import { nextEclipse, nextTransit } from '../eclipse'
+import { nextEclipse, nextTransit, type TransitEvent } from '../eclipse'
 import { nextConjunction } from '../conjunction'
 import { nextPerihelion } from '../comet'
+import { nextStorm } from '../storms'
 import type { CameraPose } from '../camera-math'
 import type { FlightTelemetry } from './CameraRig'
 import type { Locale } from '../strings'
@@ -64,7 +65,7 @@ function ComposerCapture() {
 
 /** What the interface needs to announce an event: which one, a countdown
  * and the absolute peak time the "skip to the moment" button seeks to. */
-export type EventKind = 'transit' | 'eclipse' | 'perihelion' | 'conjunction'
+export type EventKind = 'transit' | 'eclipse' | 'perihelion' | 'conjunction' | 'storm'
 export type EventAnnouncement = {
   kind: EventKind
   seconds: number
@@ -72,11 +73,34 @@ export type EventAnnouncement = {
   inProgress: boolean
 }
 
+/** Shape a scanned window into what the chip announces. */
+function announce(kind: EventKind, event: TransitEvent | null, now: number): EventAnnouncement | null {
+  if (!event) return null
+  return {
+    kind,
+    seconds: event.inProgress ? 0 : Math.max(event.entry - now, 0),
+    peakAt: event.peak,
+    inProgress: event.inProgress,
+  }
+}
+
+/** When a view holds several candidate moments, the one in progress or
+ * starting first is the one worth the chip. */
+function soonestMoment(moments: (EventAnnouncement | null)[]): EventAnnouncement | null {
+  const candidates = moments.filter((moment): moment is EventAnnouncement => moment !== null)
+  return candidates.reduce<EventAnnouncement | null>((best, moment) => {
+    if (!best) return moment
+    if (moment.inProgress !== best.inProgress) return moment.inProgress ? moment : best
+    return moment.seconds < best.seconds ? moment : best
+  }, null)
+}
+
 /** One event per view, each on the view where the sky actually shows it:
  * the transit shadow belongs to Aurelia's orbit, the eclipse darkens Nox,
  * the periapsis flares on the comet, the conjunctions line up on the views
  * of the outer watcher (Cinder sees Vesper hide behind Solis, Vesper sees
- * Aurelia cross the disc). */
+ * Aurelia cross the disc). The desert also owns its own weather: a dust
+ * storm competes with the occultation, and the nearer moment wins. */
 function sceneEvent(view: SceneView, now: number): EventAnnouncement | null {
   const shadowEvent = view === 'aurelia'
     ? nextTransit(now)
@@ -84,34 +108,16 @@ function sceneEvent(view: SceneView, now: number): EventAnnouncement | null {
       ? nextEclipse(now)
       : null
   if (shadowEvent) {
-    return {
-      kind: view === 'aurelia' ? 'transit' : 'eclipse',
-      seconds: shadowEvent.inProgress ? 0 : Math.max(shadowEvent.entry - now, 0),
-      peakAt: shadowEvent.peak,
-      inProgress: shadowEvent.inProgress,
-    }
+    return announce(view === 'aurelia' ? 'transit' : 'eclipse', shadowEvent, now)
   }
-  if (view === 'comet') {
-    const event = nextPerihelion(now)
-    return {
-      kind: 'perihelion',
-      seconds: event.inProgress ? 0 : Math.max(event.entry - now, 0),
-      peakAt: event.peak,
-      inProgress: event.inProgress,
-    }
+  if (view === 'comet') return announce('perihelion', nextPerihelion(now), now)
+  if (view === 'cinder') {
+    return soonestMoment([
+      announce('storm', nextStorm(now), now),
+      announce('conjunction', nextConjunction(view, 'vesper', now), now),
+    ])
   }
-  if (view === 'cinder' || view === 'vesper') {
-    const target = view === 'cinder' ? 'vesper' : 'aurelia'
-    const event = nextConjunction(view, target, now)
-    if (event) {
-      return {
-        kind: 'conjunction',
-        seconds: event.inProgress ? 0 : Math.max(event.entry - now, 0),
-        peakAt: event.peak,
-        inProgress: event.inProgress,
-      }
-    }
-  }
+  if (view === 'vesper') return announce('conjunction', nextConjunction(view, 'aurelia', now), now)
   return null
 }
 
@@ -241,7 +247,7 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
         <Planet reducedMotion={reducedMotion} timeScale={timeScale} showMoonLabel={overview} locale={locale} timeRef={orbitTime} moonWorldRef={moonWorld} />
       </group>
       <group ref={(node) => { groupRefs.current.cinder = node }} position={initialPositions[1]} {...planetEvents('cinder')}>
-        <Cinder reducedMotion={reducedMotion} timeScale={timeScale} />
+        <Cinder reducedMotion={reducedMotion} timeScale={timeScale} timeRef={orbitTime} />
       </group>
       <group ref={(node) => { groupRefs.current.vesper = node }} position={initialPositions[2]} {...planetEvents('vesper')}>
         <Vesper reducedMotion={reducedMotion} timeScale={timeScale} timeRef={orbitTime} />

@@ -6,12 +6,14 @@ import { noiseGLSL } from '../shaders/noise'
 import { bodyVertexGLSL, perturbNormalGLSL } from '../shaders/common'
 import { useSunDirection } from '../hooks/useSunDirection'
 import { starFlux } from '../orbits'
+import { stormIntensity } from '../storms'
 import { Atmosphere } from './Atmosphere'
 
 const surfaceFragment = /* glsl */ `
 uniform sampler2D uDayMap;
 uniform vec3 uSunDirection;
 uniform float uStarFlux;
+uniform float uStorm;
 varying vec2 vUv;
 varying vec3 vObjectPosition;
 varying vec3 vWorldPosition;
@@ -30,9 +32,17 @@ void main() {
   float elevation = micro * 0.0035 * bumpFade;
   vec3 N = perturbNormal(vWorldPosition, geometricN, elevation);
 
+  // The dust veil: broad uneven patches riding the surface, brightening the
+  // regolith toward a flat ochre shroud as the storm thickens.
+  float veil = uStorm * (0.45 + 0.55 * fbm4(p * 3.3 + vec3(11.0, -4.0, 6.0)));
+  albedo = mix(albedo, vec3(0.82, 0.58, 0.36), clamp(veil, 0.0, 1.0) * 0.75);
+
   vec3 L = normalize(uSunDirection);
   float diffuse = max(dot(N, L), 0.0);
-  vec3 color = albedo * (0.008 + diffuse * 1.15 * uStarFlux);
+  // Suspended dust scatters light around the terminator: a soft wrap that
+  // fades toward the night side.
+  float wrap = pow(max(dot(geometricN, L) * 0.5 + 0.5, 0.0), 2.0) * uStorm * 0.14;
+  vec3 color = albedo * (0.008 + (diffuse + wrap) * 1.15 * uStarFlux);
 
   gl_FragColor = vec4(color, 1.0);
   #include <tonemapping_fragment>
@@ -43,9 +53,10 @@ void main() {
 type CinderProps = {
   reducedMotion: boolean
   timeScale: number
+  timeRef: { current: number }
 }
 
-export function Cinder({ reducedMotion, timeScale }: CinderProps) {
+export function Cinder({ reducedMotion, timeScale, timeRef }: CinderProps) {
   const groupRef = useRef<Group>(null)
   const surfaceRef = useRef<Mesh>(null)
   const surfaceMaterialRef = useRef<ShaderMaterial>(null)
@@ -69,6 +80,7 @@ export function Cinder({ reducedMotion, timeScale }: CinderProps) {
       uSunDirection: { value: sunDirection },
       uDayMap: { value: dayMap },
       uStarFlux: { value: 1 },
+      uStorm: { value: 0 },
     }),
     [sunDirection, dayMap],
   )
@@ -78,6 +90,7 @@ export function Cinder({ reducedMotion, timeScale }: CinderProps) {
     updateSunDirection()
     if (surfaceMaterialRef.current) {
       surfaceMaterialRef.current.uniforms.uStarFlux.value = starFlux(worldPosition)
+      surfaceMaterialRef.current.uniforms.uStorm.value = stormIntensity(timeRef.current)
     }
 
     if (!reducedMotion && surfaceRef.current) {
