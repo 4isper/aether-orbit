@@ -41,6 +41,7 @@ uniform vec3 uSunDirection;
 uniform vec3 uMoonPosition;
 uniform float uMoonRadius;
 uniform float uStarFlux;
+uniform float uTime;
 varying vec2 vUv;
 varying vec3 vObjectPosition;
 varying vec3 vWorldPosition;
@@ -102,17 +103,33 @@ void main() {
   float cloudShadow = 1.0 - smoothstep(0.06, 0.76, cloudDensity) * 0.42;
   vec3 color = albedo * (0.004 + pow(diffuse, 0.78) * 1.18 * cloudShadow * uStarFlux);
 
+  // Sun glint on the water: a drifting field of micro-slopes perturbs the
+  // ocean normal inside the specular lobe only, so the mirror spot shimmers.
+  // At grazing angles the wave slopes spread the reflection the way a real
+  // sea does — the compact spot opens into a glittering path along the sun
+  // side of the disc. The clock is the shared simulation time — pause and
+  // reversal replay the same sea.
+  vec3 glintN = N;
+  float glintRoughness = roughness;
+  if (oceanMask > 0.001) {
+    float grazing = pow(1.0 - max(dot(geometricN, V), 0.0), 2.0);
+    float wx = fbm3(p * 130.0 + vec3(uTime * 0.4));
+    float wy = fbm3(p * 130.0 - vec3(uTime * 0.4) + vec3(4.7, 1.3, 8.1));
+    glintN = normalize(N + (tbn[0] * wx + tbn[1] * wy) * (0.055 + grazing * 0.05));
+    glintRoughness = clamp(roughness + grazing * 0.55 + (wx * 0.5 + 0.5) * 0.2, 0.06, 0.9);
+  }
+
   vec3 H = normalize(L + V);
-  float NoV = max(dot(N, V), 0.001);
+  float NoV = max(dot(glintN, V), 0.001);
   float NoL = max(dot(N, L), 0.0);
-  float NoH = max(dot(N, H), 0.0);
+  float NoH = max(dot(glintN, H), 0.0);
   float VoH = max(dot(V, H), 0.0);
-  float D = distributionGGX(NoH, roughness);
-  float G = geometrySchlickGGX(NoV, roughness) * geometrySchlickGGX(NoL, roughness);
+  float D = distributionGGX(NoH, glintRoughness);
+  float G = geometrySchlickGGX(NoV, glintRoughness) * geometrySchlickGGX(NoL, glintRoughness);
   vec3 F = vec3(0.02) + vec3(0.98) * pow(1.0 - VoH, 5.0);
   vec3 specular = (D * G * F) / max(4.0 * NoV * NoL, 0.001);
   specular *= NoL * oceanMask * daylight * cloudShadow * uStarFlux;
-  color += vec3(0.72, 0.84, 1.0) * specular * 0.85;
+  color += vec3(1.0, 0.96, 0.86) * specular * 1.5;
 
   float fresnel = pow(1.0 - max(dot(geometricN, V), 0.0), 4.0);
   color += vec3(0.015, 0.045, 0.09) * fresnel * daylight * 0.7 * uStarFlux;
@@ -313,6 +330,7 @@ export function Planet({ reducedMotion, timeScale, showMoonLabel, locale, timeRe
       uMoonPosition: { value: new Vector3() },
       uMoonRadius: { value: 0.34 },
       uStarFlux: { value: 1 },
+      uTime: { value: 0 },
     }),
     [sunDirection, dayMap, nightMap, normalMap, specularMap, cloudMap],
   )
@@ -360,6 +378,8 @@ export function Planet({ reducedMotion, timeScale, showMoonLabel, locale, timeRe
       surfaceMaterialRef.current.uniforms.uCloudOffset.value =
         surface && clouds ? (surface.rotation.y - clouds.rotation.y) / (Math.PI * 2) : 0
       surfaceMaterialRef.current.uniforms.uStarFlux.value = flux
+      // Waves ride the shared clock: a deep-linked t= lands on the same sea.
+      surfaceMaterialRef.current.uniforms.uTime.value = timeRef.current
     }
     if (cloudMaterialRef.current) {
       cloudMaterialRef.current.uniforms.uStarFlux.value = flux
