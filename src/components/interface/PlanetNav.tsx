@@ -111,6 +111,18 @@ export function PlanetNav({
         <span className="planet-number">{bodies.comet.code}</span>
         {bodies.comet.name}
       </button>
+      <button
+        type="button"
+        className="planet-link planet-link--belt"
+        aria-pressed={activeView === 'belt'}
+        aria-label={t(locale, 'flyToBelt')}
+        disabled={disabled}
+        onClick={() => onTravel('belt')}
+      >
+        <span className="planet-dot" aria-hidden="true" />
+        <span className="planet-number">{bodies.belt.code}</span>
+        {bodies.belt.name}
+      </button>
     </nav>
   )
 }

@@ -1,7 +1,7 @@
 import type { Locale } from './strings'
 
 export type PlanetId = 'aurelia' | 'cinder' | 'vesper'
-export type SceneView = PlanetId | 'system' | 'star' | 'comet' | 'moon'
+export type SceneView = PlanetId | 'system' | 'star' | 'comet' | 'moon' | 'belt'
 export const planetIds: PlanetId[] = ['aurelia', 'cinder', 'vesper']
 
 /** Locale-bound copy of a body: what the interface says about it. */
@@ -173,10 +173,36 @@ export const moonInfo: BodyInfo = {
   },
 }
 
+export const beltInfo: BodyInfo = {
+  name: 'The Belt',
+  code: 'BLT',
+  radius: '9.5',
+  metricValue: '1 620',
+  copy: {
+    ru: {
+      label: 'Пояс',
+      title: ['Между', 'миров'],
+      description: ['Три кольца обломков и тёплая дымка.', 'Каждый камень держит свою орбиту.'],
+      metricLabel: 'Обломков',
+      metricUnit: 'шт.',
+      facts: ['Зодиакальный свет на пыли', 'Кольца вращаются с разными скоростями', 'Освещение считается от Solis'],
+    },
+    en: {
+      label: 'The Belt',
+      title: ['Between', 'the worlds'],
+      description: ['Three rings of debris and a warm haze.', 'Every rock holds its own orbit.'],
+      metricLabel: 'Debris',
+      metricUnit: 'pcs',
+      facts: ['Zodiacal light on the dust', 'Rings spin at their own speeds', 'Lighting computed from Solis'],
+    },
+  },
+}
+
 /** Telemetry for every flyable destination except the system overview. */
 export const bodies: Record<Exclude<SceneView, 'system'>, BodyInfo> = {
   ...planets,
   star: starInfo,
   comet: cometInfo,
   moon: moonInfo,
+  belt: beltInfo,
 }

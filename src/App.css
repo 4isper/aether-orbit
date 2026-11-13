@@ -649,6 +649,11 @@ h1 > em {
   box-shadow: 0 0 9px rgba(180, 180, 172, 0.16);
 }
 
+.planet-link--belt .planet-dot {
+  background: radial-gradient(circle at 30% 30%, #c9b8a4, #7d6a55 48%, #26201a 75%);
+  box-shadow: 0 0 9px rgba(160, 138, 112, 0.16);
+}
+
 .experience[data-view="star"] h1 > em {
   color: #e2b98a;
 }

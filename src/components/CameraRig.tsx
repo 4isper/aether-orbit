@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { MathUtils, Vector3, type PerspectiveCamera } from 'three'
 import { type SceneView } from '../planets'
-import { planetPosition } from '../orbits'
+import { beltAnchorPosition, planetPosition } from '../orbits'
 import { cometPosition } from '../comet'
 import {
   clampPose,
@@ -423,6 +423,10 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
           cometPosition(time, journey.endLook)
         } else if (destination === 'moon') {
           journey.endLook.copy(moonWorldRef.current)
+        } else if (destination === 'belt') {
+          // The belt has no body: the camera settles onto a drifting anchor
+          // that rides the middle ring with the rocks around it.
+          beltAnchorPosition(time, journey.endLook)
         } else {
           planetPosition(destination, time, journey.endLook)
         }
@@ -550,6 +554,8 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
       cometPosition(time, scratch)
     } else if (currentView.current === 'moon') {
       scratch.copy(moonWorldRef.current)
+    } else if (currentView.current === 'belt') {
+      beltAnchorPosition(time, scratch)
     } else {
       planetPosition(currentView.current, time, scratch)
     }

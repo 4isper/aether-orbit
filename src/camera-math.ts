@@ -4,6 +4,11 @@ import { planetIds, type SceneView } from './planets.ts'
 import { orbitPoint, planetPosition } from './orbits.ts'
 
 export const PLANET_VIEW_DISTANCE = 9
+/** The belt view floats inside the debris rings: closer than the planets,
+ * the camera drifts along the middle ring with the rocks around it. */
+export const BELT_VIEW_DISTANCE = 5.5
+export const BELT_MIN_ZOOM = 3.6
+export const BELT_MAX_ZOOM = 9
 export const STAR_VIEW_DISTANCE = 11.5
 export const COMET_VIEW_DISTANCE = 3.4
 export const MOON_VIEW_DISTANCE = 1.7
@@ -68,6 +73,7 @@ export function viewZoomBounds(view: SceneView) {
   if (view === 'star') return { distance: STAR_VIEW_DISTANCE, min: MIN_ZOOM, max: MAX_ZOOM }
   if (view === 'comet') return { distance: COMET_VIEW_DISTANCE, min: COMET_MIN_ZOOM, max: COMET_MAX_ZOOM }
   if (view === 'moon') return { distance: MOON_VIEW_DISTANCE, min: MOON_MIN_ZOOM, max: MOON_MAX_ZOOM }
+  if (view === 'belt') return { distance: BELT_VIEW_DISTANCE, min: BELT_MIN_ZOOM, max: BELT_MAX_ZOOM }
   return { distance: PLANET_VIEW_DISTANCE, min: MIN_ZOOM, max: MAX_ZOOM }
 }
 
@@ -239,7 +245,9 @@ export const FLIGHT_BODY_RADII = {
   comet: 0.14,
 } as const
 
-export type FlightBodyId = Exclude<SceneView, 'system'>
+/** A body the free-flight HUD tracks: every solid destination. The belt is
+ * a ring of rocks without a surface, so it is not one of them. */
+export type FlightBodyId = Exclude<SceneView, 'system' | 'belt'>
 
 export const FLIGHT_BODY_IDS: FlightBodyId[] = ['star', 'aurelia', 'cinder', 'vesper', 'moon', 'comet']
 

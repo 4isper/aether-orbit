@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { Vector3 } from 'three'
-import { aureliaClock, moonPhaseAngle, orbitPoint, planetPeriod, planetPosition, starFlux } from './orbits.ts'
+import { aureliaClock, beltAnchorAngle, beltAnchorPosition, beltClock, moonPhaseAngle, orbitPoint, planetPeriod, planetPosition, starFlux } from './orbits.ts'
 import { planetIds } from './planets.ts'
 
 const scratch = new Vector3()
@@ -115,4 +115,29 @@ test('starlight falls off with distance, unity at Aurelia', () => {
   assert.ok(Math.abs(cinder - (9 / 14) ** 1.5) < 1e-9, `Cinder flux ${cinder}`)
   assert.ok(Math.abs(vesper - (9 / 20) ** 1.5) < 1e-9, `Vesper flux ${vesper}`)
   assert.ok(cinder > vesper, 'inner worlds must receive more light')
+})
+
+test('the belt anchor rides the middle ring between Cinder and Vesper', () => {
+  for (const time of [0, 137.4, -240, 900]) {
+    const anchor = beltAnchorPosition(time, new Vector3())
+    const radius = anchor.length()
+    assert.ok(
+      Math.abs(radius - beltClock.anchorRadius) < 1e-9,
+      `anchor radius ${radius} drifted off the middle ring`,
+    )
+    assert.ok(Math.abs(anchor.y) < 1e-9, 'the anchor left the belt plane')
+    // Two full laps back lands on the same spot: the anchor is a pure
+    // function of the clock, matching to a rounding hair.
+    const sameLap = beltAnchorPosition(time - 2 * ((Math.PI * 2) / beltClock.anchorSpeed), new Vector3())
+    assert.ok(
+      anchor.distanceTo(sameLap) < 1e-6,
+      `reversal drifted at t=${time}`,
+    )
+  }
+  // The anchor stays between the worlds it sits among.
+  const cinderRadius = orbitPoint('cinder', 0, new Vector3()).length()
+  const vesperRadius = orbitPoint('vesper', 0, new Vector3()).length()
+  assert.ok(beltClock.anchorRadius > cinderRadius && beltClock.anchorRadius < vesperRadius)
+  // It drifts forward with the ring, not backwards with it.
+  assert.ok(beltAnchorAngle(10) > beltAnchorAngle(0))
 })

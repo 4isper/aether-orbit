@@ -122,3 +122,29 @@ export function shepherdLocalPosition(time: number, target: Vector3) {
   const radius = vesperClock.shepherdOrbitRadius
   return target.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius)
 }
+
+/**
+ * The belt's own clock: where the camera anchor drifts inside the debris
+ * rings. The anchor rides the middle ring's mean motion, so the rocks around
+ * the viewpoint stay companions for a while instead of streaming past.
+ */
+export const beltClock = {
+  /** Anchor orbit radius, scene units — the middle ring's midline. */
+  anchorRadius: 17.0,
+  /** Anchor mean motion, radians per time unit — the middle ring's speed. */
+  anchorSpeed: 0.0112,
+  /** Where the anchor starts on its lap. */
+  anchorPhase: 4.2,
+} as const
+
+/** The camera anchor's angle on the shared clock: pure like every other. */
+export function beltAnchorAngle(time: number) {
+  return beltClock.anchorPhase + time * beltClock.anchorSpeed
+}
+
+/** Anchor position in world space: the belt plane is the world XZ plane. */
+export function beltAnchorPosition(time: number, target: Vector3) {
+  const angle = beltAnchorAngle(time)
+  const radius = beltClock.anchorRadius
+  return target.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius)
+}
