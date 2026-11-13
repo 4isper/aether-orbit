@@ -112,7 +112,7 @@ npm run test:smoke
 | The pause button | Stop and resume time |
 | The "Tour" button | Automatic cinematic tour of the system |
 | The RU / EN switch in the header | Change the interface language; the choice persists |
-| The "Save frame" button | PNG of the current view with the view name in the file |
+| The "Save frame" button | PNG of the current view at double resolution, with the view name in the file |
 | The "Share" button | Copies a link to the current view and pose (system share sheet on mobile) |
 | `H` (or `Р` on a Russian layout) | Cinema mode: hide and restore the interface |
 
@@ -167,7 +167,7 @@ docs/rendering.md      # a map of the rendering decisions: atmospheres, star, ri
 
 ## Performance
 
-The scene targets 60 FPS: short scattering passes (5 samples along the view ray, 2 along the light), one extra cloud-shadow sample, a procedural star at ~10 noise samples per pixel, asteroids and both comet tails on InstancedMesh/Points, and stepped DPR from 0.85 to 1.75 driven by the PerformanceMonitor. If a device still cannot keep up, the heavy effects are dropped along with resolution — Bloom and Vignette — and the frame buffer is not preserved between frames: "Save frame" re-renders the scene once at the moment of the click.
+The scene targets 60 FPS: short scattering passes (5 samples along the view ray, 2 along the light), one extra cloud-shadow sample, a procedural star at ~10 noise samples per pixel, asteroids and both comet tails on InstancedMesh/Points, and stepped DPR from 0.85 to 1.75 driven by the PerformanceMonitor. If a device still cannot keep up, the heavy effects are dropped along with resolution — Bloom and Vignette — and the frame buffer is not preserved between frames: "Save frame" re-renders the scene once at the moment of the click — at double resolution, with the supersampling factor capped for huge screens.
 
 The entry chunk is ~174 KB gzip (interface and React), three.js with the scene is ~189 KB gzip loaded under the loader. The math tests, build and headless scene smoke run in CI on Node 22 and 24, with the Node 20 build checked in a separate job.
 

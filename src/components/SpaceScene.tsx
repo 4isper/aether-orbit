@@ -48,20 +48,34 @@ function SceneReady({ onReady }: { onReady: () => void }) {
 function ComposerCapture() {
   const { composer } = useContext(EffectComposerContext)
   const gl = useThree((state) => state.gl)
+  const size = useThree((state) => state.size)
 
   useEffect(() => {
     const capture = (event: Event) => {
       const name = (event as CustomEvent<{ name?: string }>).detail?.name
       if (!name) return
-      composer.render()
-      const link = document.createElement('a')
-      link.download = name
-      link.href = gl.domElement.toDataURL('image/png')
-      link.click()
+      // Wallpaper quality: double the pixel ratio for this one frame — the
+      // composer's buffers follow the drawing buffer, so the whole chain
+      // renders supersampled. The ratio is capped so huge screens cannot
+      // spike the framebuffer.
+      const savedRatio = gl.getPixelRatio()
+      const doubled = Math.min(savedRatio * 2, 3)
+      try {
+        gl.setPixelRatio(doubled)
+        composer.setSize(size.width, size.height, false)
+        composer.render()
+        const link = document.createElement('a')
+        link.download = name
+        link.href = gl.domElement.toDataURL('image/png')
+        link.click()
+      } finally {
+        gl.setPixelRatio(savedRatio)
+        composer.setSize(size.width, size.height, false)
+      }
     }
     window.addEventListener('aether:screenshot', capture)
     return () => window.removeEventListener('aether:screenshot', capture)
-  }, [composer, gl])
+  }, [composer, gl, size.width, size.height])
 
   return null
 }
