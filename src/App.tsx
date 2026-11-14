@@ -13,6 +13,7 @@ import { eventCueTransition, playEventCue, setBoost } from './audio'
 import { BodyPanel } from './components/interface/BodyPanel'
 import { EphemerisPanel } from './components/interface/EphemerisPanel'
 import { eventLabel, formatDuration } from './components/interface/event-copy'
+import { tourCaption } from './tour-copy'
 import { HelpDialog } from './components/interface/HelpDialog'
 import { JournalDialog } from './components/interface/JournalDialog'
 import { OrbitMark } from './components/interface/OrbitMark'
@@ -415,6 +416,34 @@ function App() {
             </strong>
           </>
         )}
+      </div>
+
+      {/* The cinema tour's titles: while the pilot watches hands-free, each
+        * stop gets its world's name, title and one observation — the body
+        * card's own words, hidden interface or not. Lives outside the inert
+        * interface, fades out while the camera flies between stops. */}
+      <div
+        key={activeView}
+        className={`tour-caption ${cinema && tour && !travelling ? 'is-visible' : ''}`}
+        aria-hidden={!cinema || !tour || undefined}
+      >
+        {(() => {
+          const caption = tourCaption(activeView, locale)
+          return (
+            <>
+              {caption.name && (
+                <p className="tour-caption-eyebrow">
+                  {caption.name} {caption.eyebrow && <span>/ {caption.eyebrow}</span>}
+                </p>
+              )}
+              <h2 className="tour-caption-title">
+                <span>{caption.line1}</span>
+                {caption.line2 && <em> {caption.line2}</em>}
+              </h2>
+              {caption.fact && <p className="tour-caption-fact">{caption.fact}</p>}
+            </>
+          )
+        })()}
       </div>
 
       <div className="loader" aria-hidden={ready}>

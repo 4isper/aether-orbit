@@ -816,6 +816,60 @@ h1 > em {
   color: rgba(232, 240, 245, 0.88);
 }
 
+/* The cinema tour's titles: each stop gets its world's card in miniature,
+ * lower left, while the toast keeps the bottom center for sky moments.
+ * Fades in on arrival, out on the flight to the next stop. */
+.tour-caption {
+  position: fixed;
+  left: 46px;
+  bottom: 44px;
+  max-width: 340px;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 1.1s ease, transform 1.3s cubic-bezier(0.2, 0.7, 0.2, 1);
+  pointer-events: none;
+}
+
+.tour-caption.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.tour-caption-eyebrow {
+  margin: 0 0 6px;
+  color: rgba(199, 214, 223, 0.5);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.tour-caption-eyebrow span {
+  color: rgba(199, 214, 223, 0.3);
+}
+
+.tour-caption-title {
+  margin: 0;
+  color: rgba(237, 243, 247, 0.9);
+  font-size: 26px;
+  font-weight: 300;
+  letter-spacing: 0.02em;
+  line-height: 1.15;
+}
+
+.tour-caption-title em {
+  font-style: italic;
+  color: rgba(214, 228, 236, 0.75);
+}
+
+.tour-caption-fact {
+  margin: 10px 0 0;
+  color: rgba(202, 218, 227, 0.55);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  line-height: 1.7;
+}
+
 .experience[data-view="star"] .telemetry {
   padding: 12px 18px;
   background: rgba(1, 2, 5, 0.55);

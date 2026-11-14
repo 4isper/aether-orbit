@@ -1,18 +1,8 @@
 import type { EventAnnouncement } from '../SpaceScene'
 import { type BodyInfo, type SceneView } from '../../planets'
 import { t, type Locale } from '../../strings'
+import { worldEyebrow } from '../../tour-copy.ts'
 import { EventChip } from './EventChip'
-
-function worldEyebrow(view: SceneView, locale: Locale) {
-  if (view === 'star') return t(locale, 'orbitOfStar')
-  if (view === 'cinder') return t(locale, 'worldDesert')
-  if (view === 'vesper') return t(locale, 'worldIce')
-  if (view === 'comet') return t(locale, 'worldComet')
-  if (view === 'moon') return t(locale, 'worldMoon')
-  if (view === 'belt') return t(locale, 'worldBelt')
-  if (view === 'erebus') return t(locale, 'worldErebus')
-  return t(locale, 'worldExo')
-}
 
 /** Everything the interface says about the framed body: intro, telemetry,
  * the event chip when one is announced, the control hint and view actions. */
@@ -47,7 +37,7 @@ export function BodyPanel({
   return (
     <>
       <section className="intro reveal" aria-labelledby="scene-title" aria-hidden={travelling}>
-        <p className="eyebrow"><span />{body.name} / {worldEyebrow(activeView, locale)}</p>
+        <p className="eyebrow"><span />{body.name} / {t(locale, worldEyebrow(activeView))}</p>
         <h1 id="scene-title">
           <span>{body.copy[locale].title[0]}</span>
           <em>{body.copy[locale].title[1]}</em>

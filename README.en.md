@@ -28,7 +28,7 @@ An interactive space scene in the browser: three fictional worlds, cinematic fli
 - **Free flight** — the "Flight" button detaches the camera: WASD thrust, arrows and drag to look, Q/E down and up, wheel and pinch for impulse, Shift to boost (thrust and speed cap ×3) with a live HUD for speed and the nearest surface. Every body ahead carries its name in the void — a distant point of light answers for itself, markers and HUD distances from one position source (`flightBodyPosition`). Stare down Solis up close and the frame floods with glare. Escape or the button flies back to the regular orbit.
 - **Ephemerides** — the whole system keeps one shared log of the sky: a header button opens a panel with the schedule of every event ahead of time — the transit, the eclipse, both conjunctions, both periapsides, the storm, the shower. The next two windows of each stream (`ephemerides.ts`: the same cursor over the scanners that drives the chips) merge into one list by first contact; a moment already in progress leads the list, lit amber. Every row carries a countdown and a "skip to the moment" jump to that window's peak under the same rule the orbit chip obeys, writing the new `?t=` into the address. The panel recasts the schedule once per second while open, and fades out with cinema mode.
 - **Ambient sound** — a quiet synthesized observation-deck background built from Web Audio, zero audio assets; the choice persists and resumes on the first gesture of the next visit. Beneath it live two cues: a boost hum while Shift is held in flight, and a slow octave-fall swell when an announced window begins or the "skip to the moment" jump lands.
-- **Tour mode** — the "Tour" button runs an automatic circuit: Aurelia → Cinder → Vesper → the Belt → Boreas → Erebus → Solis → system overview, ~7 seconds per stop; any manual navigation stops the tour.
+- **Tour mode** — the "Tour" button runs an automatic circuit: Aurelia → Cinder → Vesper → the Belt → Boreas → Erebus → Solis → system overview, ~7 seconds per stop; any manual navigation stops the tour. In cinema mode (H) the tour becomes a documentary flyby: at every stop a quiet caption fades in at the bottom of the frame — the world's name, title and one observation from its body card (`tour-copy.ts`), fading out on the flight between stops; the overview stop has no observation.
 - **System overview** — all three worlds, the star and the asteroid belt in one frame; clicking a planet sphere, the star or a label starts a flight. Framing compensates for perspective so near planets stay inside the shot.
 - **World card** — telemetry on orbit plus an "Observations" row: short hints on what to look for from this angle — auroras, ring shadows, prominences, both comet tails.
 - **RU / EN** — the interface ships in two languages, a switch in the header, the choice persists between visits.
@@ -76,7 +76,7 @@ npm run build
 npm run preview
 ```
 
-Linter and math tests (orbits, Kepler's equation, camera, prominence loops, ring shadows, the cyclone, the flare, ephemerides):
+Linter and math tests (orbits, Kepler's equation, camera, prominence loops, ring shadows, the cyclone, the flare, ephemerides, the tour's captions):
 
 ```bash
 npm run lint
@@ -158,12 +158,13 @@ src/
   meteors.ts           # meteors: deterministic spawns per cycle, tangential tracks
   cyclone.ts           # Aurelia's cyclone: envelope, the eye's wander and the scanner window, like the desert's storm
   flare.ts             # Solis's flare: the envelope and the light multiplier for every world
+  tour-copy.ts         # the cinema tour's captions and the worlds' classification, shared with the body card
   ephemerides.ts       # the sky's schedule: every stream's next windows as one list
   ring-shadow.ts       # ring shadow geometry: ray-plane intersection
   galactic.ts          # the Milky Way: star directions along the galactic band
   camera-math.ts       # camera offsets, overview framing, pose serialization
   strings.ts           # interface strings: RU and EN dictionaries, locale
-  *.test.ts            # math tests: orbits, comet and perihelion, camera, prominences, eclipses, meteors, ring shadows, the band, the cyclone, the flare, ephemerides
+  *.test.ts            # math tests: orbits, comet and perihelion, camera, prominences, eclipses, meteors, ring shadows, the band, the cyclone, the flare, ephemerides, the tour's captions, the tour's captions
   shaders/noise.ts     # simplex/fbm for micro-relief
   planets.ts           # names, telemetry and the localized copy of worlds and star
   orbits.ts            # orbit radii, inclinations, speeds and phases; planet positions
