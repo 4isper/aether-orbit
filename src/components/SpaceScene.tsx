@@ -26,6 +26,7 @@ import { nextErebusPeriapsis } from '../erebus'
 import { nextShower } from '../meteors'
 import { nextStorm } from '../storms'
 import { nextCyclone } from '../cyclone'
+import { nextFlare } from '../flare'
 import { listEphemerides, type EphemerisPayload, type EventKind } from '../ephemerides'
 import type { CameraPose } from '../camera-math'
 import type { FlightTelemetry } from './CameraRig'
@@ -142,6 +143,9 @@ function viewMoment(view: SceneView, now: number): EventAnnouncement | null {
     ])
   }
   if (view === 'moon') return announce('eclipse', nextEclipse(now), now)
+  // The star owns its own outbursts: the flare is the one moment the star's
+  // view announces, and its light touches every world at once.
+  if (view === 'star') return announce('flare', nextFlare(now), now)
   if (view === 'comet') return announce('perihelion', nextPerihelion(now), now)
   // The dwarf's plunge past Vesper: rare, so the chip waits for it long.
   if (view === 'erebus') return announce('perihelion', nextErebusPeriapsis(now), now)
@@ -342,7 +346,7 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
       <Trojan timeRef={orbitTime} />
       <Comet timeRef={orbitTime} />
       <group {...starEvents}>
-        <Star reducedMotion={reducedMotion} timeScale={timeScale} />
+        <Star reducedMotion={reducedMotion} timeScale={timeScale} timeRef={orbitTime} />
       </group>
       <group ref={(node) => { groupRefs.current.aurelia = node }} position={initialPositions[0]} {...planetEvents('aurelia')}>
         <Planet reducedMotion={reducedMotion} timeScale={timeScale} showMoonLabel={overview} locale={locale} timeRef={orbitTime} moonWorldRef={moonWorld} />

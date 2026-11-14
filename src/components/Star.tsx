@@ -15,10 +15,12 @@ import { noiseGLSL } from '../shaders/noise'
 import { bodyVertexGLSL } from '../shaders/common'
 import { arcPoint, prominenceEnvelope } from '../prominences'
 import { glareFactor } from '../glare'
+import { flareIntensity } from '../flare'
 
 const surfaceFragment = /* glsl */ `
 uniform float uTime;
 uniform float uSpotTime;
+uniform float uFlare;
 varying vec3 vObjectPosition;
 varying vec3 vWorldPosition;
 varying vec3 vWorldNormal;
@@ -61,6 +63,9 @@ void main() {
   color = mix(color, color * vec3(1.25, 0.85, 0.7), umbra);
   color *= limb * 1.45;
   color += vec3(1.0, 0.32, 0.05) * pow(1.0 - mu, 2.4) * 0.55;
+  // A flare lifts the whole disc: the photosphere burns a touch hotter and
+  // whiter while the burst holds (flare.ts owns the schedule).
+  color *= 1.0 + uFlare * 0.3;
 
   gl_FragColor = vec4(color, 1.0);
   #include <tonemapping_fragment>
@@ -79,6 +84,7 @@ void main() {
 const glowFragment = /* glsl */ `
 uniform float uTime;
 uniform float uGlare;
+uniform float uFlare;
 varying vec2 vUv;
 ${noiseGLSL}
 
@@ -109,6 +115,11 @@ void main() {
   streamers *= 0.4;
 
   float alpha = halo + core + streak + streamers;
+  // A flare swells the corona: halo, streamers and the bright core all burn
+  // higher while the burst holds. The glare flood below stays camera
+  // geometry (glare.ts) — a flaring star and a staring pilot are separate
+  // stories.
+  alpha *= 1.0 + uFlare * 0.45;
   // Looking into the star floods the frame: the glare factor is camera
   // geometry (glare.ts), the flood itself rides this billboard.
   alpha += uGlare * (exp(-d * 7.0) * 0.9 + exp(-d * 2.2) * 0.3);
@@ -264,15 +275,18 @@ function ProminenceLoop({ spec, reducedMotion, timeScale }: {
 type StarProps = {
   reducedMotion: boolean
   timeScale: number
+  /** Shared simulation clock, advanced by SpaceScene once per frame: the
+   * flare schedule lives on it, like every other announced moment. */
+  timeRef: { current: number }
 }
 
-export function Star({ reducedMotion, timeScale }: StarProps) {
+export function Star({ reducedMotion, timeScale, timeRef }: StarProps) {
   const rotationRef = useRef<Group>(null)
   const glowRef = useRef<Mesh>(null)
   const surfaceMaterialRef = useRef<ShaderMaterial>(null)
   const glowMaterialRef = useRef<ShaderMaterial>(null)
-  const surfaceUniforms = useMemo(() => ({ uTime: { value: 0 }, uSpotTime: { value: 0 } }), [])
-  const glowUniforms = useMemo(() => ({ uTime: { value: 0 }, uGlare: { value: 0 } }), [])
+  const surfaceUniforms = useMemo(() => ({ uTime: { value: 0 }, uSpotTime: { value: 0 }, uFlare: { value: 0 } }), [])
+  const glowUniforms = useMemo(() => ({ uTime: { value: 0 }, uGlare: { value: 0 }, uFlare: { value: 0 } }), [])
   const forwardScratch = useMemo(() => new Vector3(), [])
   useFrame((state, rawDelta) => {
     const delta = Math.min(rawDelta, 0.1)
@@ -288,11 +302,14 @@ export function Star({ reducedMotion, timeScale }: StarProps) {
     // every mode, including reduced motion.
     state.camera.getWorldDirection(forwardScratch)
     forwardScratch.negate()
+    const flare = flareIntensity(timeRef.current)
+    if (surfaceMaterialRef.current) surfaceMaterialRef.current.uniforms.uFlare.value = flare
     if (glowMaterialRef.current) {
       glowMaterialRef.current.uniforms.uGlare.value = glareFactor(
         forwardScratch.dot(state.camera.position),
         state.camera.position.length(),
       )
+      glowMaterialRef.current.uniforms.uFlare.value = flare
     }
     if (reducedMotion) return
     if (surfaceMaterialRef.current) {

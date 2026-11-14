@@ -7,6 +7,7 @@ import { bodyVertexGLSL, perturbNormalGLSL } from '../shaders/common'
 import { useSunDirection } from '../hooks/useSunDirection'
 import { starFlux } from '../orbits'
 import { stormIntensity } from '../storms'
+import { flareLight } from '../flare'
 import { Atmosphere } from './Atmosphere'
 
 const surfaceFragment = /* glsl */ `
@@ -89,7 +90,7 @@ export function Cinder({ reducedMotion, timeScale, timeRef }: CinderProps) {
     const delta = Math.min(rawDelta, 0.1)
     updateSunDirection()
     if (surfaceMaterialRef.current) {
-      surfaceMaterialRef.current.uniforms.uStarFlux.value = starFlux(worldPosition)
+      surfaceMaterialRef.current.uniforms.uStarFlux.value = starFlux(worldPosition) * flareLight(timeRef.current)
       surfaceMaterialRef.current.uniforms.uStorm.value = stormIntensity(timeRef.current)
     }
 

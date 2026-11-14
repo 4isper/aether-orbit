@@ -20,6 +20,7 @@ import { Atmosphere } from './Atmosphere'
 import { Moon } from './Moon'
 import { lightningStrikes, LIGHTNING_CELLS, type LightningStrike } from '../lightning'
 import { cycloneCenter, cycloneIntensity } from '../cyclone'
+import { flareLight } from '../flare'
 import { aureliaFrame, aureliaClock, moonPhaseAngle, starFlux } from '../orbits'
 import { useSunDirection } from '../hooks/useSunDirection'
 import { t, type Locale } from '../strings'
@@ -401,7 +402,7 @@ export function Planet({ reducedMotion, timeScale, showMoonLabel, locale, timeRe
   useFrame((_, rawDelta) => {
     const delta = Math.min(rawDelta, 0.1)
     updateSunDirection()
-    const flux = starFlux(worldPosition)
+    const flux = starFlux(worldPosition) * flareLight(timeRef.current)
 
     const surface = surfaceRef.current
     const clouds = cloudsRef.current
@@ -477,7 +478,7 @@ export function Planet({ reducedMotion, timeScale, showMoonLabel, locale, timeRe
       if (moonMaterialRef.current) {
         moonMaterialRef.current.uniforms.uPlanetPosition.value.copy(worldPosition)
         moonMaterialRef.current.uniforms.uPlanetRadius.value = planetRadius
-        moonMaterialRef.current.uniforms.uStarFlux.value = starFlux(moonWorld)
+        moonMaterialRef.current.uniforms.uStarFlux.value = starFlux(moonWorld) * flareLight(timeRef.current)
       }
     }
   })

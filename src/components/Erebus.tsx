@@ -4,6 +4,7 @@ import { Vector3, type Group, type Mesh, type ShaderMaterial } from 'three'
 import { noiseGLSL } from '../shaders/noise'
 import { bodyVertexGLSL, perturbNormalGLSL } from '../shaders/common'
 import { starFlux } from '../orbits'
+import { flareLight } from '../flare'
 import { erebusPosition } from '../erebus'
 import { useSunDirection } from '../hooks/useSunDirection'
 
@@ -69,7 +70,7 @@ export function Erebus({ reducedMotion, timeScale, timeRef }: {
     groupRef.current?.position.copy(worldPosition)
     updateSunDirection()
     if (materialRef.current) {
-      materialRef.current.uniforms.uStarFlux.value = starFlux(worldPosition)
+      materialRef.current.uniforms.uStarFlux.value = starFlux(worldPosition) * flareLight(timeRef.current)
     }
     if (!reducedMotion && surfaceRef.current) {
       surfaceRef.current.rotation.y += delta * 0.02 * timeScale

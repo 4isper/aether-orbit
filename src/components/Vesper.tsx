@@ -6,6 +6,7 @@ import { bodyVertexGLSL, perturbNormalGLSL } from '../shaders/common'
 import { Atmosphere } from './Atmosphere'
 import { RingRocks } from './RingRocks'
 import { shepherdLocalPosition, starFlux } from '../orbits'
+import { flareLight } from '../flare'
 import { useSunDirection } from '../hooks/useSunDirection'
 
 /**
@@ -210,7 +211,7 @@ export function Vesper({ reducedMotion, timeScale, timeRef }: VesperProps) {
   useFrame((_, rawDelta) => {
     const delta = Math.min(rawDelta, 0.1)
     updateSunDirection()
-    const flux = starFlux(worldPosition)
+    const flux = starFlux(worldPosition) * flareLight(timeRef.current)
     if (surfaceMaterialRef.current) surfaceMaterialRef.current.uniforms.uStarFlux.value = flux
     if (ringMaterialRef.current) ringMaterialRef.current.uniforms.uStarFlux.value = flux
     if (shepherdMaterialRef.current) shepherdMaterialRef.current.uniforms.uStarFlux.value = flux
