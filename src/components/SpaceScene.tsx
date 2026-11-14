@@ -1,7 +1,8 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { useCursor } from '@react-three/drei'
-import { Bloom, EffectComposer, EffectComposerContext, Vignette } from '@react-three/postprocessing'
+import { Bloom, EffectComposer, EffectComposerContext, ToneMapping, Vignette } from '@react-three/postprocessing'
+import { ToneMappingMode } from 'postprocessing'
 import { Vector3, type Group } from 'three'
 import { Backdrop } from './Backdrop'
 import { Belt } from './Belt'
@@ -394,6 +395,11 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
               luminanceSmoothing={0.32}
             />
             <Vignette offset={0.2} darkness={0.58} />
+            {/* The composer turns the renderer's own tone mapping off while
+             * the scene renders — without this pass the ACES curve the
+             * materials were written for never runs, and the exposure knob
+             * is dead. The chain closes with the tone mapping. */}
+            <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
           </>
         )}
       </EffectComposer>
