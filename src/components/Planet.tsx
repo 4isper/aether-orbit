@@ -7,6 +7,7 @@ import {
   NoColorSpace,
   RepeatWrapping,
   SRGBColorSpace,
+  Vector2,
   Vector3,
   Vector4,
   type Group,
@@ -18,6 +19,7 @@ import { bodyVertexGLSL, perturbNormalGLSL } from '../shaders/common'
 import { Atmosphere } from './Atmosphere'
 import { Moon } from './Moon'
 import { lightningStrikes, LIGHTNING_CELLS, type LightningStrike } from '../lightning'
+import { cycloneCenter, cycloneIntensity } from '../cyclone'
 import { aureliaFrame, aureliaClock, moonPhaseAngle, starFlux } from '../orbits'
 import { useSunDirection } from '../hooks/useSunDirection'
 import { t, type Locale } from '../strings'
@@ -42,6 +44,8 @@ uniform vec3 uMoonPosition;
 uniform float uMoonRadius;
 uniform float uStarFlux;
 uniform float uTime;
+uniform float uCyclone;
+uniform vec2 uCycloneCenter;
 varying vec2 vUv;
 varying vec3 vObjectPosition;
 varying vec3 vWorldPosition;
@@ -101,7 +105,15 @@ void main() {
   float diffuse = max(dot(N, L), 0.0);
   float cloudDensity = texture2D(uCloudMap, vec2(vUv.x + uCloudOffset, vUv.y)).r;
   float cloudShadow = 1.0 - smoothstep(0.06, 0.76, cloudDensity) * 0.42;
-  vec3 color = albedo * (0.004 + pow(diffuse, 0.78) * 1.18 * cloudShadow * uStarFlux);
+  // The cyclone shades the water itself: the same vortex, read in the map
+  // frame the cloud shadow already uses — the shade rides the decks'
+  // rotation drift and sits under the spiral the cloud layer draws.
+  vec2 cycloneDelta = vec2((vUv.x + uCloudOffset) - uCycloneCenter.x, vUv.y - uCycloneCenter.y);
+  float cycloneDu = abs(cycloneDelta.x);
+  cycloneDu = min(cycloneDu, 1.0 - cycloneDu);
+  float cycloneDistance = length(vec2(cycloneDu * 2.0, cycloneDelta.y)) * 9.0;
+  float shade = cloudShadow * (1.0 - uCyclone * exp(-cycloneDistance * cycloneDistance * 0.5) * 0.5);
+  vec3 color = albedo * (0.004 + pow(diffuse, 0.78) * 1.18 * shade * uStarFlux);
 
   // Sun glint on the water: a drifting field of micro-slopes perturbs the
   // ocean normal inside the specular lobe only, so the mirror spot shimmers.
@@ -128,7 +140,7 @@ void main() {
   float G = geometrySchlickGGX(NoV, glintRoughness) * geometrySchlickGGX(NoL, glintRoughness);
   vec3 F = vec3(0.02) + vec3(0.98) * pow(1.0 - VoH, 5.0);
   vec3 specular = (D * G * F) / max(4.0 * NoV * NoL, 0.001);
-  specular *= NoL * oceanMask * daylight * cloudShadow * uStarFlux;
+  specular *= NoL * oceanMask * daylight * shade * uStarFlux;
   color += vec3(1.0, 0.96, 0.86) * specular * 1.5;
 
   float fresnel = pow(1.0 - max(dot(geometricN, V), 0.0), 4.0);
@@ -165,12 +177,30 @@ uniform vec3 uMoonPosition;
 uniform float uMoonRadius;
 uniform float uStarFlux;
 uniform vec4 uStrikes[3];
+uniform float uCyclone;
+uniform vec2 uCycloneCenter;
+uniform float uCycloneSpin;
 varying vec2 vUv;
 varying vec3 vWorldPosition;
 varying vec3 vWorldNormal;
 
 void main() {
   float density = texture2D(uCloudMap, vUv).r;
+
+  // The cyclone: a spiral wound into the deck around its own eye, pinned to
+  // the cloud map's UV frame like the lightning cells, so it rides the air
+  // mass the deck rotation carries. The seam wraps like a strike's patch;
+  // the u axis doubles to keep the vortex round on the sphere (360 degrees
+  // of longitude per u turn against 180 of latitude per v turn).
+  vec2 eyeDelta = vUv - uCycloneCenter;
+  float eyeDu = abs(eyeDelta.x);
+  eyeDu = min(eyeDu, 1.0 - eyeDu);
+  float eyeDistance = length(vec2(eyeDu * 2.0, eyeDelta.y)) * 9.0;
+  float eyeClear = smoothstep(0.0, 0.16, eyeDistance);
+  float spiral = sin(atan(eyeDelta.y, eyeDelta.x) * 3.0 + eyeDistance * 4.2 - uCycloneSpin) * 0.5 + 0.5;
+  float vortex = uCyclone * eyeClear * exp(-eyeDistance * eyeDistance * 0.35) * (0.45 + 0.55 * spiral);
+  density = clamp(density + vortex * 0.85, 0.0, 1.0);
+
   float coverage = smoothstep(0.06, 0.76, density);
 
   vec3 N = normalize(vWorldNormal);
@@ -196,6 +226,9 @@ void main() {
   );
   color += vec3(0.2, 0.35, 0.55) * rim * daylight * 0.25 * uStarFlux;
   color *= moonShadow;
+  // Tall storm tops catch the sun: the spiral reads a touch brighter and
+  // harder-edged than the surrounding deck.
+  color = mix(color, vec3(0.88, 0.92, 0.97), vortex * daylight * 0.4);
 
   // Night-side lightning: each strike lights its own patch of the deck from
   // within, only where clouds are dense and the sun is down. The schedule
@@ -214,7 +247,7 @@ void main() {
   }
 
   float alpha = coverage * (0.015 + daylight * 0.66) * mix(1.0, moonShadow, 0.35);
-  alpha = min(alpha + glowSum * 0.45, 1.0);
+  alpha = min(alpha + glowSum * 0.45 + vortex * daylight * 0.5, 1.0);
 
   gl_FragColor = vec4(color, alpha);
   #include <tonemapping_fragment>
@@ -331,6 +364,8 @@ export function Planet({ reducedMotion, timeScale, showMoonLabel, locale, timeRe
       uMoonRadius: { value: 0.34 },
       uStarFlux: { value: 1 },
       uTime: { value: 0 },
+      uCyclone: { value: 0 },
+      uCycloneCenter: { value: new Vector2(0.5, 0.5) },
     }),
     [sunDirection, dayMap, nightMap, normalMap, specularMap, cloudMap],
   )
@@ -342,6 +377,9 @@ export function Planet({ reducedMotion, timeScale, showMoonLabel, locale, timeRe
       uMoonRadius: { value: aureliaFrame.moonRadius },
       uStarFlux: { value: 1 },
       uStrikes: { value: Array.from({ length: LIGHTNING_CELLS }, () => new Vector4()) },
+      uCyclone: { value: 0 },
+      uCycloneCenter: { value: new Vector2(0.5, 0.5) },
+      uCycloneSpin: { value: 0 },
     }),
     [sunDirection, cloudMap],
   )
@@ -374,12 +412,18 @@ export function Planet({ reducedMotion, timeScale, showMoonLabel, locale, timeRe
     }
 
     const planetRadius = aureliaFrame.planetRadius * (compact ? 0.76 : 1)
+    // The cyclone rides the shared clock like the lightning: pause and
+    // reversal replay the same weather, deep links land on the same spiral.
+    const cyclone = cycloneIntensity(timeRef.current)
+    const cycloneEye = cycloneCenter(timeRef.current)
     if (surfaceMaterialRef.current) {
       surfaceMaterialRef.current.uniforms.uCloudOffset.value =
         surface && clouds ? (surface.rotation.y - clouds.rotation.y) / (Math.PI * 2) : 0
       surfaceMaterialRef.current.uniforms.uStarFlux.value = flux
       // Waves ride the shared clock: a deep-linked t= lands on the same sea.
       surfaceMaterialRef.current.uniforms.uTime.value = timeRef.current
+      surfaceMaterialRef.current.uniforms.uCyclone.value = cyclone
+      ;(surfaceMaterialRef.current.uniforms.uCycloneCenter.value as Vector2).set(cycloneEye.u, cycloneEye.v)
     }
     if (cloudMaterialRef.current) {
       cloudMaterialRef.current.uniforms.uStarFlux.value = flux
@@ -396,6 +440,10 @@ export function Planet({ reducedMotion, timeScale, showMoonLabel, locale, timeRe
           0,
         )
       }
+      const cloudCyclone = cloudMaterialRef.current.uniforms
+      cloudCyclone.uCyclone.value = cyclone
+      ;(cloudCyclone.uCycloneCenter.value as Vector2).set(cycloneEye.u, cycloneEye.v)
+      cloudCyclone.uCycloneSpin.value = timeRef.current * 0.85
     }
     if (!reducedMotion) auroraTime.current += delta * timeScale
     if (auroraMaterialRef.current) {
