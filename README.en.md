@@ -32,7 +32,7 @@ An interactive space scene in the browser: three fictional worlds, cinematic fli
 - **World card** — telemetry on orbit plus an "Observations" row: short hints on what to look for from this angle — auroras, ring shadows, prominences, both comet tails.
 - **RU / EN** — the interface ships in two languages, a switch in the header, the choice persists between visits.
 - **Keyboard shortcuts** — `Space` pauses time, `1–7` jump to views, `?` opens a shortcut cheat-sheet.
-- **Share button** — copies a link to the exact view, camera pose and simulation moment (`?view=`, `?yaw=&pitch=&zoom=`, `?t=` — the URL contract lives in `deep-link.ts`); the deterministic clock means the link reproduces the sky, not just the framing, and jumping to an event writes the leap target into the address.
+- **Share button** — copies a link to the exact view, camera pose and simulation moment (`?view=`, `?yaw=&pitch=&zoom=`, `?t=` — the URL contract lives in `deep-link.ts`); the deterministic clock means the link reproduces the sky, not just the framing, and jumping to an event writes the leap target into the address. A second button shows the same address as a QR code for a phone camera — drawn on the fly, no external services.
 - **Visit restore** — like the locale and the ambience, the last session lives in localStorage (`session.ts`): returning to a bare address opens the scene on the same view, with the same camera pose and moment. Explicit link parameters always win — they override the session piece by piece.
 - **Adaptive quality** — canvas resolution steps between 0.85 and 1.75 DPR based on sustained FPS; the DOM interface stays crisp.
 - **PWA** — the app installs to a home screen and keeps working offline: a manifest and a small service worker cache the shell, hashed chunks and textures (shell network-first, assets cache-first). Registered in production builds only.
@@ -114,6 +114,7 @@ npm run test:smoke
 | The RU / EN switch in the header | Change the interface language; the choice persists |
 | The "Save frame" button | PNG of the current view at double resolution, with the view name in the file |
 | The "Share" button | Copies a link to the current view and pose (system share sheet on mobile) |
+| The "QR code" button | The same frame address for a phone camera; the code is assembled on the fly, no external services |
 | `H` (or `Р` on a Russian layout) | Cinema mode: hide and restore the interface |
 
 Deep links: a URL like `?view=vesper` opens the scene straight on Vesper's orbit (`aurelia`, `cinder`, `vesper`, `moon`, `comet`, `star`, `belt`, `erebus`, `system`), and `?view=vesper&yaw=0.25&pitch=0.12&zoom=10.5` also restores a saved camera pose. The address updates on every arrival and during inspection, so the exact view can always be copied from the address bar.

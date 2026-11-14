@@ -27,6 +27,7 @@ export function BodyPanel({
   onReset,
   onSaveFrame,
   onShare,
+  onQr,
   copied,
 }: {
   body: BodyInfo
@@ -39,6 +40,7 @@ export function BodyPanel({
   onReset: () => void
   onSaveFrame: () => void
   onShare: () => void
+  onQr: () => void
   copied: boolean
 }) {
   const isStar = activeView === 'star'
@@ -122,6 +124,16 @@ export function BodyPanel({
             <path d="M8.1 10.9l6.8-4M8.1 13.1l6.8 4" stroke="currentColor" strokeWidth="1.3" />
           </svg>
           <span>{copied ? t(locale, 'linkCopied') : t(locale, 'shareFrameShort')}</span>
+        </button>
+        <span className="view-actions-divider" aria-hidden="true" />
+        <button className="reset-view" type="button" onClick={onQr} disabled={!ready} aria-label={t(locale, 'qrShow')}>
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <rect x="4" y="4" width="6.5" height="6.5" stroke="currentColor" strokeWidth="1.3" />
+            <rect x="13.5" y="4" width="6.5" height="6.5" stroke="currentColor" strokeWidth="1.3" />
+            <rect x="4" y="13.5" width="6.5" height="6.5" stroke="currentColor" strokeWidth="1.3" />
+            <path d="M13.5 13.5h2.2v2.2h-2.2zM17.8 17.8h2.2v2.2h-2.2zM17.8 13.5h2.2M13.5 19.5v2.5" stroke="currentColor" strokeWidth="1.3" />
+          </svg>
+          <span>{t(locale, 'qrShowShort')}</span>
         </button>
       </div>
     </>

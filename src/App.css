@@ -1188,6 +1188,42 @@ h1 > em {
   color: rgba(229, 238, 243, 0.8);
 }
 
+/* The frame link as a QR code: the light plate is the quiet zone the
+ * matrix itself does not carry, so scanners get their white margin. */
+.qr-card {
+  max-width: 340px;
+  text-align: center;
+}
+
+.qr-plate {
+  width: 216px;
+  margin: 0 auto;
+  padding: 16px;
+  background: rgba(238, 243, 246, 0.94);
+}
+
+.qr-plate svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  fill: rgba(10, 16, 24, 0.92);
+}
+
+.qr-hint {
+  margin: 14px 0 8px;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  line-height: 1.7;
+}
+
+.qr-url {
+  margin: 0;
+  font-size: 9px;
+  letter-spacing: 0.03em;
+  color: rgba(199, 214, 223, 0.35);
+  word-break: break-all;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;

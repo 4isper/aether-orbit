@@ -12,6 +12,7 @@ export function useKeyboardShortcuts({
   setCinema,
   setHelp,
   setFreeFlight,
+  setQr,
 }: {
   views: SceneView[]
   travelTo: (view: SceneView) => void
@@ -19,6 +20,7 @@ export function useKeyboardShortcuts({
   setCinema: Dispatch<SetStateAction<boolean>>
   setHelp: Dispatch<SetStateAction<boolean>>
   setFreeFlight: Dispatch<SetStateAction<boolean>>
+  setQr: Dispatch<SetStateAction<boolean>>
 }) {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -27,6 +29,7 @@ export function useKeyboardShortcuts({
       if (event.key === 'Escape') {
         setCinema(false)
         setHelp(false)
+        setQr(false)
         setFreeFlight(false)
       }
       if (event.key === '?') setHelp((value) => !value)
@@ -49,5 +52,5 @@ export function useKeyboardShortcuts({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [views, travelTo, setPaused, setCinema, setHelp, setFreeFlight])
+  }, [views, travelTo, setPaused, setCinema, setHelp, setFreeFlight, setQr])
 }

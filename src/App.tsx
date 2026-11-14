@@ -13,6 +13,7 @@ import { eventLabel, formatDuration } from './components/interface/event-copy'
 import { HelpDialog } from './components/interface/HelpDialog'
 import { OrbitMark } from './components/interface/OrbitMark'
 import { PlanetNav } from './components/interface/PlanetNav'
+import { QrDialog } from './components/interface/QrDialog'
 import { SystemPanel } from './components/interface/SystemPanel'
 import { TimeControls } from './components/interface/TimeControls'
 import { TopBar } from './components/interface/TopBar'
@@ -134,6 +135,7 @@ function App() {
   const [freeFlight, setFreeFlight] = useState(false)
   const [cinema, setCinema] = useState(false)
   const [help, setHelp] = useState(false)
+  const [qr, setQr] = useState(false)
   const tabVisible = useTabVisibility()
   const timeScale = paused ? 0 : reversed ? -speed : speed
 
@@ -166,6 +168,7 @@ function App() {
     setCinema,
     setHelp,
     setFreeFlight,
+    setQr,
   })
   useTour({
     tour,
@@ -305,6 +308,7 @@ function App() {
             onReset={resetView}
             onSaveFrame={saveFrame}
             onShare={shareLink}
+            onQr={() => setQr(true)}
             copied={copied}
           />
         ) : (
@@ -326,6 +330,7 @@ function App() {
       </div>
 
       {help && <HelpDialog locale={locale} onClose={() => setHelp(false)} />}
+      {qr && <QrDialog locale={locale} onClose={() => setQr(false)} />}
 
       {/* Cinema mode hides the interface, but the sky keeps talking: a quiet
         * toast carries the announcement until the moment ends. Lives outside
