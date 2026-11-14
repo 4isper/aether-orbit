@@ -6,8 +6,8 @@ import type { FlightTelemetry } from './components/CameraRig'
 import { parsePose, type CameraPose } from './camera-math'
 import { deepLinkUrl, parseTimeParam } from './deep-link'
 import { loadSession, saveSession } from './session'
-import { readStoredLocale, storeLocale, t, type Locale } from './strings'
-import { eventCueTransition, isAmbienceOn, playEventCue, readStoredAmbience, setAmbience, setBoost, storeAmbience } from './audio'
+import { t } from './strings'
+import { eventCueTransition, playEventCue, setBoost } from './audio'
 import { BodyPanel } from './components/interface/BodyPanel'
 import { eventLabel, formatDuration } from './components/interface/event-copy'
 import { HelpDialog } from './components/interface/HelpDialog'
@@ -16,12 +16,17 @@ import { PlanetNav } from './components/interface/PlanetNav'
 import { SystemPanel } from './components/interface/SystemPanel'
 import { TimeControls } from './components/interface/TimeControls'
 import { TopBar } from './components/interface/TopBar'
+import { useAmbience } from './hooks/useAmbience'
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
+import { useLocale } from './hooks/useLocale'
+import { useReducedMotion } from './hooks/useReducedMotion'
+import { useShareLink } from './hooks/useShareLink'
+import { useTabVisibility } from './hooks/useTabVisibility'
+import { useTour } from './hooks/useTour'
 import './App.css'
 
 const SceneCanvas = lazy(() => import('./SceneCanvas'))
 
-const TOUR_STOPS: SceneView[] = ['aurelia', 'cinder', 'vesper', 'belt', 'comet', 'erebus', 'star', 'system']
-const TOUR_DWELL_MS = 7000
 const SCENE_VIEWS: SceneView[] = [...planetIds, 'star', 'comet', 'moon', 'belt', 'erebus', 'system']
 
 /** Deep link support: ?view=vesper opens the scene already on that orbit.
@@ -66,26 +71,11 @@ function detectWebGLSupport() {
   }
 }
 
-function useReducedMotion() {
-  const [reduced, setReduced] = useState(
-    () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
-  )
-
-  useEffect(() => {
-    const query = window.matchMedia('(prefers-reduced-motion: reduce)')
-    const update = () => setReduced(query.matches)
-    query.addEventListener('change', update)
-    return () => query.removeEventListener('change', update)
-  }, [])
-
-  return reduced
-}
-
 function App() {
   const [initialView] = useState(readInitialView)
   const [initialPose] = useState(readInitialPose)
   const [initialTime] = useState(readInitialTime)
-  const [locale, setLocale] = useState<Locale>(readStoredLocale)
+  const { locale, toggleLocale } = useLocale()
   const [ready, setReady] = useState(false)
   const [webglSupported] = useState(detectWebGLSupport)
   const [activeView, setActiveView] = useState<SceneView>(initialView)
@@ -139,12 +129,12 @@ function App() {
   const [paused, setPaused] = useState(false)
   const [speed, setSpeed] = useState(1)
   const [reversed, setReversed] = useState(false)
-  const [sound, setSound] = useState(readStoredAmbience)
+  const { sound, toggleSound } = useAmbience()
   const [tour, setTour] = useState(false)
   const [freeFlight, setFreeFlight] = useState(false)
   const [cinema, setCinema] = useState(false)
   const [help, setHelp] = useState(false)
-  const [tabVisible, setTabVisible] = useState(() => !document.hidden)
+  const tabVisible = useTabVisibility()
   const timeScale = paused ? 0 : reversed ? -speed : speed
 
   useEffect(() => {
@@ -169,43 +159,23 @@ function App() {
     setBoost(boosting)
   }, [boosting])
 
-  const toggleLocale = useCallback(() => {
-    setLocale((value) => {
-      const next: Locale = value === 'ru' ? 'en' : 'ru'
-      storeLocale(next)
-      return next
-    })
-  }, [])
+  useKeyboardShortcuts({
+    views: SCENE_VIEWS,
+    travelTo,
+    setPaused,
+    setCinema,
+    setHelp,
+    setFreeFlight,
+  })
+  useTour({
+    tour,
+    ready,
+    travelling,
+    tabVisible,
+    activeView,
+    setDestination,
+  })
 
-  const toggleSound = useCallback(() => {
-    // The audio call stays outside the state updater: StrictMode double-
-    // invokes updaters and the ambience toggle must run exactly once.
-    setAmbience(!sound)
-    setSound(!sound)
-    storeAmbience(!sound)
-  }, [sound])
-
-  useEffect(() => {
-    // A remembered intent starts on the first gesture anywhere: browsers
-    // hold the AudioContext until one, so the choice resumes instead.
-    if (!sound) return
-    const resume = () => {
-      if (!isAmbienceOn()) setAmbience(true)
-    }
-    window.addEventListener('pointerdown', resume)
-    window.addEventListener('keydown', resume)
-    return () => {
-      window.removeEventListener('pointerdown', resume)
-      window.removeEventListener('keydown', resume)
-    }
-  }, [sound])
-
-  useEffect(() => {
-    document.documentElement.lang = locale
-    document.title = locale === 'ru'
-      ? 'Aether — Тихая орбита'
-      : 'Aether — The Quiet Orbit'
-  }, [locale])
   const resetView = useCallback(() => window.dispatchEvent(new Event('aether:reset')), [])
   // The time scrub's jog wheel: relative nudges land on the shared clock.
   const scrubTime = useCallback((delta: number) => {
@@ -218,74 +188,7 @@ function App() {
       detail: { name: `aether-${activeView === 'system' ? 'system' : activeView}.png` },
     }))
   }, [activeView])
-  const [copied, setCopied] = useState(false)
-  const copiedTimer = useRef(0)
-  const shareFrame = useCallback(() => {
-    // The address bar already carries the current view and camera pose, kept
-    // fresh by the camera rig, so the URL alone is enough to reproduce a view.
-    const url = window.location.href
-    const markCopied = () => {
-      setCopied(true)
-      window.clearTimeout(copiedTimer.current)
-      copiedTimer.current = window.setTimeout(() => setCopied(false), 2400)
-    }
-    if (navigator.canShare?.({ url })) {
-      navigator.share({ url, title: document.title })
-        .catch((error: unknown) => {
-          if ((error as DOMException)?.name === 'AbortError') return
-          navigator.clipboard?.writeText(url).then(markCopied).catch(() => {})
-        })
-    } else {
-      navigator.clipboard?.writeText(url).then(markCopied).catch(() => {})
-    }
-  }, [])
-
-  useEffect(() => {
-    const onVisibilityChange = () => setTabVisible(!document.hidden)
-    document.addEventListener('visibilitychange', onVisibilityChange)
-    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
-  }, [])
-
-  useEffect(() => {
-    // H works on both layouts: latin H and Cyrillic Р sit on the same key.
-    const onKey = (event: KeyboardEvent) => {
-      const key = event.key.toLowerCase()
-      if (key === 'h' || key === 'р') setCinema((value) => !value)
-      if (event.key === 'Escape') {
-        setCinema(false)
-        setHelp(false)
-        setFreeFlight(false)
-      }
-      if (event.key === '?') setHelp((value) => !value)
-      // Space and digits must not hijack an interactive element that has
-      // focus: buttons already activate on Space.
-      const target = event.target as HTMLElement | null
-      const onControl = Boolean(
-        target
-          && (['BUTTON', 'A', 'INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName)
-            || target.isContentEditable),
-      )
-      if (!onControl && event.key === ' ' && !event.repeat) {
-        event.preventDefault()
-        setPaused((value) => !value)
-      }
-      if (!onControl && /^[1-9]$/.test(event.key)) {
-        const view = SCENE_VIEWS[Number(event.key) - 1]
-        if (view) travelTo(view)
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [travelTo])
-
-  useEffect(() => {
-    if (!tour || !ready || travelling || !tabVisible) return
-    const timer = window.setTimeout(() => {
-      const index = TOUR_STOPS.indexOf(activeView)
-      setDestination(TOUR_STOPS[(index + 1) % TOUR_STOPS.length])
-    }, TOUR_DWELL_MS)
-    return () => window.clearTimeout(timer)
-  }, [tour, ready, travelling, activeView, tabVisible])
+  const { copied, shareLink } = useShareLink()
 
   return (
     <main
@@ -401,7 +304,7 @@ function App() {
             onSeekEvent={seekToEvent}
             onReset={resetView}
             onSaveFrame={saveFrame}
-            onShare={shareFrame}
+            onShare={shareLink}
             copied={copied}
           />
         ) : (
