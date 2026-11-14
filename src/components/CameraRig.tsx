@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { MathUtils, Vector3, type PerspectiveCamera } from 'three'
 import { type SceneView } from '../planets'
+import { stepAutopilot, wrapPi } from '../autopilot'
 import { beltAnchorPosition, planetPosition } from '../orbits'
 import { cometPosition } from '../comet'
 import { erebusPosition } from '../erebus'
@@ -10,6 +11,8 @@ import {
   computeOverviewPose,
   FLIGHT_DURATION,
   INTRO_DURATION,
+  flightBodyPosition,
+  FLIGHT_BODY_RADII,
   nearestFlightBody,
   orbitOffset,
   OVERVIEW_MAX_ZOOM,
@@ -32,6 +35,7 @@ export type FlightTelemetry = {
   nearestId: FlightBodyId
   nearestDistance: number
   boosting: boolean
+  autopilotId: FlightBodyId | null
 }
 
 type CameraRigProps = {
@@ -53,6 +57,7 @@ type CameraRigProps = {
 const MAX_STEP = 0.1
 const SHARE_INTERVAL = 1.5
 const FLIGHT_INFO_INTERVAL = 0.25
+const autopilotTarget = new Vector3()
 const BASE_FOV = 36
 
 /** Free-flight tuning: system scale runs from the 8.4-unit star out to the
@@ -136,6 +141,9 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
   const free = useRef({
     active: false,
     keys: new Set<string>(),
+    // The autopilot's target body while it flies the ship; any manual key,
+    // drag or wheel impulse hands the ship back to the pilot.
+    autopilot: null as FlightBodyId | null,
     look: { yaw: 0, pitch: 0 },
     state: {
       position: new Vector3(),
@@ -250,6 +258,7 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
       const dx = event.clientX - drag.current.x
       const dy = event.clientY - drag.current.y
       if (free.current.active) {
+        free.current.autopilot = null
         free.current.look.yaw -= dx * 0.0032
         free.current.look.pitch += dy * 0.0022
       } else if (currentView.current === 'system') {
@@ -282,6 +291,7 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
       event.preventDefault()
       if (flight.current.active) return
       if (free.current.active) {
+        free.current.autopilot = null
         freeThrust(-event.deltaY * 0.012)
         return
       }
@@ -300,6 +310,7 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
       }
       if (free.current.active) {
         // Look with the arrows; WASDQE are tracked on the window below.
+        free.current.autopilot = null
         if (event.key === 'ArrowLeft') free.current.look.yaw += 0.06
         if (event.key === 'ArrowRight') free.current.look.yaw -= 0.06
         if (event.key === 'ArrowUp') free.current.look.pitch += 0.04
@@ -359,6 +370,14 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
     window.addEventListener('keydown', onKeyDownMove)
     window.addEventListener('keyup', onKeyUpMove)
     window.addEventListener('blur', onWindowBlur)
+    // The flight markers ask for an autopilot approach; only an active
+    // flight answers, and the command survives until a hand or an arrival.
+    const onAutopilot = (event: Event) => {
+      const id = (event as CustomEvent<{ id?: string }>).detail?.id
+      if (!id || !free.current.active) return
+      free.current.autopilot = id as FlightBodyId
+    }
+    window.addEventListener('aether:autopilot', onAutopilot)
     window.addEventListener('aether:scrub', onScrub)
 
     return () => {
@@ -373,6 +392,7 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
       window.removeEventListener('keyup', onKeyUpMove)
       window.removeEventListener('blur', onWindowBlur)
       window.removeEventListener('aether:scrub', onScrub)
+      window.removeEventListener('aether:autopilot', onAutopilot)
     }
   }, [gl])
 
@@ -402,6 +422,7 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
     if (freeFlight && !free.current.active && !journey.active) {
       free.current.active = true
       const st = free.current.state
+      free.current.autopilot = null
       st.position.copy(camera.position)
       st.velocity.set(0, 0, 0)
       const dir = scratch.copy(lookAt.current).sub(camera.position).normalize()
@@ -484,6 +505,26 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
         down: free.current.keys.has('KeyQ'),
         boost: boosting,
       }
+      // The autopilot aims the ship at its body and answers with the pilot's
+      // own commands; the first manual hand takes over. The look target rides
+      // the yaw seam the short way around.
+      if (free.current.autopilot) {
+        if (input.forward || input.back || input.left || input.right || input.up || input.down) {
+          free.current.autopilot = null
+        } else {
+          const id = free.current.autopilot
+          flightBodyPosition(id, moonWorldRef.current, time, autopilotTarget)
+          const steer = stepAutopilot(
+            st.position, st.velocity, autopilotTarget,
+            FLIGHT_BODY_RADII[id] + 2.5, FREE_FLIGHT_PARAMS.damping,
+          )
+          free.current.look.yaw = st.yaw + wrapPi(steer.yaw - wrapPi(st.yaw))
+          free.current.look.pitch = steer.pitch
+          input.forward = input.forward || steer.forward
+          input.back = input.back || steer.brake
+          if (steer.done) free.current.autopilot = null
+        }
+      }
       stepFreeFlight(st, input, free.current.look, delta, FREE_FLIGHT_PARAMS)
       // Publish the HUD readout at a calm throttle, only when something
       // the pilot could notice has actually changed.
@@ -497,9 +538,11 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
             nearestId: nearest.id,
             nearestDistance: Math.max(nearest.distance, 0),
             boosting,
+            autopilotId: free.current.autopilot,
           }
           const prev = flightInfoSent.current
           if (!prev || prev.boosting !== info.boosting || prev.nearestId !== info.nearestId
+            || prev.autopilotId !== info.autopilotId
             || Math.abs(info.speed - prev.speed) > 0.05
             || Math.abs(info.nearestDistance - prev.nearestDistance) > 0.05) {
             flightInfoSent.current = info

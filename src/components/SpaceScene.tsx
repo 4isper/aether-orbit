@@ -371,7 +371,15 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
         moonWorldRef={moonWorld}
       />
       {/* Names in the void: only while the pilot is detached and flying. */}
-      {freeFlight && <FlightMarkers timeRef={orbitTime} moonWorldRef={moonWorld} />}
+      {freeFlight && (
+        <FlightMarkers
+          timeRef={orbitTime}
+          moonWorldRef={moonWorld}
+          locale={locale}
+          flight={freeFlight}
+          onAutopilot={(id) => window.dispatchEvent(new CustomEvent('aether:autopilot', { detail: { id } }))}
+        />
+      )}
       {overview && <SystemOverview onSelect={selectBody} timeRef={orbitTime} locale={locale} />}
       <SceneReady onReady={onReady} />
       <EffectComposer multisampling={0} enabled={!lowEnd}>

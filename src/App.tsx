@@ -351,6 +351,11 @@ function App() {
               <strong>{flightInfo.nearestDistance.toFixed(1)} <small>{t(locale, 'hudUnit')}</small></strong>
             </div>
             {flightInfo.boosting && <div className="flight-hud-boost">{t(locale, 'hudBoost')}</div>}
+            {flightInfo.autopilotId && (
+              <div className="flight-hud-autopilot">
+                {t(locale, 'hudAutopilot', { name: bodies[flightInfo.autopilotId].name })}
+              </div>
+            )}
           </div>
         )}
 
