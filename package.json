@@ -9,7 +9,9 @@
     "lint": "oxlint",
     "test": "node --experimental-strip-types --test src/*.test.ts",
     "preview": "vite preview",
-    "test:smoke": "node scripts/smoke.mjs"
+    "test:smoke": "node scripts/smoke.mjs",
+    "test:frames": "node scripts/frames.mjs",
+    "golden:update": "node scripts/frames.mjs --update"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",

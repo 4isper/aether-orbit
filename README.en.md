@@ -90,6 +90,13 @@ npm run build
 npm run test:smoke
 ```
 
+A golden-frame regression: six fixed deep links (the flare's peak, the cyclone over the ocean, Vesper's rings, the desert, the belt, the overview) are rendered and compared against references in `docs/golden/` — reduced motion freezes every private accumulator, the shared clock and pose come from the link, so a frame is a pure function of its address. A frame that drifts past tolerance (mean channel delta, fraction of hard-shifting pixels) fails the run; a conscious visual change re-records them:
+
+```bash
+npm run test:frames        # compare (CI)
+npm run golden:update      # re-record the references
+```
+
 ## Controls
 
 | Action | Result |
@@ -133,7 +140,7 @@ The canvas is keyboard-accessible: focus, arrows and reset work without a mouse;
 - Three.js via React Three Fiber and Drei
 - Custom GLSL shaders: surface and clouds, atmosphere, the living star, the comet, asteroids, the star field, the backdrop
 - `@react-three/postprocessing`: Bloom and Vignette, ACES Filmic tone mapping
-- Oxlint and `node:test` for math checks, a headless shader smoke test and CI on GitHub Actions
+- Oxlint and `node:test` for math checks, a headless shader smoke test, golden-frame regression on fixed deep links, and CI on GitHub Actions
 
 ## Structure
 
