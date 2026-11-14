@@ -31,6 +31,16 @@ export function parseTimeParam(params: URLSearchParams): number | null {
   return time
 }
 
+/** The modes a link can ask for. 'idle' turns the scene into living
+ * wallpaper: an endless tour in cinema mode, starting on arrival. */
+export type ViewMode = 'idle'
+
+/** Parse the mode from URL params; null when missing or unknown — a mode
+ * the scene does not know is simply not asked for, never an error. */
+export function parseModeParam(params: URLSearchParams): ViewMode | null {
+  return params.get('mode') === 'idle' ? 'idle' : null
+}
+
 /** The address for a view with optional camera pose and shared moment.
  * Aurelia stays the bare home view; everything else names itself. */
 export function deepLinkUrl(view: SceneView, pose?: CameraPose | null, time?: number | null): string {

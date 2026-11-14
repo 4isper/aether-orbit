@@ -123,6 +123,8 @@ npm run test:smoke
 
 Deep links: a URL like `?view=vesper` opens the scene straight on Vesper's orbit (`aurelia`, `cinder`, `vesper`, `moon`, `comet`, `star`, `belt`, `erebus`, `system`), and `?view=vesper&yaw=0.25&pitch=0.12&zoom=10.5` also restores a saved camera pose. The address updates on every arrival and during inspection, so the exact view can always be copied from the address bar.
 
+**Living wallpaper** mode: a link like `/?mode=idle` starts an endless cinema-mode tour at once — world captions, quiet event toasts, zero buttons. A tablet on a stand becomes the observation deck; any manual move stops the tour and the mode quietly degrades to a normal session.
+
 The canvas is keyboard-accessible: focus, arrows and reset work without a mouse; the view switches and overview labels are regular buttons with aria-labels.
 
 ## Stack

@@ -4,7 +4,7 @@ import { bodies, planetIds, type SceneView } from './planets'
 import type { EventAnnouncement } from './components/SpaceScene'
 import type { FlightTelemetry } from './components/CameraRig'
 import { parsePose, type CameraPose } from './camera-math'
-import { deepLinkUrl, parseTimeParam } from './deep-link'
+import { deepLinkUrl, parseModeParam, parseTimeParam } from './deep-link'
 import { loadSession, saveSession } from './session'
 import { addJournalFrame, readJournal, type JournalFrame } from './journal'
 import { t } from './strings'
@@ -77,10 +77,19 @@ function detectWebGLSupport() {
   }
 }
 
+/** Deep link support: ?mode=idle turns the scene into living wallpaper —
+ * an endless tour in cinema mode from the first frame. Any manual move
+ * stops the tour and the mode quietly degrades to a normal session. */
+function readInitialMode() {
+  return parseModeParam(new URLSearchParams(window.location.search))
+}
+
 function App() {
   const [initialView] = useState(readInitialView)
   const [initialPose] = useState(readInitialPose)
   const [initialTime] = useState(readInitialTime)
+  const [initialMode] = useState(readInitialMode)
+  const idle = initialMode === 'idle'
   const { locale, toggleLocale } = useLocale()
   const [ready, setReady] = useState(false)
   const [webglSupported] = useState(detectWebGLSupport)
@@ -145,9 +154,9 @@ function App() {
   const [speed, setSpeed] = useState(1)
   const [reversed, setReversed] = useState(false)
   const { sound, toggleSound } = useAmbience()
-  const [tour, setTour] = useState(false)
+  const [tour, setTour] = useState(idle)
   const [freeFlight, setFreeFlight] = useState(false)
-  const [cinema, setCinema] = useState(false)
+  const [cinema, setCinema] = useState(idle)
   const [help, setHelp] = useState(false)
   const [qr, setQr] = useState(false)
   const [journalOpen, setJournalOpen] = useState(false)

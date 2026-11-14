@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { deepLinkUrl, formatTimeParam, parseTimeParam } from './deep-link.ts'
+import { deepLinkUrl, formatTimeParam, parseModeParam, parseTimeParam } from './deep-link.ts'
 import type { CameraPose } from './camera-math.ts'
 
 const POSE: CameraPose = { yaw: 0.21, pitch: -0.05, zoom: 9.4 }
@@ -45,4 +45,14 @@ test('formatTimeParam keeps one decimal so roundtrips are exact', () => {
   const formatted = formatTimeParam(128.34)
   assert.ok(formatted)
   assert.equal(parseTimeParam(new URLSearchParams(`t=${formatted}`)), 128.3)
+})
+
+test('parseModeParam accepts only the idle mode, rejects everything else', () => {
+  assert.equal(parseModeParam(new URLSearchParams('mode=idle')), 'idle')
+  // Unknown modes are not errors — the link simply has no mode.
+  assert.equal(parseModeParam(new URLSearchParams('mode=party')), null)
+  assert.equal(parseModeParam(new URLSearchParams('mode=')), null)
+  assert.equal(parseModeParam(new URLSearchParams('')), null)
+  // Case-sensitive: a share link is typed, not interpreted.
+  assert.equal(parseModeParam(new URLSearchParams('mode=IDLE')), null)
 })
