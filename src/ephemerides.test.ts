@@ -12,6 +12,7 @@ const STREAMS = [
   'conjunction/vesper',
   'conjunction/aurelia',
   'storm',
+  'cyclone',
   'shower',
 ]
 

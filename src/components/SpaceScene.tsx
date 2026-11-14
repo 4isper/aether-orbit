@@ -25,6 +25,7 @@ import { nextPerihelion } from '../comet'
 import { nextErebusPeriapsis } from '../erebus'
 import { nextShower } from '../meteors'
 import { nextStorm } from '../storms'
+import { nextCyclone } from '../cyclone'
 import { listEphemerides, type EphemerisPayload, type EventKind } from '../ephemerides'
 import type { CameraPose } from '../camera-math'
 import type { FlightTelemetry } from './CameraRig'
@@ -127,20 +128,20 @@ function soonestMoment(moments: (EventAnnouncement | null)[]): EventAnnouncement
 }
 
 /** One own event per view, each on the view where the sky actually shows
- * it: the transit shadow belongs to Aurelia's orbit, the eclipse darkens
- * Nox, the periapsis flares on the comet, the conjunctions line up on the
- * views of the outer watcher (Cinder sees Vesper hide behind Solis, Vesper
- * sees Aurelia cross the disc). The desert also owns its own weather: a
- * dust storm competes with the occultation, and the nearer moment wins. */
+ * it: the transit shadow and the cyclone belong to Aurelia's orbit, the
+ * eclipse darkens Nox, the periapsis flares on the comet, the conjunctions
+ * line up on the views of the outer watcher (Cinder sees Vesper hide behind
+ * Solis, Vesper sees Aurelia cross the disc). The worlds also own their
+ * weather: the desert's dust storm and the ocean's cyclone compete with the
+ * shadow moments, and the nearer one wins. */
 function viewMoment(view: SceneView, now: number): EventAnnouncement | null {
-  const shadowEvent = view === 'aurelia'
-    ? nextTransit(now)
-    : view === 'moon'
-      ? nextEclipse(now)
-      : null
-  if (shadowEvent) {
-    return announce(view === 'aurelia' ? 'transit' : 'eclipse', shadowEvent, now)
+  if (view === 'aurelia') {
+    return soonestMoment([
+      announce('transit', nextTransit(now), now),
+      announce('cyclone', nextCyclone(now), now),
+    ])
   }
+  if (view === 'moon') return announce('eclipse', nextEclipse(now), now)
   if (view === 'comet') return announce('perihelion', nextPerihelion(now), now)
   // The dwarf's plunge past Vesper: rare, so the chip waits for it long.
   if (view === 'erebus') return announce('perihelion', nextErebusPeriapsis(now), now)

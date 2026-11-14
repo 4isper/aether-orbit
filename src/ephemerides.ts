@@ -11,11 +11,12 @@ import { nextConjunction } from './conjunction.ts'
 import { nextPerihelion } from './comet.ts'
 import { nextShower } from './meteors.ts'
 import { nextStorm } from './storms.ts'
+import { nextCyclone } from './cyclone.ts'
 import { nextErebusPeriapsis } from './erebus.ts'
 
 /** The kinds of sky moment the scene announces — the schedule and the
  * per-view chip speak the same names. */
-export type EventKind = 'transit' | 'eclipse' | 'perihelion' | 'conjunction' | 'storm' | 'shower'
+export type EventKind = 'transit' | 'eclipse' | 'perihelion' | 'conjunction' | 'storm' | 'cyclone' | 'shower'
 
 /** The body an entry's label names: a conjunction names its target, a
  * periapsis names its world. Everything else is its own subject. */
@@ -53,6 +54,7 @@ const STREAMS: EventStream[] = [
   { kind: 'conjunction', body: 'vesper', next: (now) => nextConjunction('cinder', 'vesper', now) },
   { kind: 'conjunction', body: 'aurelia', next: (now) => nextConjunction('vesper', 'aurelia', now) },
   { kind: 'storm', next: nextStorm },
+  { kind: 'cyclone', next: nextCyclone },
   { kind: 'shower', next: nextShower },
 ]
 

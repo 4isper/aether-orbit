@@ -12,6 +12,7 @@ export function ephemerisLabel(entry: Pick<EphemerisEntry, 'kind' | 'body'>): St
   if (entry.kind === 'eclipse') return 'eventEclipse'
   if (entry.kind === 'perihelion') return entry.body === 'erebus' ? 'eventPerihelionErebus' : 'eventPerihelion'
   if (entry.kind === 'storm') return 'eventStorm'
+  if (entry.kind === 'cyclone') return 'eventCyclone'
   if (entry.kind === 'shower') return 'eventShower'
   return entry.body === 'vesper' ? 'eventConjunctionVesper' : 'eventConjunctionAurelia'
 }
