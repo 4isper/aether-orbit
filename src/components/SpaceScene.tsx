@@ -346,7 +346,7 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
       <Trojan timeRef={orbitTime} />
       <Comet timeRef={orbitTime} />
       <group {...starEvents}>
-        <Star reducedMotion={reducedMotion} timeScale={timeScale} timeRef={orbitTime} />
+        <Star timeRef={orbitTime} />
       </group>
       <group ref={(node) => { groupRefs.current.aurelia = node }} position={initialPositions[0]} {...planetEvents('aurelia')}>
         <Planet reducedMotion={reducedMotion} timeScale={timeScale} showMoonLabel={overview} locale={locale} timeRef={orbitTime} moonWorldRef={moonWorld} />

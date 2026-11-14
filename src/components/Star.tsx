@@ -234,10 +234,9 @@ const PROMINENCES: ProminenceSpec[] = [
   { a: [-0.96, -0.1, 0.26], b: [-0.9, -0.22, 0.37], apex: 0.22, tube: 0.034, period: 52, offset: 0.22, brightness: 2.1 },
 ]
 
-function ProminenceLoop({ spec, reducedMotion, timeScale }: {
+function ProminenceLoop({ spec, timeRef }: {
   spec: ProminenceSpec
-  reducedMotion: boolean
-  timeScale: number
+  timeRef: { current: number }
 }) {
   const materialRef = useRef<ShaderMaterial>(null)
   const geometry = useMemo(() => buildLoopGeometry(spec), [spec])
@@ -246,14 +245,14 @@ function ProminenceLoop({ spec, reducedMotion, timeScale }: {
     uTime: { value: 0 },
     uBrightness: { value: spec.brightness },
   }), [spec])
-  const time = useRef(0)
 
-  useFrame((_, rawDelta) => {
+  useFrame(() => {
     const material = materialRef.current
-    if (!material || reducedMotion) return
-    time.current += Math.min(rawDelta, 0.1) * timeScale
-    material.uniforms.uEnergy.value = prominenceEnvelope(time.current / spec.period - spec.offset)
-    material.uniforms.uTime.value = time.current
+    if (!material) return
+    // The loop rides the shared clock: a deep link lands on the same arc
+    // phase, pause freezes it, reversal replays it backwards.
+    material.uniforms.uEnergy.value = prominenceEnvelope(timeRef.current / spec.period - spec.offset)
+    material.uniforms.uTime.value = timeRef.current
   })
 
   return (
@@ -273,14 +272,12 @@ function ProminenceLoop({ spec, reducedMotion, timeScale }: {
 }
 
 type StarProps = {
-  reducedMotion: boolean
-  timeScale: number
   /** Shared simulation clock, advanced by SpaceScene once per frame: the
-   * flare schedule lives on it, like every other announced moment. */
+   * flare schedule, granulation, spots and the loops all live on it. */
   timeRef: { current: number }
 }
 
-export function Star({ reducedMotion, timeScale, timeRef }: StarProps) {
+export function Star({ timeRef }: StarProps) {
   const rotationRef = useRef<Group>(null)
   const glowRef = useRef<Mesh>(null)
   const surfaceMaterialRef = useRef<ShaderMaterial>(null)
@@ -288,36 +285,37 @@ export function Star({ reducedMotion, timeScale, timeRef }: StarProps) {
   const surfaceUniforms = useMemo(() => ({ uTime: { value: 0 }, uSpotTime: { value: 0 }, uFlare: { value: 0 } }), [])
   const glowUniforms = useMemo(() => ({ uTime: { value: 0 }, uGlare: { value: 0 }, uFlare: { value: 0 } }), [])
   const forwardScratch = useMemo(() => new Vector3(), [])
-  useFrame((state, rawDelta) => {
-    const delta = Math.min(rawDelta, 0.1)
-    // The photosphere and its prominences rotate together: the loops are
-    // anchored to the surface, so one clock drives the whole group.
-    if (rotationRef.current) rotationRef.current.rotation.y += delta * 0.004 * timeScale
+  useFrame((state) => {
+    // Everything the star shows reads the shared clock — granulation, the
+    // spot drift, the corona, the loops' rotation — so a deep link lands on
+    // the same boiling phase, pause freezes it and reversal replays it.
+    const time = timeRef.current
+    if (rotationRef.current) rotationRef.current.rotation.y = time * 0.004
+    if (surfaceMaterialRef.current) {
+      // Granulation churns every few scene-minutes; spot groups drift ~30x
+      // slower, for days.
+      surfaceUniforms.uTime.value = time
+      surfaceUniforms.uSpotTime.value = time * 0.03
+      surfaceUniforms.uFlare.value = flareIntensity(time)
+    }
+    if (glowMaterialRef.current) {
+      glowUniforms.uTime.value = time
+      glowUniforms.uFlare.value = flareIntensity(time)
+    }
     const glow = glowRef.current
     if (glow) {
       glow.quaternion.copy(state.camera.quaternion)
       glow.position.copy(state.camera.position).normalize().multiplyScalar(2.42)
     }
-    // The white-out of looking into the star: not motion, so it applies in
-    // every mode, including reduced motion.
+    // The white-out of looking into the star: camera geometry, not the clock.
     state.camera.getWorldDirection(forwardScratch)
     forwardScratch.negate()
-    const flare = flareIntensity(timeRef.current)
-    if (surfaceMaterialRef.current) surfaceMaterialRef.current.uniforms.uFlare.value = flare
     if (glowMaterialRef.current) {
       glowMaterialRef.current.uniforms.uGlare.value = glareFactor(
         forwardScratch.dot(state.camera.position),
         state.camera.position.length(),
       )
-      glowMaterialRef.current.uniforms.uFlare.value = flare
     }
-    if (reducedMotion) return
-    if (surfaceMaterialRef.current) {
-      // Granulation churns every few scene-minutes; spot groups drift for days.
-      surfaceMaterialRef.current.uniforms.uTime.value += delta * timeScale
-      surfaceMaterialRef.current.uniforms.uSpotTime.value += delta * timeScale * 0.03
-    }
-    if (glowMaterialRef.current) glowMaterialRef.current.uniforms.uTime.value += delta * timeScale
   })
 
   return (
@@ -345,7 +343,7 @@ export function Star({ reducedMotion, timeScale, timeRef }: StarProps) {
           />
         </mesh>
         {PROMINENCES.map((spec, index) => (
-          <ProminenceLoop key={index} spec={spec} reducedMotion={reducedMotion} timeScale={timeScale} />
+          <ProminenceLoop key={index} spec={spec} timeRef={timeRef} />
         ))}
       </group>
       <mesh raycast={() => null}>

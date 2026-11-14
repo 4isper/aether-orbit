@@ -1,5 +1,5 @@
 /**
- * Golden-frame regression test: opens fixed deep links in software-WebGL
+ * Golden-frame regression test: opens nine fixed deep links in software-WebGL
  * Chromium and compares the rendered canvas against committed references in
  * docs/golden/. Reduced motion freezes every private accumulator, the shared
  * clock lands on the deep-linked ?t=, and the camera sits on the shared pose,
@@ -50,6 +50,9 @@ const FRAMES = [
   { name: 'cinder', url: '/?view=cinder&t=300&yaw=0.1&pitch=0.1&zoom=8&dpr=1' },
   { name: 'belt', url: '/?view=belt&t=100&dpr=1' },
   { name: 'system', url: '/?view=system&t=150&dpr=1' },
+  { name: 'star-flare', url: '/?view=star&t=105&dpr=1' },
+  { name: 'moon', url: '/?view=moon&t=200&dpr=1' },
+  { name: 'erebus', url: '/?view=erebus&t=120&dpr=1' },
 ]
 
 const MEAN_TOLERANCE = 1.5
