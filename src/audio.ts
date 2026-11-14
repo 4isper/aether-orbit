@@ -9,6 +9,8 @@
 let ctx: AudioContext | null = null
 let master: GainNode | null = null
 let boostGain: GainNode | null = null
+let weather: { cyclone: GainNode; flare: GainNode; shower: GainNode } | null = null
+let autopilotGain: GainNode | null = null
 let enabled = false
 
 const LEVEL = 0.09
@@ -26,6 +28,25 @@ export function eventCueTransition(
   next: { inProgress: boolean } | null,
 ): boolean {
   return Boolean(next?.inProgress) && !(previous?.inProgress ?? false)
+}
+
+/** Which synthesized voices the current announcement asks for: the wind
+ * belongs to the ocean, the rumble to the star, the patter to the sky. */
+export type WeatherVoices = { cyclone: boolean; flare: boolean; shower: boolean }
+
+/**
+ * Map an announcement onto the voices it should drive. Only a moment in
+ * progress speaks — a countdown is not weather yet — and the announcement's
+ * kind picks the single voice: the per-view chip already guarantees the wind
+ * is announced on the ocean and the rumble at the star.
+ */
+export function voicesFromEvent(next: { kind: string; inProgress: boolean } | null): WeatherVoices {
+  const kind = next?.inProgress ? next.kind : null
+  return {
+    cyclone: kind === 'cyclone',
+    flare: kind === 'flare',
+    shower: kind === 'shower',
+  }
 }
 
 function buildGraph(context: AudioContext): GainNode {
@@ -87,6 +108,87 @@ function buildGraph(context: AudioContext): GainNode {
   }
   hum(41.2)
   hum(41.8)
+
+  // The weather voices, all fed from the same noise bed and the same bus:
+  // silent until a moment in progress asks for its own sound.
+  const weatherBus = context.createGain()
+  weatherBus.gain.value = 1
+  weatherBus.connect(out)
+  weather = {
+    cyclone: context.createGain(),
+    flare: context.createGain(),
+    shower: context.createGain(),
+  }
+  for (const gain of Object.values(weather)) {
+    gain.gain.value = 0.0001
+    gain.connect(weatherBus)
+  }
+
+  // Cyclone wind: the bed swept through a moving bandpass — a gust that
+  // never repeats, owned by the ocean's view.
+  const wind = context.createBiquadFilter()
+  wind.type = 'bandpass'
+  wind.frequency.value = 420
+  wind.Q.value = 1.3
+  noise.connect(wind).connect(weather.cyclone)
+  const gust = context.createOscillator()
+  gust.type = 'sine'
+  gust.frequency.value = 0.11
+  const gustDepth = context.createGain()
+  gustDepth.gain.value = 170
+  gust.connect(gustDepth).connect(wind.frequency)
+  gust.start()
+
+  // Flare rumble: the bed sunk to a growl under a sub oscillator, owned by
+  // the star's view.
+  const rumble = context.createBiquadFilter()
+  rumble.type = 'lowpass'
+  rumble.frequency.value = 85
+  rumble.Q.value = 0.8
+  noise.connect(rumble).connect(weather.flare)
+  const sub = context.createOscillator()
+  sub.type = 'sine'
+  sub.frequency.value = 34
+  const subGain = context.createGain()
+  subGain.gain.value = 0.7
+  sub.connect(subGain).connect(weather.flare)
+  sub.start()
+
+  // Shower patter: the bed squeezed through a highpass, alive on a fast
+  // amplitude tide — felt as rain on the deck, heard from every view.
+  const patter = context.createBiquadFilter()
+  patter.type = 'highpass'
+  patter.frequency.value = 3400
+  patter.Q.value = 0.7
+  const patterTide = context.createGain()
+  patterTide.gain.value = 0.6
+  patter.connect(patterTide).connect(weather.shower)
+  const tide = context.createOscillator()
+  tide.type = 'sine'
+  tide.frequency.value = 7.3
+  const tideDepth = context.createGain()
+  tideDepth.gain.value = 0.4
+  tide.connect(tideDepth).connect(patterTide.gain)
+  tide.start()
+
+  // The autopilot course: a soft beating pair under the flight hum's
+  // register, on while the ship flies itself.
+  const courseBus = context.createGain()
+  courseBus.gain.value = 0.0001
+  courseBus.connect(out)
+  autopilotGain = courseBus
+  const course = (frequency: number) => {
+    const osc = context.createOscillator()
+    osc.type = 'triangle'
+    osc.frequency.value = frequency
+    const filter = context.createBiquadFilter()
+    filter.type = 'lowpass'
+    filter.frequency.value = 240
+    osc.connect(filter).connect(courseBus)
+    osc.start()
+  }
+  course(58)
+  course(58.7)
 
   // Breathing: a very slow LFO swells the whole mix around its base level.
   const lfo = context.createOscillator()
@@ -150,6 +252,29 @@ export function setBoost(active: boolean) {
   if (!ctx || !boostGain) return
   const now = ctx.currentTime
   boostGain.gain.setTargetAtTime(active ? BOOST_LEVEL : 0.0001, now, active ? 0.12 : 0.35)
+}
+
+/**
+ * The weather voices: on while their moment is in progress on the current
+ * view, off the instant the chip turns to something else. Idempotent, safe
+ * with the sound off (no context yet — nothing to drive).
+ */
+export function setWeatherVoices(voices: WeatherVoices) {
+  if (!ctx || !weather) return
+  const now = ctx.currentTime
+  weather.cyclone.gain.setTargetAtTime(voices.cyclone ? 0.5 : 0.0001, now, voices.cyclone ? 0.9 : 0.6)
+  weather.flare.gain.setTargetAtTime(voices.flare ? 0.6 : 0.0001, now, voices.flare ? 0.5 : 0.7)
+  weather.shower.gain.setTargetAtTime(voices.shower ? 0.4 : 0.0001, now, voices.shower ? 0.6 : 0.5)
+}
+
+/**
+ * The autopilot's course hum under the flight: on while the ship flies
+ * itself. Idempotent, safe with the sound off.
+ */
+export function setAutopilot(active: boolean) {
+  if (!ctx || !autopilotGain) return
+  const now = ctx.currentTime
+  autopilotGain.gain.setTargetAtTime(active ? 0.05 : 0.0001, now, active ? 0.3 : 0.5)
 }
 
 /**

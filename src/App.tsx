@@ -9,7 +9,7 @@ import { loadSession, saveSession } from './session'
 import { addJournalFrame, readJournal, type JournalFrame } from './journal'
 import { t } from './strings'
 import type { EphemerisPayload } from './ephemerides'
-import { eventCueTransition, playEventCue, setBoost } from './audio'
+import { eventCueTransition, playEventCue, setAutopilot, setBoost, setWeatherVoices, voicesFromEvent } from './audio'
 import { BodyPanel } from './components/interface/BodyPanel'
 import { EphemerisPanel } from './components/interface/EphemerisPanel'
 import { eventLabel, formatDuration } from './components/interface/event-copy'
@@ -131,6 +131,9 @@ function App() {
     if (eventCueTransition(announcedRef.current, announcement)) playEventCue()
     announcedRef.current = announcement
     setEvent(announcement)
+    // The moment's own voice: wind on the ocean, a rumble at the star, a
+    // patter in the sky — following the chip while it speaks.
+    setWeatherVoices(voicesFromEvent(announcement))
   }, [])
   const seekToMoment = useCallback((moment: number) => {
     window.dispatchEvent(new CustomEvent('aether:seek', { detail: { time: moment } }))
@@ -191,6 +194,11 @@ function App() {
   useEffect(() => {
     setBoost(boosting)
   }, [boosting])
+  // The autopilot's course hum follows the flight markers' command.
+  const autopilotId = flightInfo?.autopilotId
+  useEffect(() => {
+    setAutopilot(autopilotId !== undefined && autopilotId !== null)
+  }, [autopilotId])
 
   useKeyboardShortcuts({
     views: SCENE_VIEWS,
