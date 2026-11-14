@@ -46,7 +46,8 @@ export function alignmentDepth(observer: PlanetId, target: PlanetId, time: numbe
 export const CONJUNCTION_THRESHOLD_SOLIS_RADII = 0.6
 
 /** Horizon: one synodic period of the pair (the alignment clock) with a
- * quarter as margin, so a scan never misses the next meeting. */
+ * quarter as margin, so a scan never misses the next meeting. The shared
+ * scan adds `now` itself — this stays a duration, whatever the clock says. */
 function synodicPeriod(observer: PlanetId, target: PlanetId) {
   return 1 / Math.abs(1 / planetPeriod(observer) - 1 / planetPeriod(target))
 }
@@ -59,6 +60,6 @@ export function nextConjunction(observer: PlanetId, target: PlanetId, now: numbe
   return nextWindow(now, {
     measure: (time) => alignmentDepth(observer, target, time),
     threshold: CONJUNCTION_THRESHOLD_SOLIS_RADII,
-    horizon: now + synodicPeriod(observer, target) * 1.25,
+    horizon: synodicPeriod(observer, target) * 1.25,
   })
 }

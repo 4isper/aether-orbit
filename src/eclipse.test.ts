@@ -63,7 +63,13 @@ test('the scan always finds the next transit, wherever you start', () => {
   for (let start = 0; start <= 1000; start += 37) {
     const event = nextTransit(start)
     assert.ok(event, `no transit found from t=${start}`)
-    assert.ok(event.entry >= start, `event from t=${start} starts in the past`)
+    // A start inside a window reports that window honestly — its first
+    // contact lies behind the start; otherwise the next window is ahead.
+    if (event.inProgress) {
+      assert.ok(event.entry <= start && start <= event.exit, `window from t=${start} does not cover the start`)
+    } else {
+      assert.ok(event.entry >= start, `event from t=${start} starts in the past`)
+    }
   }
 })
 
@@ -91,7 +97,9 @@ test('nextTransit from inside an event reports that event', () => {
   const inside = nextTransit(event.entry + 0.2)
   assert.ok(inside)
   assert.ok(inside.inProgress, 'a moment inside the window must be in progress')
-  assert.ok(Math.abs(inside.peak - event.peak) < 1.5, 'peak jumped between scans')
+  // The backward walk finds the true peak instead of drifting: repeated
+  // scans land on the same instant, so "to the moment" stays idempotent.
+  assert.ok(Math.abs(inside.peak - event.peak) < 0.3, 'peak jumped between scans')
 })
 
 test('nextTransit after an event finds the next month, strictly ahead', () => {

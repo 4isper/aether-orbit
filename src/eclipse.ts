@@ -138,6 +138,37 @@ export function nextWindow(now: number, scan: WindowScan): TransitEvent | null {
   let previous = now
   let t = now
   let horizon = now + scan.horizon
+
+  // A scan may start inside a window: the chip reads the sky mid-moment and
+  // a jump lands on a peak. The window's true first contact and its deepest
+  // point lie behind `now`, so walk back while the depth stays under the
+  // threshold — otherwise entry would clamp to the scan start and the peak
+  // would drift half a step back on every rescan, so "to the moment" would
+  // never land twice on the same instant.
+  if (scan.measure(now) <= scan.threshold) {
+    let back = now
+    let inside = now
+    for (;;) {
+      const distance = scan.measure(back)
+      if (distance < depth) {
+        depth = distance
+        coarsePeak = back
+      }
+      if (distance > scan.threshold) {
+        entry = refineEdge(scan, back, inside)
+        break
+      }
+      if (back <= now - scan.horizon) {
+        // A window outliving the backward horizon has an unknowable first
+        // contact: floor the entry the way the forward scan floors an exit.
+        entry = back
+        break
+      }
+      inside = back
+      back -= SCAN_STEP
+    }
+  }
+
   while (t <= horizon) {
     const distance = scan.measure(t)
     if (distance < depth) {
