@@ -114,6 +114,11 @@ const ru = {
   eventSeconds: '{s} с',
   ephemerides: 'Эфемериды',
   ephemeridesClose: 'Закрыть эфемериды',
+  journal: 'Журнал',
+  journalShow: 'Открыть бортовой журнал',
+  journalClose: 'Закрыть журнал',
+  journalEmpty: 'Сохранённые кадры появятся здесь — «Сохранить кадр» добавит текущий',
+  journalFrame: 'Кадр: {name}',
 }
 
 export type StringKey = keyof typeof ru
@@ -225,6 +230,11 @@ const en: Record<StringKey, string> = {
   eventSeconds: '{s} s',
   ephemerides: 'Ephemerides',
   ephemeridesClose: 'Close the ephemerides',
+  journal: 'Journal',
+  journalShow: 'Open the frame journal',
+  journalClose: 'Close the journal',
+  journalEmpty: 'Saved frames will appear here — "Save frame" adds the current one',
+  journalFrame: 'Frame: {name}',
 }
 
 export const strings: Record<Locale, Record<StringKey, string>> = { ru, en }

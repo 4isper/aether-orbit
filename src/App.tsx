@@ -6,6 +6,7 @@ import type { FlightTelemetry } from './components/CameraRig'
 import { parsePose, type CameraPose } from './camera-math'
 import { deepLinkUrl, parseTimeParam } from './deep-link'
 import { loadSession, saveSession } from './session'
+import { addJournalFrame, readJournal, type JournalFrame } from './journal'
 import { t } from './strings'
 import type { EphemerisPayload } from './ephemerides'
 import { eventCueTransition, playEventCue, setBoost } from './audio'
@@ -13,6 +14,7 @@ import { BodyPanel } from './components/interface/BodyPanel'
 import { EphemerisPanel } from './components/interface/EphemerisPanel'
 import { eventLabel, formatDuration } from './components/interface/event-copy'
 import { HelpDialog } from './components/interface/HelpDialog'
+import { JournalDialog } from './components/interface/JournalDialog'
 import { OrbitMark } from './components/interface/OrbitMark'
 import { PlanetNav } from './components/interface/PlanetNav'
 import { QrDialog } from './components/interface/QrDialog'
@@ -147,6 +149,7 @@ function App() {
   const [cinema, setCinema] = useState(false)
   const [help, setHelp] = useState(false)
   const [qr, setQr] = useState(false)
+  const [journalOpen, setJournalOpen] = useState(false)
   // Cinema hides the interface, panel with it — derived, so the scene simply
   // stops recasting an invisible schedule, and reopening cinema-free brings
   // the same switch back without a second state.
@@ -188,6 +191,7 @@ function App() {
     setFreeFlight,
     setQr,
     setEphemerisOpen,
+    setJournalOpen,
   })
   useTour({
     tour,
@@ -210,6 +214,25 @@ function App() {
       detail: { name: `aether-${activeView === 'system' ? 'system' : activeView}.png` },
     }))
   }, [activeView])
+  // The logbook: the scene pairs the capture's small copy with the moment
+  // on its clock; the address bar at this instant carries the freshest pose.
+  const [journal, setJournal] = useState<JournalFrame[]>(() => readJournal(window.localStorage, SCENE_VIEWS))
+  const handleFrameCaptured = useCallback((frame: { time: number; thumbnail: string }) => {
+    const pose = parsePose(new URLSearchParams(window.location.search)) ?? poseRef.current ?? undefined
+    addJournalFrame(window.localStorage, {
+      view: activeView,
+      pose: pose ?? undefined,
+      time: frame.time,
+      thumbnail: frame.thumbnail,
+      takenAt: Date.now(),
+    }, SCENE_VIEWS)
+    setJournal(readJournal(window.localStorage, SCENE_VIEWS))
+  }, [activeView])
+  const openJournalFrame = useCallback((frame: JournalFrame) => {
+    // The stored deep link restores view, pose and moment in one navigation —
+    // the same contract a shared link obeys.
+    window.location.assign(deepLinkUrl(frame.view, frame.pose, frame.time))
+  }, [])
   const { copied, shareLink } = useShareLink()
 
   return (
@@ -249,6 +272,7 @@ function App() {
                 onSelect={travelTo}
                 onEvent={handleEvent}
                 onEphemeris={handleEphemeris}
+                onFrameCaptured={handleFrameCaptured}
                 onFlightTelemetry={handleFlightTelemetry}
               />
             </Suspense>
@@ -265,6 +289,8 @@ function App() {
           bodyCode={body ? body.code : null}
           ephemerisOpen={ephemerisOpen}
           onToggleEphemeris={() => setEphemerisOpen((value) => !value)}
+          journalOpen={journalOpen}
+          onToggleJournal={() => setJournalOpen((value) => !value)}
           onToggleLocale={toggleLocale}
         />
         <PlanetNav
@@ -362,6 +388,14 @@ function App() {
 
       {help && <HelpDialog locale={locale} onClose={() => setHelp(false)} />}
       {qr && <QrDialog locale={locale} onClose={() => setQr(false)} />}
+      {journalOpen && (
+        <JournalDialog
+          locale={locale}
+          frames={journal}
+          onOpenFrame={openJournalFrame}
+          onClose={() => setJournalOpen(false)}
+        />
+      )}
 
       {/* Cinema mode hides the interface, but the sky keeps talking: a quiet
         * toast carries the announcement until the moment ends. Lives outside

@@ -1,8 +1,8 @@
 import { t, type Locale } from '../../strings'
 import { OrbitMark } from './OrbitMark'
 
-/** Header: brand, what the scene is doing right now, the schedule switch
- * and the locale toggle. */
+/** Header: brand, what the scene is doing right now, the schedule and
+ * journal switches, the locale toggle. */
 export function TopBar({
   locale,
   travelling,
@@ -11,6 +11,8 @@ export function TopBar({
   bodyCode,
   ephemerisOpen,
   onToggleEphemeris,
+  journalOpen,
+  onToggleJournal,
   onToggleLocale,
 }: {
   locale: Locale
@@ -20,6 +22,8 @@ export function TopBar({
   bodyCode: string | null
   ephemerisOpen: boolean
   onToggleEphemeris: () => void
+  journalOpen: boolean
+  onToggleJournal: () => void
   onToggleLocale: () => void
 }) {
   return (
@@ -48,6 +52,15 @@ export function TopBar({
           onClick={onToggleEphemeris}
         >
           {t(locale, 'ephemerides')}
+        </button>
+        <button
+          type="button"
+          className={`ephemeris-toggle ${journalOpen ? 'is-open' : ''}`}
+          aria-label={t(locale, 'journalShow')}
+          aria-pressed={journalOpen}
+          onClick={onToggleJournal}
+        >
+          {t(locale, 'journal')}
         </button>
         <button
           type="button"

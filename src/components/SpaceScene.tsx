@@ -69,6 +69,20 @@ function ComposerCapture() {
         link.download = name
         link.href = gl.domElement.toDataURL('image/png')
         link.click()
+        // The logbook keeps a small copy of the same frame: drawn from the
+        // fresh buffer before the ratio restore resizes (and clears) it.
+        const thumb = document.createElement('canvas')
+        const scale = 480 / gl.domElement.width
+        thumb.width = 480
+        thumb.height = Math.max(1, Math.round(gl.domElement.height * scale))
+        const context = thumb.getContext('2d')
+        if (context) {
+          context.drawImage(gl.domElement, 0, 0, thumb.width, thumb.height)
+          const thumbnail = thumb.toDataURL('image/webp', 0.75)
+          if (thumbnail.startsWith('data:image/')) {
+            window.dispatchEvent(new CustomEvent('aether:frame-captured', { detail: { thumbnail } }))
+          }
+        }
       } finally {
         gl.setPixelRatio(savedRatio)
         composer.setSize(size.width, size.height, false)
@@ -168,10 +182,13 @@ type SpaceSceneProps = {
   onSelect: (view: SceneView) => void
   onEvent?: (announcement: EventAnnouncement | null) => void
   onEphemeris?: (payload: EphemerisPayload) => void
+  /** A frame was just captured: the logbook entry needs the moment it shows,
+   * which only this scene's clock knows. */
+  onFrameCaptured?: (frame: { time: number; thumbnail: string }) => void
   onFlightTelemetry?: (telemetry: FlightTelemetry) => void
 }
 
-export function SpaceScene({ activeView, destination, initialView, initialPose, initialTime, timeScale, locale, reducedMotion, lowEnd = false, freeFlight, onReady, onArrive, onSharePose, onSelect, onEvent, onEphemeris, onFlightTelemetry }: SpaceSceneProps) {
+export function SpaceScene({ activeView, destination, initialView, initialPose, initialTime, timeScale, locale, reducedMotion, lowEnd = false, freeFlight, onReady, onArrive, onSharePose, onSelect, onEvent, onEphemeris, onFrameCaptured, onFlightTelemetry }: SpaceSceneProps) {
   const gl = useThree((state) => state.gl)
   const [hovered, setHovered] = useState(false)
   const travelling = activeView !== destination
@@ -196,6 +213,21 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
   useEffect(() => {
     onEphemerisRef.current = onEphemeris
   })
+  const onFrameCapturedRef = useRef(onFrameCaptured)
+  useEffect(() => {
+    onFrameCapturedRef.current = onFrameCaptured
+  })
+
+  useEffect(() => {
+    // The capture's small copy: pair it with the moment on this scene's
+    // shared clock, the one field nobody else holds.
+    const onFrameCaptured = (event: Event) => {
+      const thumbnail = (event as CustomEvent<{ thumbnail?: string }>).detail?.thumbnail
+      if (thumbnail) onFrameCapturedRef.current?.({ time: orbitTime.current, thumbnail })
+    }
+    window.addEventListener('aether:frame-captured', onFrameCaptured)
+    return () => window.removeEventListener('aether:frame-captured', onFrameCaptured)
+  }, [])
   const emitEphemeris = useCallback(() => {
     onEphemerisRef.current?.({ now: orbitTime.current, entries: listEphemerides(orbitTime.current) })
   }, [])

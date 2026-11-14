@@ -1259,6 +1259,60 @@ h1 > em {
   text-transform: uppercase;
 }
 
+/* Frame journal: a wider card with a gallery grid of saved frames. */
+.journal-card {
+  max-width: 560px;
+}
+
+.journal-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.journal-frame {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 0;
+  border: 1px solid rgba(150, 180, 200, 0.14);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.journal-frame:hover {
+  border-color: rgba(174, 205, 224, 0.45);
+}
+
+.journal-thumb {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.journal-caption {
+  padding: 4px 8px 6px;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(229, 238, 243, 0.7);
+}
+
+.journal-caption small {
+  color: rgba(202, 218, 227, 0.4);
+  font-variant-numeric: tabular-nums;
+}
+
+.journal-empty {
+  margin: 0;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  line-height: 1.7;
+  color: rgba(206, 222, 231, 0.5);
+}
+
 .shortcuts-list {
   margin: 0;
 }

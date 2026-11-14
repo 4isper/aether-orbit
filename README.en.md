@@ -35,6 +35,7 @@ An interactive space scene in the browser: three fictional worlds, cinematic fli
 - **Keyboard shortcuts** — `Space` pauses time, `1–7` jump to views, `?` opens a shortcut cheat-sheet.
 - **Share button** — copies a link to the exact view, camera pose and simulation moment (`?view=`, `?yaw=&pitch=&zoom=`, `?t=` — the URL contract lives in `deep-link.ts`); the deterministic clock means the link reproduces the sky, not just the framing, and jumping to an event writes the leap target into the address. A second button shows the same address as a QR code for a phone camera — drawn on the fly, no external services.
 - **Visit restore** — like the locale and the ambience, the last session lives in localStorage (`session.ts`): returning to a bare address opens the scene on the same view, with the same camera pose and moment. Explicit link parameters always win — they override the session piece by piece.
+- **Frame journal** — every saved frame leaves a trace: a small preview, the view, the pose and the moment land in a bounded logbook — twelve frames, the oldest displaced by the new (`journal.ts`; entries are judged one by one, a broken one falls out alone). The "Journal" button in the header opens the gallery; clicking a frame brings it back whole — the same deep link a shared one obeys: view, pose and the deterministic moment reproduce one to one.
 - **Adaptive quality** — canvas resolution steps between 0.85 and 1.75 DPR based on sustained FPS; the DOM interface stays crisp.
 - **PWA** — the app installs to a home screen and keeps working offline: a manifest and a small service worker cache the shell, hashed chunks and textures (shell network-first, assets cache-first). Registered in production builds only.
 - **Careful-motion mode** — with `prefers-reduced-motion` flights are instant, rotation and star twinkle are disabled.
@@ -113,6 +114,7 @@ npm run test:smoke
 | The pause button | Stop and resume time |
 | The "Tour" button | Automatic cinematic tour of the system |
 | The "Ephemerides" button in the header | The schedule of every system event ahead of time; "skip to the moment" in a row jumps to that row's peak |
+| The "Journal" button in the header | A gallery of saved frames; clicking a frame opens its deep link — view, pose and moment |
 | The RU / EN switch in the header | Change the interface language; the choice persists |
 | The "Save frame" button | PNG of the current view at double resolution, with the view name in the file |
 | The "Share" button | Copies a link to the current view and pose (system share sheet on mobile) |

@@ -35,6 +35,7 @@ type SceneCanvasProps = {
   onSelect: (view: SceneView) => void
   onEvent?: (announcement: EventAnnouncement | null) => void
   onEphemeris?: (payload: EphemerisPayload) => void
+  onFrameCaptured?: (frame: { time: number; thumbnail: string }) => void
   onFlightTelemetry?: (telemetry: FlightTelemetry) => void
 }
 
@@ -55,6 +56,7 @@ export default function SceneCanvas({
   onSelect,
   onEvent,
   onEphemeris,
+  onFrameCaptured,
   onFlightTelemetry,
 }: SceneCanvasProps) {
   const [dpr, setDpr] = useState(getMaxDpr)
@@ -115,6 +117,7 @@ export default function SceneCanvas({
             onSelect={onSelect}
             onEvent={onEvent}
             onEphemeris={onEphemeris}
+            onFrameCaptured={onFrameCaptured}
             onFlightTelemetry={onFlightTelemetry}
           />
         </PerformanceMonitor>
