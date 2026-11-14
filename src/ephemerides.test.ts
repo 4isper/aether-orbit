@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { listEphemerides } from './ephemerides.ts'
+import { listEphemerides, pastEphemerides } from './ephemerides.ts'
 
 /** Every stream the schedule walks, named the way entries name themselves:
  * a conjunction and a periapsis carry the body their label talks about. */
@@ -96,6 +96,43 @@ test('the schedule stays honest at deep time, where deep links wander', () => {
         `window ${streamName(entry)} has a non-finite peak at t=${start}`)
       assert.ok(entry.peak >= start - 150,
         `stale window ${streamName(entry)} at t=${start}: peak ${entry.peak}`)
+    }
+  }
+})
+
+test('the diary reads only finished windows, most recent first', () => {
+  for (let start = 200; start <= 1200; start += 173) {
+    const past = pastEphemerides(start)
+    assert.ok(past.length > 0, `the diary is empty at t=${start}`)
+    for (const entry of past) {
+      assert.ok(entry.exit <= start, `window ${entry.kind} at t=${start} is not finished`)
+      assert.ok(entry.entry >= start - 240, `window ${entry.kind} at t=${start} reaches past the diary`)
+    }
+    for (let i = 1; i < past.length; i++) {
+      assert.ok(past[i - 1].exit >= past[i].exit,
+        `the diary breaks order at t=${start}: ${past[i - 1].exit} then ${past[i].exit}`)
+    }
+  }
+})
+
+test('the diary never repeats a stream: one entry per occurrence', () => {
+  for (let start = 100; start <= 1500; start += 191) {
+    const byStream = new Map<string, number>()
+    for (const entry of pastEphemerides(start)) {
+      const key = entry.kind + (entry.body ?? '')
+      assert.ok(!byStream.has(key), `stream ${key} repeats in the diary at t=${start}`)
+      byStream.set(key, entry.peak)
+    }
+  }
+})
+
+test('a moment in progress is not yet diary material', () => {
+  // Jump onto a peak: the covering window is happening now, not in the past.
+  const peaks = listEphemerides(400).map((entry) => entry.peak)
+  for (const peak of peaks) {
+    for (const entry of pastEphemerides(peak)) {
+      assert.ok(!(entry.entry <= peak && peak <= entry.exit),
+        `window ${entry.kind} claims to be both now and past at t=${peak}`)
     }
   }
 })

@@ -32,11 +32,12 @@ export type EphemerisEntry = {
   exit: number
 }
 
-/** What the panel reads: the schedule with the moment it was cast for, so
- * the countdowns know their zero. */
+/** What the panel reads: the schedule ahead and the diary behind, both with
+ * the moment they were cast for, so the countdowns know their zero. */
 export type EphemerisPayload = {
   now: number
   entries: EphemerisEntry[]
+  past: EphemerisEntry[]
 }
 
 type EventStream = {
@@ -102,4 +103,50 @@ export function listEphemerides(now: number): EphemerisEntry[] {
   return STREAMS
     .flatMap((stream) => streamWindows(stream, now))
     .sort((a, b) => a.entry - b.entry)
+}
+
+/**
+ * How far back the diary reaches, in time units: a couple of the sky's
+ * faster laps, enough for the moment that just ended to still be listed.
+ */
+export const EPHEMERIS_LOOKBACK = 240
+
+/** How many finished moments the diary keeps. */
+export const EPHEMERIS_PAST_DEPTH = 6
+
+/**
+ * The sky's diary: the windows that finished within the lookback, most
+ * recent first. Scanned forward from the lookback's edge with the same
+ * per-stream scanners — the past is only a cursor placed earlier. A window
+ * still in progress belongs to the schedule, not the diary.
+ */
+export function pastEphemerides(now: number): EphemerisEntry[] {
+  const from = now - EPHEMERIS_LOOKBACK
+  const past: EphemerisEntry[] = []
+  for (const stream of STREAMS) {
+    let cursor = from
+    while (cursor <= now) {
+      const window = stream.next(cursor)
+      if (!window || window.entry > now) break
+      if (window.exit <= now) {
+        past.push({ kind: stream.kind, body: stream.body, ...window })
+        cursor = window.exit + CURSOR_STEP
+      } else {
+        // In progress right now: everything later is the future's business.
+        break
+      }
+    }
+  }
+  // One row per stream — its most recent occurrence. The recurrence rhythm
+  // is the schedule's business; the diary names what just ended.
+  const seen = new Set<string>()
+  return past
+    .sort((a, b) => b.exit - a.exit)
+    .filter((entry) => {
+      const key = `${entry.kind}/${entry.body ?? ''}`
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+    .slice(0, EPHEMERIS_PAST_DEPTH)
 }

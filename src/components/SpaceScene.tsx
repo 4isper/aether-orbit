@@ -27,7 +27,7 @@ import { nextShower } from '../meteors'
 import { nextStorm } from '../storms'
 import { nextCyclone } from '../cyclone'
 import { nextFlare } from '../flare'
-import { listEphemerides, type EphemerisPayload, type EventKind } from '../ephemerides'
+import { listEphemerides, pastEphemerides, type EphemerisPayload, type EventKind } from '../ephemerides'
 import type { CameraPose } from '../camera-math'
 import type { FlightTelemetry } from './CameraRig'
 import type { Locale } from '../strings'
@@ -234,7 +234,8 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
     return () => window.removeEventListener('aether:frame-captured', onFrameCaptured)
   }, [])
   const emitEphemeris = useCallback(() => {
-    onEphemerisRef.current?.({ now: orbitTime.current, entries: listEphemerides(orbitTime.current) })
+    const now = orbitTime.current
+    onEphemerisRef.current?.({ now, entries: listEphemerides(now), past: pastEphemerides(now) })
   }, [])
 
   useEffect(() => {

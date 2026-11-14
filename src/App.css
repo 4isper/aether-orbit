@@ -503,6 +503,21 @@ h1 > em {
   white-space: nowrap;
 }
 
+.ephemeris-diary-head {
+  margin: 10px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid rgba(150, 180, 200, 0.16);
+  color: rgba(199, 214, 223, 0.45);
+}
+
+.ephemeris-row--past {
+  opacity: 0.75;
+}
+
+.ephemeris-row--past strong {
+  color: rgba(202, 218, 227, 0.6);
+}
+
 @media (max-width: 900px) {
   .ephemeris-panel {
     right: 24px;

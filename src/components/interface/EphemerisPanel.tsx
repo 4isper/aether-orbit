@@ -4,9 +4,11 @@ import { ephemerisLabel, formatDuration } from './event-copy'
 
 /**
  * The ephemerides panel: every sky moment the scanners promise, one list
- * whatever view holds the camera. The scene recasts the schedule once per
- * second while it is open, so the countdowns breathe with the clock; each
- * row's "skip" lands on that moment's peak, exactly like the orbit chip.
+ * whatever view holds the camera — and beneath it, the sky's diary: the
+ * moments that just finished, each replayable, because the simulation is
+ * deterministic and a jump to a past peak replays it exactly. The scene
+ * recasts both lists once per second while the panel is open, so the
+ * countdowns breathe with the clock.
  */
 export function EphemerisPanel({
   locale,
@@ -55,6 +57,27 @@ export function EphemerisPanel({
               </div>
             )
           })}
+          {payload.past.length > 0 && (
+            <>
+              <p className="ephemeris-diary-head">{t(locale, 'ephemeridesPast')}</p>
+              {payload.past.map((entry) => (
+                <div className="ephemeris-row ephemeris-row--past" key={`past-${entry.kind}-${entry.body ?? ''}-${entry.peak}`}>
+                  <span className="ephemeris-label">{t(locale, ephemerisLabel(entry))}</span>
+                  <strong>
+                    {t(locale, 'ephemeridesAgo', { time: formatDuration(Math.max(payload.now - entry.exit, 0), locale) })}
+                  </strong>
+                  <button
+                    type="button"
+                    className="event-go"
+                    aria-label={`${t(locale, 'ephemeridesReplay')}: ${t(locale, ephemerisLabel(entry))}`}
+                    onClick={() => onSeek(entry.peak)}
+                  >
+                    {t(locale, 'ephemeridesReplay')}
+                  </button>
+                </div>
+              ))}
+            </>
+          )}
         </div>
       )}
     </aside>
