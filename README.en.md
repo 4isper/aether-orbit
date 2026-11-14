@@ -26,6 +26,7 @@ An interactive space scene in the browser: three fictional worlds, cinematic fli
 - **Heliocentric system** — the star in the center, three slightly inclined orbits with slow planetary motion; lighting and terminators follow the direction to the star, so the planet phase changes along the orbit. Illumination falls with distance from Solis — Vesper receives half to a third of Aurelia's light (exponent 1.5 — an exposure compromise between the honest inverse square and a legible frame).
 - **Event announcements** — the simulation is deterministic, so events are computed ahead by pure geometry: Nox's transit across Solis (from Aurelia's orbit), Nox's eclipse in Aurelia's shadow (from Nox's orbit), and Boreas's plunge toward perihelion (on the comet); `conjunction.ts` feeds the same scanner a different measure — from Cinder's orbit Vesper slips behind the star's disc, from Vesper's orbit Aurelia crosses it as a silhouette. The desert keeps its own weather too: on Cinder's orbit the storm (`storms.ts`) competes with Vesper's occultation, and whichever moment comes first takes the chip. And the meteor shower is the one event visible from every view: it joins every chip's candidate list under the same nearest-moment rule; the system overview, which owns no sky moment of its own, grows a chip only for it. Each shows a countdown chip with a "skip to the moment" button; the moment's beginning and the jump sound a short synthesized swell when sound is on. In cinema mode (H), where the chip hides with the whole interface, the announcement keeps living as a quiet toast at the bottom of the frame — no buttons, nothing to click.
 - **Free flight** — the "Flight" button detaches the camera: WASD thrust, arrows and drag to look, Q/E down and up, wheel and pinch for impulse, Shift to boost (thrust and speed cap ×3) with a live HUD for speed and the nearest surface. Every body ahead carries its name in the void — a distant point of light answers for itself, markers and HUD distances from one position source (`flightBodyPosition`). Stare down Solis up close and the frame floods with glare. Escape or the button flies back to the regular orbit.
+- **Ephemerides** — the whole system keeps one shared log of the sky: a header button opens a panel with the schedule of every event ahead of time — the transit, the eclipse, both conjunctions, both periapsides, the storm, the shower. The next two windows of each stream (`ephemerides.ts`: the same cursor over the scanners that drives the chips) merge into one list by first contact; a moment already in progress leads the list, lit amber. Every row carries a countdown and a "skip to the moment" jump to that window's peak under the same rule the orbit chip obeys, writing the new `?t=` into the address. The panel recasts the schedule once per second while open, and fades out with cinema mode.
 - **Ambient sound** — a quiet synthesized observation-deck background built from Web Audio, zero audio assets; the choice persists and resumes on the first gesture of the next visit. Beneath it live two cues: a boost hum while Shift is held in flight, and a slow octave-fall swell when an announced window begins or the "skip to the moment" jump lands.
 - **Tour mode** — the "Tour" button runs an automatic circuit: Aurelia → Cinder → Vesper → the Belt → Boreas → Erebus → Solis → system overview, ~7 seconds per stop; any manual navigation stops the tour.
 - **System overview** — all three worlds, the star and the asteroid belt in one frame; clicking a planet sphere, the star or a label starts a flight. Framing compensates for perspective so near planets stay inside the shot.
@@ -74,7 +75,7 @@ npm run build
 npm run preview
 ```
 
-Linter and math tests (orbits, Kepler's equation, camera, prominence loops, ring shadows):
+Linter and math tests (orbits, Kepler's equation, camera, prominence loops, ring shadows, ephemerides):
 
 ```bash
 npm run lint
@@ -111,6 +112,7 @@ npm run test:smoke
 | The reverse button (◀◀ next to pause) | Time runs backwards: orbits, phases, the comet and the star's boiling reverse |
 | The pause button | Stop and resume time |
 | The "Tour" button | Automatic cinematic tour of the system |
+| The "Ephemerides" button in the header | The schedule of every system event ahead of time; "skip to the moment" in a row jumps to that row's peak |
 | The RU / EN switch in the header | Change the interface language; the choice persists |
 | The "Save frame" button | PNG of the current view at double resolution, with the view name in the file |
 | The "Share" button | Copies a link to the current view and pose (system share sheet on mobile) |
@@ -152,6 +154,7 @@ src/
   comet.ts             # the comet's Kepler orbit: Kepler's equation, positions, perihelion window
   prominences.ts       # prominence loops: arc between legs, life cycle
   meteors.ts           # meteors: deterministic spawns per cycle, tangential tracks
+  ephemerides.ts       # the sky's schedule: every stream's next windows as one list
   ring-shadow.ts       # ring shadow geometry: ray-plane intersection
   galactic.ts          # the Milky Way: star directions along the galactic band
   camera-math.ts       # camera offsets, overview framing, pose serialization

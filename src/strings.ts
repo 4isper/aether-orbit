@@ -112,6 +112,8 @@ const ru = {
   eventGo: 'К моменту',
   eventDuration: '{m} мин {s} с',
   eventSeconds: '{s} с',
+  ephemerides: 'Эфемериды',
+  ephemeridesClose: 'Закрыть эфемериды',
 }
 
 export type StringKey = keyof typeof ru
@@ -221,6 +223,8 @@ const en: Record<StringKey, string> = {
   eventGo: 'Skip to the moment',
   eventDuration: '{m} min {s} s',
   eventSeconds: '{s} s',
+  ephemerides: 'Ephemerides',
+  ephemeridesClose: 'Close the ephemerides',
 }
 
 export const strings: Record<Locale, Record<StringKey, string>> = { ru, en }

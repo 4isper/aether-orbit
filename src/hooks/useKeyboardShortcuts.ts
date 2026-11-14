@@ -13,6 +13,7 @@ export function useKeyboardShortcuts({
   setHelp,
   setFreeFlight,
   setQr,
+  setEphemerisOpen,
 }: {
   views: SceneView[]
   travelTo: (view: SceneView) => void
@@ -21,6 +22,7 @@ export function useKeyboardShortcuts({
   setHelp: Dispatch<SetStateAction<boolean>>
   setFreeFlight: Dispatch<SetStateAction<boolean>>
   setQr: Dispatch<SetStateAction<boolean>>
+  setEphemerisOpen: Dispatch<SetStateAction<boolean>>
 }) {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -31,6 +33,7 @@ export function useKeyboardShortcuts({
         setHelp(false)
         setQr(false)
         setFreeFlight(false)
+        setEphemerisOpen(false)
       }
       if (event.key === '?') setHelp((value) => !value)
       // Space and digits must not hijack an interactive element that has
@@ -52,5 +55,5 @@ export function useKeyboardShortcuts({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [views, travelTo, setPaused, setCinema, setHelp, setFreeFlight, setQr])
+  }, [views, travelTo, setPaused, setCinema, setHelp, setFreeFlight, setQr, setEphemerisOpen])
 }

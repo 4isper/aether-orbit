@@ -30,6 +30,13 @@ export type EphemerisEntry = {
   exit: number
 }
 
+/** What the panel reads: the schedule with the moment it was cast for, so
+ * the countdowns know their zero. */
+export type EphemerisPayload = {
+  now: number
+  entries: EphemerisEntry[]
+}
+
 type EventStream = {
   kind: EventKind
   body?: EventBody

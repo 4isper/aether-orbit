@@ -7,8 +7,10 @@ import { parsePose, type CameraPose } from './camera-math'
 import { deepLinkUrl, parseTimeParam } from './deep-link'
 import { loadSession, saveSession } from './session'
 import { t } from './strings'
+import type { EphemerisPayload } from './ephemerides'
 import { eventCueTransition, playEventCue, setBoost } from './audio'
 import { BodyPanel } from './components/interface/BodyPanel'
+import { EphemerisPanel } from './components/interface/EphemerisPanel'
 import { eventLabel, formatDuration } from './components/interface/event-copy'
 import { HelpDialog } from './components/interface/HelpDialog'
 import { OrbitMark } from './components/interface/OrbitMark'
@@ -118,15 +120,24 @@ function App() {
     announcedRef.current = announcement
     setEvent(announcement)
   }, [])
-  const seekToEvent = useCallback(() => {
-    if (!event) return
-    window.dispatchEvent(new CustomEvent('aether:seek', { detail: { time: event.peakAt } }))
+  const seekToMoment = useCallback((moment: number) => {
+    window.dispatchEvent(new CustomEvent('aether:seek', { detail: { time: moment } }))
     // The leap lands in the middle of the moment: let it be heard.
     playEventCue()
     // The address bar carries the jumped-to moment too, so a copy right after
     // the leap still reproduces the frame; the pose is the last shared one.
-    window.history.replaceState(null, '', deepLinkUrl(activeView, poseRef.current, event.peakAt))
-  }, [event, activeView])
+    window.history.replaceState(null, '', deepLinkUrl(activeView, poseRef.current, moment))
+  }, [activeView])
+  const seekToEvent = useCallback(() => {
+    if (event) seekToMoment(event.peakAt)
+  }, [event, seekToMoment])
+  // The ephemerides panel: the interface owns the switch, the scene owns the
+  // clock the schedule is cast on.
+  const [ephemerisOpen, setEphemerisOpen] = useState(false)
+  const [ephemeris, setEphemeris] = useState<EphemerisPayload | null>(null)
+  const handleEphemeris = useCallback((payload: EphemerisPayload) => {
+    setEphemeris(payload)
+  }, [])
   const [paused, setPaused] = useState(false)
   const [speed, setSpeed] = useState(1)
   const [reversed, setReversed] = useState(false)
@@ -136,6 +147,13 @@ function App() {
   const [cinema, setCinema] = useState(false)
   const [help, setHelp] = useState(false)
   const [qr, setQr] = useState(false)
+  // Cinema hides the interface, panel with it — derived, so the scene simply
+  // stops recasting an invisible schedule, and reopening cinema-free brings
+  // the same switch back without a second state.
+  const ephemerisActive = ephemerisOpen && !cinema
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('aether:ephemeris', { detail: { open: ephemerisActive } }))
+  }, [ephemerisActive])
   const tabVisible = useTabVisibility()
   const timeScale = paused ? 0 : reversed ? -speed : speed
 
@@ -169,6 +187,7 @@ function App() {
     setHelp,
     setFreeFlight,
     setQr,
+    setEphemerisOpen,
   })
   useTour({
     tour,
@@ -229,6 +248,7 @@ function App() {
                 onSharePose={handleSharePose}
                 onSelect={travelTo}
                 onEvent={handleEvent}
+                onEphemeris={handleEphemeris}
                 onFlightTelemetry={handleFlightTelemetry}
               />
             </Suspense>
@@ -243,6 +263,8 @@ function App() {
           freeFlight={freeFlight}
           overview={overview}
           bodyCode={body ? body.code : null}
+          ephemerisOpen={ephemerisOpen}
+          onToggleEphemeris={() => setEphemerisOpen((value) => !value)}
           onToggleLocale={toggleLocale}
         />
         <PlanetNav
@@ -294,6 +316,15 @@ function App() {
             </div>
             {flightInfo.boosting && <div className="flight-hud-boost">{t(locale, 'hudBoost')}</div>}
           </div>
+        )}
+
+        {ephemerisActive && (
+          <EphemerisPanel
+            locale={locale}
+            payload={ephemeris}
+            onSeek={seekToMoment}
+            onClose={() => setEphemerisOpen(false)}
+          />
         )}
 
         {body ? (

@@ -1,4 +1,4 @@
-import { useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { useCursor } from '@react-three/drei'
 import { Bloom, EffectComposer, EffectComposerContext, Vignette } from '@react-three/postprocessing'
@@ -25,6 +25,7 @@ import { nextPerihelion } from '../comet'
 import { nextErebusPeriapsis } from '../erebus'
 import { nextShower } from '../meteors'
 import { nextStorm } from '../storms'
+import { listEphemerides, type EphemerisPayload, type EventKind } from '../ephemerides'
 import type { CameraPose } from '../camera-math'
 import type { FlightTelemetry } from './CameraRig'
 import type { Locale } from '../strings'
@@ -82,7 +83,6 @@ function ComposerCapture() {
 
 /** What the interface needs to announce an event: which one, a countdown
  * and the absolute peak time the "skip to the moment" button seeks to. */
-export type EventKind = 'transit' | 'eclipse' | 'perihelion' | 'conjunction' | 'storm' | 'shower'
 export type EventAnnouncement = {
   kind: EventKind
   seconds: number
@@ -167,10 +167,11 @@ type SpaceSceneProps = {
   onSharePose: (view: SceneView, pose: CameraPose, time: number) => void
   onSelect: (view: SceneView) => void
   onEvent?: (announcement: EventAnnouncement | null) => void
+  onEphemeris?: (payload: EphemerisPayload) => void
   onFlightTelemetry?: (telemetry: FlightTelemetry) => void
 }
 
-export function SpaceScene({ activeView, destination, initialView, initialPose, initialTime, timeScale, locale, reducedMotion, lowEnd = false, freeFlight, onReady, onArrive, onSharePose, onSelect, onEvent, onFlightTelemetry }: SpaceSceneProps) {
+export function SpaceScene({ activeView, destination, initialView, initialPose, initialTime, timeScale, locale, reducedMotion, lowEnd = false, freeFlight, onReady, onArrive, onSharePose, onSelect, onEvent, onEphemeris, onFlightTelemetry }: SpaceSceneProps) {
   const gl = useThree((state) => state.gl)
   const [hovered, setHovered] = useState(false)
   const travelling = activeView !== destination
@@ -188,6 +189,16 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
   const eventTimer = useRef(0)
   const lastEventView = useRef(initialView)
   const eventRef = useRef<EventAnnouncement | null>(null)
+  // The ephemerides panel reads the schedule while it is open: the interface
+  // turns it on and off, the scene casts it on its own clock.
+  const ephemerisWanted = useRef(false)
+  const onEphemerisRef = useRef(onEphemeris)
+  useEffect(() => {
+    onEphemerisRef.current = onEphemeris
+  })
+  const emitEphemeris = useCallback(() => {
+    onEphemerisRef.current?.({ now: orbitTime.current, entries: listEphemerides(orbitTime.current) })
+  }, [])
 
   useEffect(() => {
     // "Skip to the moment": jump the shared simulation clock. Everything
@@ -195,7 +206,12 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
     // lands on the requested instant exactly.
     const onSeek = (event: Event) => {
       const time = (event as CustomEvent<{ time?: number }>).detail?.time
-      if (Number.isFinite(time)) orbitTime.current = time as number
+      if (Number.isFinite(time)) {
+        orbitTime.current = time as number
+        // The panel's countdowns measure from the clock it knows: a jump
+        // recasts the schedule at once.
+        if (ephemerisWanted.current) emitEphemeris()
+      }
     }
     // The time scrub's jog wheel: relative nudges around the current moment,
     // so the interface never needs the absolute clock to scrub. The URL
@@ -204,13 +220,22 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
       const delta = (event as CustomEvent<{ delta?: number }>).detail?.delta
       if (Number.isFinite(delta)) orbitTime.current += delta as number
     }
+    // The ephemerides panel asks the scene for its schedule; opening casts
+    // it at once, closing only stills the once-per-second recast.
+    const onEphemerisToggle = (event: Event) => {
+      const open = (event as CustomEvent<{ open?: boolean }>).detail?.open
+      ephemerisWanted.current = Boolean(open)
+      if (open) emitEphemeris()
+    }
     window.addEventListener('aether:seek', onSeek)
     window.addEventListener('aether:scrub', onScrub)
+    window.addEventListener('aether:ephemeris', onEphemerisToggle)
     return () => {
       window.removeEventListener('aether:seek', onSeek)
       window.removeEventListener('aether:scrub', onScrub)
+      window.removeEventListener('aether:ephemeris', onEphemerisToggle)
     }
-  }, [])
+  }, [emitEphemeris])
 
   useFrame((_, rawDelta) => {
     const delta = Math.min(rawDelta, 0.1)
@@ -221,21 +246,25 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
 
     // Announce the active view's event at a calm one-update-per-second pace;
     // a view change announces immediately so the chip switches without lag.
+    // The open ephemerides panel recasts its schedule on the same cadence.
     eventTimer.current += delta
-    if (onEvent && (eventTimer.current >= 1 || lastEventView.current !== activeView)) {
+    if (eventTimer.current >= 1 || lastEventView.current !== activeView) {
       eventTimer.current = 0
       lastEventView.current = activeView
-      const next = sceneEvent(activeView, orbitTime.current)
-      const prev = eventRef.current
-      const changed = (next === null) !== (prev === null)
-        || (next && prev && (next.kind !== prev.kind
-          || next.inProgress !== prev.inProgress
-          || Math.abs(next.seconds - prev.seconds) >= 0.5
-          || Math.abs(next.peakAt - prev.peakAt) > 1))
-      if (changed) {
-        eventRef.current = next
-        onEvent(next)
+      if (onEvent) {
+        const next = sceneEvent(activeView, orbitTime.current)
+        const prev = eventRef.current
+        const changed = (next === null) !== (prev === null)
+          || (next && prev && (next.kind !== prev.kind
+            || next.inProgress !== prev.inProgress
+            || Math.abs(next.seconds - prev.seconds) >= 0.5
+            || Math.abs(next.peakAt - prev.peakAt) > 1))
+        if (changed) {
+          eventRef.current = next
+          onEvent(next)
+        }
       }
+      if (ephemerisWanted.current) emitEphemeris()
     }
   })
 
