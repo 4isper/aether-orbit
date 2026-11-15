@@ -1,6 +1,7 @@
 import { useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Euler, Matrix4, Quaternion, ShaderMaterial, Vector3, type InstancedMesh } from 'three'
+import { keplerSpeedAroundVesper } from '../orbits'
 import { ringRockLayout } from '../ring-rocks'
 
 const vertexShader = /* glsl */ `
@@ -41,8 +42,6 @@ void main() {
 
 const ROCK_COUNT = 420
 const ROCK_SEED = 2026
-/** One lap of the ring's slow revolution, radians per time unit. */
-const REVOLVE_SPEED = 0.045
 /** Level of detail: the layer lives for close flights only. Zero size past
  * FADE_FAR, full size inside FADE_NEAR — the rocks grow in as the pilot
  * descends on the plane, with no transparency to sort against the rings. */
@@ -58,6 +57,19 @@ export function RingRocks({ timeRef, worldPosition }: { timeRef: { current: numb
   const ref = useRef<InstancedMesh>(null)
   const camera = useThree((state) => state.camera)
   const layout = useMemo(() => ringRockLayout(ROCK_COUNT, ROCK_SEED), [])
+  const omega = useMemo(() => {
+    // Per-rock Kepler around Vesper (keplerSpeedAroundVesper): the ring
+    // shears — inner ice overtakes outer — and at the shepherd's radius the
+    // rocks move exactly with the shepherd itself.
+    const speeds = new Float32Array(ROCK_COUNT)
+    for (let i = 0; i < ROCK_COUNT; i++) {
+      const x = layout.positions[i * 3]
+      const z = layout.positions[i * 3 + 2]
+      speeds[i] = keplerSpeedAroundVesper(Math.hypot(x, z))
+    }
+    return speeds
+  }, [layout])
+  const lastTime = useRef(Number.NaN)
   const material = useMemo(
     () => new ShaderMaterial({
       vertexShader,
@@ -104,7 +116,23 @@ export function RingRocks({ timeRef, worldPosition }: { timeRef: { current: numb
     mesh.visible = fade > 0
     mesh.scale.setScalar(Math.max(fade, 1e-4))
     material.uniforms.uCenter.value.copy(worldPosition)
-    mesh.rotation.y = timeRef.current * REVOLVE_SPEED
+    // Per-rock laps on the CPU, one cos/sin pair per rock per frame, in the
+    // shepherd's direction of travel. Like the belt: JS math is bit-identical
+    // across runs, and the lap advances only when the shared clock does.
+    const time = timeRef.current
+    if (fade === 0 || time === lastTime.current) return
+    lastTime.current = time
+    const array = mesh.instanceMatrix.array as Float32Array
+    for (let i = 0; i < ROCK_COUNT; i++) {
+      const angle = time * omega[i]
+      const c = Math.cos(angle)
+      const s = Math.sin(angle)
+      const x = layout.positions[i * 3]
+      const z = layout.positions[i * 3 + 2]
+      array[i * 16 + 12] = c * x - s * z
+      array[i * 16 + 14] = s * x + c * z
+    }
+    mesh.instanceMatrix.needsUpdate = true
   })
 
   return (

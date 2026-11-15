@@ -149,6 +149,21 @@ export function shepherdLocalPosition(time: number, target: Vector3) {
   return target.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius)
 }
 
+/**
+ * Vesper's gravity in scene units, implied by the shepherd's own clock
+ * (shepherdAngularSpeed² · shepherdOrbitRadius³ ≈ 0.181): the ring's ice
+ * rides the same pull, so every rock's mean motion follows
+ * keplerSpeedAroundVesper at its own radius — the ring shears, and the
+ * shepherd co-moves with the material it guards.
+ */
+export const vesperGM = vesperClock.shepherdAngularSpeed ** 2 * vesperClock.shepherdOrbitRadius ** 3
+
+/** Circular-orbit mean motion at a radius around Vesper: Kepler with the
+ * planet's implied GM. */
+export function keplerSpeedAroundVesper(radius: number) {
+  return Math.sqrt(vesperGM / radius ** 3)
+}
+
 export type BeltRingConfig = {
   /** Inner edge of the ring, scene units. */
   inner: number

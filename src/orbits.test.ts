@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { Vector3 } from 'three'
-import { aureliaClock, beltAnchorAngle, beltAnchorPosition, beltClock, beltRings, moonPhaseAngle, orbitPoint, planetPeriod, planetPosition, starFlux, vesperClock } from './orbits.ts'
+import { aureliaClock, beltAnchorAngle, beltAnchorPosition, beltClock, beltRings, keplerSpeedAroundVesper, moonPhaseAngle, orbitPoint, planetPeriod, planetPosition, starFlux, vesperClock } from './orbits.ts'
 import { planetIds } from './planets.ts'
 
 const scratch = new Vector3()
@@ -159,6 +159,22 @@ test('satellite clocks imply the declared compact-scale masses', () => {
   const routhLimit = 0.0385
   const aureliaRatio = moonGM / (starGM + moonGM)
   assert.ok(aureliaRatio > routhLimit, `Aurelia ratio ${aureliaRatio} slipped under Routh — update the trojan story`)
+})
+
+test('Vesper ring ice rides the shepherd\'s own Kepler law', () => {
+  // The ring's ice obeys the planet's implied GM: mean motion falls as
+  // r^-1.5, and at the shepherd's radius it moves exactly with the shepherd.
+  assert.ok(
+    Math.abs(keplerSpeedAroundVesper(vesperClock.shepherdOrbitRadius) - vesperClock.shepherdAngularSpeed) < 1e-12,
+    'the shepherd lost the ring material it guards',
+  )
+  const inner = keplerSpeedAroundVesper(2.5)
+  const outer = keplerSpeedAroundVesper(4)
+  assert.ok(inner > outer, 'ring ice must shear: inner rocks overtake outer ones')
+  assert.ok(
+    Math.abs(keplerSpeedAroundVesper(5) * Math.pow(2, 1.5) - keplerSpeedAroundVesper(2.5)) < 1e-12,
+    'ring mean motion must fall as r^-1.5',
+  )
 })
 
 test('the belt rides the same Kepler-3 as the planets', () => {
