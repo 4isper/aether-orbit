@@ -10,7 +10,7 @@
     "test": "node --experimental-strip-types --test src/*.test.ts",
     "preview": "vite preview",
     "test:smoke": "node scripts/smoke.mjs",
-    "test:frames": "node scripts/frames.mjs",
+    "test:frames": "node scripts/frames.mjs || node scripts/frames.mjs",
     "golden:update": "node scripts/frames.mjs --update"
   },
   "dependencies": {

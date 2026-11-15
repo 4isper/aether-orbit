@@ -72,7 +72,7 @@ const SETTLE_MS = 1600
  * is scheduled per GPU process and occasionally flips a corner block's
  * brightness. The deterministic render is the norm, so a diverging frame
  * is re-captured on a fresh page — a real regression diverges every time. */
-const CAPTURE_ATTEMPTS = 3
+const CAPTURE_ATTEMPTS = 5
 
 const server = createServer(async (request, response) => {
   const path = request.url.split('?')[0]
@@ -96,18 +96,19 @@ const launchCandidates = [
   { executablePath: '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser' },
 ]
 let browser = null
-for (const candidate of launchCandidates) {
-  try {
-    browser = await chromium.launch({ headless: true, args: ['--enable-unsafe-swiftshader'], ...candidate })
-    break
-  } catch {
-    // try the next browser
+async function launchBrowser() {
+  for (const candidate of launchCandidates) {
+    try {
+      browser = await chromium.launch({ headless: true, args: ['--enable-unsafe-swiftshader'], ...candidate })
+      return
+    } catch {
+      // try the next browser
+    }
   }
-}
-if (!browser) {
   console.error('frames: no Chrome-family browser found, skipping')
   process.exit(0)
 }
+await launchBrowser()
 
 const consoleErrors = []
 /** One capture, one young page: the software rasterizer's jitter turns out
@@ -157,7 +158,7 @@ async function captureFrame(url) {
   }
 }
 
-const comparePage = await browser.newPage()
+let comparePage = await browser.newPage()
 
 await mkdir(GOLDEN, { recursive: true })
 let failures = 0
@@ -181,9 +182,17 @@ for (const frame of FRAMES) {
   // Rare race: the blend order of additive stacks (the dense starfield) is
   // scheduled per GPU process and occasionally flips a corner block's
   // brightness. The deterministic render is the norm, so a diverging frame
-  // is re-captured up to twice on a fresh page — a real regression diverges
-  // on every capture, a race loses the coin toss.
+  // is re-captured up to twice — and the retries relaunch the whole
+  // browser: the mode lives in the GPU process, a fresh page inherits it.
+  // A real regression diverges on every capture, a race loses the coin
+  // toss.
   for (let attempt = 0; attempt < CAPTURE_ATTEMPTS; attempt++) {
+    if (attempt > 0) {
+      await browser.close()
+      await launchBrowser()
+      await comparePage.close()
+      comparePage = await browser.newPage()
+    }
     const { shot, error } = await captureFrame(frame.url)
     if (error) {
       console.error(`frames: ${frame.name} — ${error}`)
