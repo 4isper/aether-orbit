@@ -49,15 +49,18 @@ const MIME = {
 }
 
 /** Fixed moments: flare peak on the star's orbit, cyclone over the ocean,
- * the ring system, the desert, the belt interior and the overview. */
+ * the ring system, the desert, the belt interior, the overview, the moon's
+ * transit at its deepest point and the comet at perihelion. */
 const FRAMES = [
   { name: 'aurelia-cyclone', url: '/?view=aurelia&t=16&yaw=0&pitch=0.12&zoom=6&dpr=1' },
   { name: 'aurelia-flare', url: '/?view=aurelia&t=105&yaw=0.2&pitch=0.1&zoom=7&dpr=1' },
+  { name: 'transit-peak', url: '/?view=aurelia&t=77.7&yaw=2.0&pitch=0.25&zoom=7&dpr=1' },
   { name: 'vesper-rings', url: '/?view=vesper&t=120&yaw=-0.2&pitch=0.08&zoom=8&dpr=1' },
   { name: 'cinder', url: '/?view=cinder&t=300&yaw=0.1&pitch=0.1&zoom=8&dpr=1' },
   { name: 'belt', url: '/?view=belt&t=100&dpr=1' },
   { name: 'system', url: '/?view=system&t=150&dpr=1' },
   { name: 'star-flare', url: '/?view=star&t=105&dpr=1' },
+  { name: 'comet-perihelion', url: '/?view=comet&t=452.5&dpr=1' },
   { name: 'moon', url: '/?view=moon&t=200&dpr=1' },
   { name: 'erebus', url: '/?view=erebus&t=120&dpr=1' },
 ]
