@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { Group, Mesh, Vector3 } from 'three'
-import { moonPhaseAngle, planetPosition, aureliaClock } from './orbits.ts'
+import { moonPhaseAngle, planetPosition, aureliaClock, aureliaFrame } from './orbits.ts'
 import {
   shadowDistance,
   nextTransit,
   moonWorldPosition,
-  DISC_THRESHOLD_MOON_RADII,
+  TRANSIT_THRESHOLD_MOON_RADII,
   nextEclipse,
   moonShadowDepth,
   ECLIPSE_THRESHOLD_PLANET_RADII,
@@ -45,14 +45,18 @@ test('the pure moon position matches the scene graph exactly', () => {
   }
 })
 
-test('shadow distance is finite, non-negative, or the no-shadow sentinel', () => {
+test('shadow margin is finite or the no-shadow sentinel', () => {
   for (let t = 0; t < 500; t += 1.3) {
     const distance = shadowDistance(t)
     assert.ok(
       Number.isFinite(distance) || distance === Number.POSITIVE_INFINITY,
       `NaN at t=${t}`,
     )
-    assert.ok(distance >= 0, `negative at t=${t}`)
+    // The margin is signed: negative is a surface point inside the cone.
+    // The deep end bottoms out at the planet radius plus the cone, both in
+    // moon radii, so anything below this bound is a bug, not a shadow.
+    const floor = -(aureliaFrame.planetRadius / 0.34 + 4)
+    assert.ok(Number.isNaN(distance) === false && (distance === Number.POSITIVE_INFINITY || distance > floor), `out of range at t=${t}: ${distance}`)
   }
 })
 
@@ -80,14 +84,17 @@ test('a window is a bounded event, not a penumbral season', () => {
   assert.ok(event.exit - event.entry < month / 2, `window ${(event.exit - event.entry).toFixed(1)} spans half a month`)
   // The window may outlive the scan's month horizon: its exit must still be
   // a real closure, refined to the actual crossing.
-  assert.ok(shadowDistance(event.exit + 0.5) > DISC_THRESHOLD_MOON_RADII, 'exit is not a real crossing')
+  assert.ok(shadowDistance(event.exit + 0.5) > TRANSIT_THRESHOLD_MOON_RADII, 'exit is not a real crossing')
 })
 
 test('nextTransit returns a bounded window with a peak inside it', () => {
   const event = nextTransit(0)
   assert.ok(event, 'expected a transit ahead of t=0')
   assert.ok(event.entry < event.peak && event.peak < event.exit, 'window is not ordered')
-  assert.ok(event.exit - event.entry < 20, `window too long: ${event.exit - event.entry}`)
+  // The honest cone widened the crossing: Solis's disc is enormous from the
+  // surface, so the silhouette clips it for a long sweep — still well under
+  // half a month, and the peak is the ring dead-center.
+  assert.ok(event.exit - event.entry < 32, `window too long: ${event.exit - event.entry}`)
   assert.ok(shadowDistance(event.peak) < shadowDistance(event.entry), 'peak is not the deepest point')
 })
 

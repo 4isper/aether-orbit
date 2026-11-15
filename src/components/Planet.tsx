@@ -16,6 +16,7 @@ import {
 } from 'three'
 import { noiseGLSL } from '../shaders/noise'
 import { bodyVertexGLSL, perturbNormalGLSL } from '../shaders/common'
+import { FLIGHT_BODY_RADII } from '../camera-math'
 import { Atmosphere } from './Atmosphere'
 import { Moon } from './Moon'
 import { lightningStrikes, LIGHTNING_CELLS, type LightningStrike } from '../lightning'
@@ -43,6 +44,7 @@ uniform float uCloudOffset;
 uniform vec3 uSunDirection;
 uniform vec3 uMoonPosition;
 uniform float uMoonRadius;
+uniform float uSunRadius;
 uniform float uStarFlux;
 uniform float uTime;
 uniform float uCyclone;
@@ -147,14 +149,22 @@ void main() {
   float fresnel = pow(1.0 - max(dot(geometricN, V), 0.0), 4.0);
   color += vec3(0.015, 0.045, 0.09) * fresnel * daylight * 0.7 * uStarFlux;
 
-  vec3 moonOffset = uMoonPosition - vWorldPosition;
-  float moonAlong = dot(moonOffset, L);
-  if (moonAlong > 0.0) {
-    float moonPerp = sqrt(max(dot(moonOffset, moonOffset) - moonAlong * moonAlong, 0.0));
-    // The moon is angularly smaller than Solis from the surface, so its shadow
-    // is a wide soft penumbra (annular eclipse) with a warm refracted rim,
-    // not a hard umbra disc.
-    float penumbra = 1.0 - smoothstep(uMoonRadius * 1.2, uMoonRadius * 3.3, moonPerp);
+  // The moon's shadow is honest cone geometry: Solis outgrows Nox, so the
+  // umbra closes at an apex behind the moon and the annular antumbra
+  // diverges past it — a soft ring with a warm refracted rim, never a hard
+  // disc. The axis runs sun→moon→out (Solis sits at the world origin): at
+  // this compact scale the moon's parallax bends it far off the sun
+  // direction the planet sees.
+  vec3 toMoonFragment = vWorldPosition - uMoonPosition;
+  vec3 shadowAxis = normalize(uMoonPosition);
+  float shadowAlong = dot(toMoonFragment, shadowAxis);
+  if (shadowAlong > 0.0) {
+    float shadowPerp = sqrt(max(dot(toMoonFragment, toMoonFragment) - shadowAlong * shadowAlong, 0.0));
+    float sunMoon = length(uMoonPosition);
+    float apex = uMoonRadius * sunMoon / (uSunRadius - uMoonRadius);
+    float coneInner = uMoonRadius * abs(1.0 - shadowAlong / apex);
+    float coneOuter = uMoonRadius + (uSunRadius + uMoonRadius) * shadowAlong / sunMoon;
+    float penumbra = 1.0 - smoothstep(coneInner, coneOuter, shadowPerp);
     color *= 1.0 - penumbra * 0.68;
     color *= mix(vec3(1.0), vec3(1.35, 0.78, 0.6), penumbra);
   }
@@ -176,6 +186,7 @@ uniform sampler2D uCloudMap;
 uniform vec3 uSunDirection;
 uniform vec3 uMoonPosition;
 uniform float uMoonRadius;
+uniform float uSunRadius;
 uniform float uStarFlux;
 uniform vec4 uStrikes[3];
 uniform float uCyclone;
@@ -212,12 +223,19 @@ void main() {
   float diffuse = max(ndl, 0.0);
   float rim = pow(1.0 - max(dot(N, V), 0.0), 3.0);
 
-  vec3 moonOffset = uMoonPosition - vWorldPosition;
-  float moonAlong = dot(moonOffset, L);
+  // Same cone as the surface shader: the shadow axis runs sun→moon→out and
+  // the shade spans the annular ring out to the penumbra edge.
+  vec3 toMoonFragment = vWorldPosition - uMoonPosition;
+  vec3 shadowAxisCloud = normalize(uMoonPosition);
+  float shadowAlongCloud = dot(toMoonFragment, shadowAxisCloud);
   float moonShadow = 1.0;
-  if (moonAlong > 0.0) {
-    float moonPerp = sqrt(max(dot(moonOffset, moonOffset) - moonAlong * moonAlong, 0.0));
-    moonShadow = 1.0 - (1.0 - smoothstep(uMoonRadius * 1.2, uMoonRadius * 3.3, moonPerp)) * 0.68;
+  if (shadowAlongCloud > 0.0) {
+    float shadowPerpCloud = sqrt(max(dot(toMoonFragment, toMoonFragment) - shadowAlongCloud * shadowAlongCloud, 0.0));
+    float sunMoon = length(uMoonPosition);
+    float apex = uMoonRadius * sunMoon / (uSunRadius - uMoonRadius);
+    float coneInner = uMoonRadius * abs(1.0 - shadowAlongCloud / apex);
+    float coneOuter = uMoonRadius + (uSunRadius + uMoonRadius) * shadowAlongCloud / sunMoon;
+    moonShadow = 1.0 - (1.0 - smoothstep(coneInner, coneOuter, shadowPerpCloud)) * 0.68;
   }
 
   vec3 color = mix(
@@ -362,6 +380,7 @@ export function Planet({ reducedMotion, showMoonLabel, locale, timeRef, moonWorl
       uCloudOffset: { value: 0 },
       uMoonPosition: { value: new Vector3() },
       uMoonRadius: { value: 0.34 },
+      uSunRadius: { value: FLIGHT_BODY_RADII.star },
       uStarFlux: { value: 1 },
       uTime: { value: 0 },
       uCyclone: { value: 0 },
@@ -375,6 +394,7 @@ export function Planet({ reducedMotion, showMoonLabel, locale, timeRef, moonWorl
       uCloudMap: { value: cloudMap },
       uMoonPosition: { value: new Vector3() },
       uMoonRadius: { value: aureliaFrame.moonRadius },
+      uSunRadius: { value: FLIGHT_BODY_RADII.star },
       uStarFlux: { value: 1 },
       uStrikes: { value: Array.from({ length: LIGHTNING_CELLS }, () => new Vector4()) },
       uCyclone: { value: 0 },

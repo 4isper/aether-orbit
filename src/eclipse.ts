@@ -8,6 +8,7 @@
  * where the sun-moon axis passes within the penumbra of the surface.
  */
 import { Euler, Quaternion, Vector3 } from 'three'
+import { FLIGHT_BODY_RADII } from './camera-math.ts'
 import { aureliaClock, aureliaFrame, moonPhaseAngle, planetPeriod, planetPosition } from './orbits.ts'
 
 const qWorld = new Quaternion().setFromEuler(new Euler(...aureliaFrame.worldRotation))
@@ -33,20 +34,31 @@ export function moonWorldPosition(time: number, target: Vector3) {
 }
 
 /**
- * Closest approach of the sun-moon shadow axis to Aurelia's center, in moon
- * radii. Below (planet radius + penumbra) in these units some surface
- * darkening is visible; below the planet radius alone the shadow crosses
- * the disc itself.
+ * Closest margin of Aurelia's surface to the moon's shadow cone, in moon
+ * radii: negative means some surface point stands where the silhouette
+ * overlaps Solis's disc. Solis sits at the world origin and the shadow
+ * falls along the sun→moon line — at this compact scale the moon's
+ * parallax (≈0.4 rad from the planet's vantage) bends that line far off
+ * the parallel-ray shortcut, so the axis is honest geometry. Solis
+ * outgrows Nox: the umbra cone closes at an apex behind the moon and the
+ * annular antumbra diverges past it — a ring, never a total shadow.
  */
 export function shadowDistance(time: number) {
   planetPosition('aurelia', time, planetScratch)
   moonWorldPosition(time, moonScratch)
-  // The shadow axis runs from the moon along the direction to the star.
-  const sun = sunScratch.copy(planetScratch).negate().normalize()
-  const offset = shadowOffsetScratch.copy(moonScratch).sub(planetScratch)
-  const along = offset.dot(sun)
+  const axis = sunScratch.copy(moonScratch).normalize()
+  const offset = shadowOffsetScratch.copy(planetScratch).sub(moonScratch)
+  const along = offset.dot(axis)
   if (along <= 0) return Number.POSITIVE_INFINITY
-  return Math.sqrt(Math.max(offset.lengthSq() - along * along, 0)) / aureliaFrame.moonRadius
+  const perp = Math.sqrt(Math.max(offset.lengthSq() - along * along, 0))
+  const sunMoon = moonScratch.length()
+  // The penumbra edge: partial overlap from a surface point, diverging
+  // from the moon's limb through Solis's far edge.
+  const penumbra = TRANSIT_MOON_RADIUS + (STAR_RADIUS + TRANSIT_MOON_RADIUS) * along / sunMoon
+  // The cone reaches the planet's sphere where a surface point closest to
+  // the axis still sits inside it.
+  const margin = Math.max(perp - aureliaFrame.planetRadius, 0) - penumbra
+  return margin / TRANSIT_MOON_RADIUS
 }
 
 export type TransitEvent = {
@@ -58,12 +70,15 @@ export type TransitEvent = {
 }
 
 /**
- * The event's own threshold: the shadow axis inside the planet's disc, i.e.
- * the moon silhouette actually crossing the sun as seen from the surface.
- * (The wider penumbra grazes the limb for almost half a month — that is a
- * season, not an event, and announcing it would be wrong.)
+ * The event's own threshold: the margin crosses zero where the shadow cone
+ * first touches the planet's sphere — some surface point sees the moon's
+ * silhouette overlap the sun's disc. The measure is the signed margin, so
+ * the peak is the deepest alignment.
  */
-export const DISC_THRESHOLD_MOON_RADII = aureliaFrame.planetRadius / aureliaFrame.moonRadius
+export const TRANSIT_THRESHOLD_MOON_RADII = 0
+
+const STAR_RADIUS = FLIGHT_BODY_RADII.star
+const TRANSIT_MOON_RADIUS = aureliaFrame.moonRadius
 
 /**
  * Eclipse of the moon: the depth of Nox inside Aurelia's shadow cylinder,
@@ -204,7 +219,7 @@ export function nextWindow(now: number, scan: WindowScan): TransitEvent | null {
 export function nextTransit(now: number): TransitEvent | null {
   return nextWindow(now, {
     measure: shadowDistance,
-    threshold: DISC_THRESHOLD_MOON_RADII,
+    threshold: TRANSIT_THRESHOLD_MOON_RADII,
     horizon: SCAN_HORIZON,
   })
 }
