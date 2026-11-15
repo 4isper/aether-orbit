@@ -35,6 +35,9 @@ type SceneCanvasProps = {
   initialView: SceneView
   initialPose?: CameraPose | null
   initialTime?: number | null
+  /** A deep link's ?dpr= pin: hold the renderer at this resolution and let
+   * the quality ladder sleep — the frame must match its address. */
+  dprPin?: number | null
   exposure: number
   timeScale: number
   locale: Locale
@@ -57,6 +60,7 @@ export default function SceneCanvas({
   initialView,
   initialPose,
   initialTime,
+  dprPin = null,
   exposure,
   timeScale,
   locale,
@@ -71,16 +75,19 @@ export default function SceneCanvas({
   onFrameCaptured,
   onFlightTelemetry,
 }: SceneCanvasProps) {
-  const [dpr, setDpr] = useState(getMaxDpr)
+  const [dpr, setDpr] = useState(() => dprPin ?? getMaxDpr())
   const [lowEnd, setLowEnd] = useState(false)
   const [contextLost, setContextLost] = useState(false)
   const handleQualityChange = useCallback(({ factor }: { factor: number }) => {
+    // A pinned link holds its resolution: the ladder measures, but the frame
+    // must match its address on every machine, every run.
+    if (dprPin != null) return
     const nextDpr = MIN_DPR + (getMaxDpr() - MIN_DPR) * factor
     setDpr(Math.round(nextDpr * 20) / 20)
     // Hysteresis: drop the expensive postprocessing below 0.35, restore it
     // only above 0.5 so the toggle cannot flicker around one threshold.
     setLowEnd((prev) => (prev ? factor > 0.5 : factor < 0.35))
-  }, [])
+  }, [dprPin])
   const handleCreated = useCallback(({ gl }: { gl: WebGLRenderer }) => {
     gl.domElement.tabIndex = 0
     gl.toneMapping = ACESFilmicToneMapping

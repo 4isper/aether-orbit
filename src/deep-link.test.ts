@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { deepLinkUrl, formatTimeParam, parseModeParam, parseTimeParam } from './deep-link.ts'
+import { deepLinkUrl, formatTimeParam, parseDprParam, parseModeParam, parseTimeParam } from './deep-link.ts'
 import type { CameraPose } from './camera-math.ts'
 
 const POSE: CameraPose = { yaw: 0.21, pitch: -0.05, zoom: 9.4 }
@@ -33,6 +33,18 @@ test('parseTimeParam accepts 0 and negatives, rejects junk', () => {
   assert.equal(parseTimeParam(new URLSearchParams('t=1e999')), null)
   // Absurdly far moments are malformed shares, not valid times.
   assert.equal(parseTimeParam(new URLSearchParams('t=1e10')), null)
+})
+
+test('parseDprParam pins the renderer resolution, rejects junk', () => {
+  assert.equal(parseDprParam(new URLSearchParams('dpr=1')), 1)
+  assert.equal(parseDprParam(new URLSearchParams('dpr=1.25')), 1.25)
+  // Outside the sane screen range the value is a malformed link, not a
+  // resolution anyone asked for.
+  assert.equal(parseDprParam(new URLSearchParams('dpr=0')), null)
+  assert.equal(parseDprParam(new URLSearchParams('dpr=9')), null)
+  assert.equal(parseDprParam(new URLSearchParams('dpr=abc')), null)
+  assert.equal(parseDprParam(new URLSearchParams('dpr=')), null)
+  assert.equal(parseDprParam(new URLSearchParams('')), null)
 })
 
 test('formatTimeParam keeps one decimal so roundtrips are exact', () => {

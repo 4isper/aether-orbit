@@ -31,6 +31,26 @@ export function parseTimeParam(params: URLSearchParams): number | null {
   return time
 }
 
+/** Sanity bounds for a pinned renderer resolution: outside them the value is
+ * a malformed link, not a screen anyone holds. */
+const MIN_PINNED_DPR = 0.5
+const MAX_PINNED_DPR = 4
+
+/**
+ * Parse a pinned renderer resolution from URL params (?dpr=1); null when
+ * missing or malformed. A pinned link freezes the quality ladder: the frame
+ * renders at the resolution the address asks for, not at whatever the frame
+ * rate meter happens to settle on this machine — the golden-frame harness
+ * hangs its whole reproducibility contract on this.
+ */
+export function parseDprParam(params: URLSearchParams): number | null {
+  const raw = params.get('dpr')
+  if (raw === null || raw === '') return null
+  const dpr = Number(raw)
+  if (!Number.isFinite(dpr) || dpr < MIN_PINNED_DPR || dpr > MAX_PINNED_DPR) return null
+  return dpr
+}
+
 /** The modes a link can ask for. 'idle' turns the scene into living
  * wallpaper: an endless tour in cinema mode, starting on arrival. */
 export type ViewMode = 'idle'

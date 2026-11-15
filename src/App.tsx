@@ -4,7 +4,7 @@ import { bodies, planetIds, type SceneView } from './planets'
 import type { EventAnnouncement } from './components/SpaceScene'
 import type { FlightTelemetry } from './components/CameraRig'
 import { parsePose, type CameraPose } from './camera-math'
-import { deepLinkUrl, parseModeParam, parseTimeParam } from './deep-link'
+import { deepLinkUrl, parseDprParam, parseModeParam, parseTimeParam } from './deep-link'
 import { loadSession, saveSession } from './session'
 import { readStoredExposure, storeExposure } from './exposure'
 import { addJournalFrame, readJournal, type JournalFrame } from './journal'
@@ -85,11 +85,19 @@ function readInitialMode() {
   return parseModeParam(new URLSearchParams(window.location.search))
 }
 
+/** Deep link support: ?dpr=… pins the renderer's resolution and freezes the
+ * quality ladder — a shared frame renders at the resolution its address
+ * asks for, on every machine, every time. */
+function readInitialDpr(): number | null {
+  return parseDprParam(new URLSearchParams(window.location.search))
+}
+
 function App() {
   const [initialView] = useState(readInitialView)
   const [initialPose] = useState(readInitialPose)
   const [initialTime] = useState(readInitialTime)
   const [initialMode] = useState(readInitialMode)
+  const [initialDpr] = useState(readInitialDpr)
   const idle = initialMode === 'idle'
   const { locale, toggleLocale } = useLocale()
   const [ready, setReady] = useState(false)
@@ -288,6 +296,7 @@ function App() {
                 initialView={initialView}
                 initialPose={initialPose}
                 initialTime={initialTime}
+                dprPin={initialDpr}
                 exposure={exposure}
                 timeScale={timeScale}
                 locale={locale}
