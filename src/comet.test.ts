@@ -67,17 +67,16 @@ test('velocity lag pulls tail particles back along the path of motion', () => {
   assert.ok(shift.dot(VELOCITY) < 0, `shift ${shift.toArray()} opposes velocity`)
 })
 
-test('the dust tail curves farther off the anti-sun line than the ion tail', () => {
-  const angleFromAntiSun = (lagCurve: number) => {
+test('the ion tail is exactly anti-sunward, whatever the motion', () => {
+  // The solar wind is radial: zero lag means every particle sits on the
+  // straight anti-sun line, whatever the comet's velocity says.
+  for (const t of [0.3, 0.7, 1]) {
     const point = tailParticlePosition(
-      1, TAIL_LENGTH, lagCurve, 0, HEAD, VELOCITY, ANTI_SUN, 0, 0, new Vector3(),
+      t, TAIL_LENGTH, 0, 0, HEAD, VELOCITY, ANTI_SUN, 0, 0, new Vector3(),
     )
-    const direction = point.sub(HEAD).normalize()
-    return Math.acos(direction.dot(ANTI_SUN))
+    const expected = HEAD.clone().addScaledVector(ANTI_SUN, t * TAIL_LENGTH)
+    assert.ok(point.distanceTo(expected) < 1e-9, `ion particle at t=${t} left the radial line`)
   }
-  const ion = angleFromAntiSun(0.32)
-  const dust = angleFromAntiSun(1.05)
-  assert.ok(dust > ion * 1.5, `dust ${dust} vs ion ${ion}`)
 })
 
 test('the comet tracks negative time the same as the equivalent positive time', () => {

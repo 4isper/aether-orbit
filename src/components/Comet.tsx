@@ -19,12 +19,12 @@ const MIN_TAIL_LENGTH = 2.2
 const MAX_TAIL_LENGTH = 7.5
 const MIN_TAIL_ACTIVITY = 0.45
 const MAX_TAIL_ACTIVITY = 1.3
-// The ion tail hugs the anti-sun line, straight from the solar wind. The
-// dust tail is ballistic: every grain left the nucleus with the comet's own
-// motion and flies its private Kepler orbit under radiation-reduced
-// gravity, so the curve along the orbit's wake comes from the physics, not
-// from a lag factor.
-const TAIL_LAG_CURVE = 0.32
+// The ion tail hugs the anti-sun line, straight from the solar wind: the
+// wind is radial, so no lag along the path of motion. The dust tail is
+// ballistic: every grain left the nucleus with the comet's own motion and
+// flies its private Kepler orbit under radiation-reduced gravity, so the
+// curve along the orbit's wake comes from the physics, not from a lag
+// factor.
 const TAIL_SPREAD = 0.16
 const DUST_COUNT = 52
 const DUST_BETA_MIN = 0.12
@@ -162,7 +162,7 @@ export function Comet({ timeRef }: CometProps) {
         const t = (i + 1) / TAIL_COUNT
         const seed = i * 12.9898
         const spread = t * tailLength * TAIL_SPREAD + 0.05
-        tailParticlePosition(t, tailLength, TAIL_LAG_CURVE, spread, head, velocity, antiSun, time, seed, scratch)
+        tailParticlePosition(t, tailLength, 0, spread, head, velocity, antiSun, time, seed, scratch)
         tailPositions[i * 3] = scratch.x
         tailPositions[i * 3 + 1] = scratch.y
         tailPositions[i * 3 + 2] = scratch.z

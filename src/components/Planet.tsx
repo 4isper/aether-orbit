@@ -45,6 +45,9 @@ uniform vec3 uSunDirection;
 uniform vec3 uMoonPosition;
 uniform float uMoonRadius;
 uniform float uSunRadius;
+uniform vec3 uPlanetCenter;
+uniform float uGroupScale;
+uniform float uDeckSpin;
 uniform float uStarFlux;
 uniform float uTime;
 uniform float uCyclone;
@@ -106,12 +109,27 @@ void main() {
   float ndl = dot(geometricN, L);
   float daylight = smoothstep(-0.12, 0.25, ndl);
   float diffuse = max(dot(N, L), 0.0);
-  float cloudDensity = texture2D(uCloudMap, vec2(vUv.x + uCloudOffset, vUv.y)).r;
+  // Projected cloud shadow, honest rays: Solis sits at the world origin, so
+  // the ray toward the sun from this point crosses the deck 1.25% of the
+  // radius above the surface — straight overhead only at the sub-solar
+  // point, stretched far along the slant near the terminator. The hit's map
+  // UV is read in the deck's own spinning frame.
+  vec3 centerToFragment = (vWorldPosition - uPlanetCenter) / uGroupScale;
+  vec3 rayDir = normalize(-vWorldPosition);
+  float b = dot(centerToFragment, rayDir);
+  float tHit = -b + sqrt(max(b * b + 2.025 * 2.025 - dot(centerToFragment, centerToFragment), 0.0));
+  vec3 hitLocal = centerToFragment + rayDir * tHit;
+  float cD = cos(uDeckSpin);
+  float sD = sin(uDeckSpin);
+  vec3 hitDeck = vec3(cD * hitLocal.x - sD * hitLocal.z, hitLocal.y, sD * hitLocal.x + cD * hitLocal.z);
+  float hitU = fract(atan(hitDeck.z, -hitDeck.x) / 6.28318530718);
+  float hitV = acos(clamp(hitDeck.y / 2.025, -1.0, 1.0)) / 3.14159265359;
+  float cloudDensity = texture2D(uCloudMap, vec2(hitU, hitV)).r;
   float cloudShadow = 1.0 - smoothstep(0.06, 0.76, cloudDensity) * 0.42;
   // The cyclone shades the water itself: the same vortex, read in the map
-  // frame the cloud shadow already uses — the shade rides the decks'
+  // frame the projected shadow now uses — the shade rides the decks'
   // rotation drift and sits under the spiral the cloud layer draws.
-  vec2 cycloneDelta = vec2((vUv.x + uCloudOffset) - uCycloneCenter.x, vUv.y - uCycloneCenter.y);
+  vec2 cycloneDelta = vec2(hitU - uCycloneCenter.x, hitV - uCycloneCenter.y);
   float cycloneDu = abs(cycloneDelta.x);
   cycloneDu = min(cycloneDu, 1.0 - cycloneDu);
   float cycloneDistance = length(vec2(cycloneDu * 2.0, cycloneDelta.y)) * 9.0;
@@ -381,6 +399,9 @@ export function Planet({ reducedMotion, showMoonLabel, locale, timeRef, moonWorl
       uMoonPosition: { value: new Vector3() },
       uMoonRadius: { value: 0.34 },
       uSunRadius: { value: FLIGHT_BODY_RADII.star },
+      uPlanetCenter: { value: worldPosition },
+      uGroupScale: { value: 1 },
+      uDeckSpin: { value: 0 },
       uStarFlux: { value: 1 },
       uTime: { value: 0 },
       uCyclone: { value: 0 },
@@ -441,6 +462,10 @@ export function Planet({ reducedMotion, showMoonLabel, locale, timeRef, moonWorl
     if (surfaceMaterialRef.current) {
       surfaceMaterialRef.current.uniforms.uCloudOffset.value =
         surface && clouds ? (surface.rotation.y - clouds.rotation.y) / (Math.PI * 2) : 0
+      // The projected cloud shadow reads the deck's live frame: the group's
+      // scale and the deck's own spin.
+      surfaceMaterialRef.current.uniforms.uGroupScale.value = compact ? 0.76 : 1
+      if (clouds) surfaceMaterialRef.current.uniforms.uDeckSpin.value = clouds.rotation.y
       surfaceMaterialRef.current.uniforms.uStarFlux.value = flux
       // Waves ride the shared clock: a deep-linked t= lands on the same sea.
       surfaceMaterialRef.current.uniforms.uTime.value = timeRef.current
