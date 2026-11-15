@@ -21,7 +21,7 @@ import { Moon } from './Moon'
 import { lightningStrikes, LIGHTNING_CELLS, type LightningStrike } from '../lightning'
 import { cycloneCenter, cycloneIntensity } from '../cyclone'
 import { flareLight } from '../flare'
-import { aureliaFrame, aureliaClock, moonPhaseAngle, starFlux } from '../orbits'
+import { aureliaFrame, aureliaClock, aureliaSpinPhase, moonPhaseAngle, starFlux } from '../orbits'
 import { useSunDirection } from '../hooks/useSunDirection'
 import { t, type Locale } from '../strings'
 
@@ -307,7 +307,6 @@ void main() {
 
 type PlanetProps = {
   reducedMotion: boolean
-  timeScale: number
   showMoonLabel?: boolean
   locale: Locale
   /** Shared simulation clock, advanced by SpaceScene once per frame. */
@@ -316,7 +315,7 @@ type PlanetProps = {
   moonWorldRef?: { current: Vector3 }
 }
 
-export function Planet({ reducedMotion, timeScale, showMoonLabel, locale, timeRef, moonWorldRef }: PlanetProps) {
+export function Planet({ reducedMotion, showMoonLabel, locale, timeRef, moonWorldRef }: PlanetProps) {
   const groupRef = useRef<Group>(null)
   const surfaceRef = useRef<Mesh>(null)
   const cloudsRef = useRef<Mesh>(null)
@@ -397,19 +396,21 @@ export function Planet({ reducedMotion, timeScale, showMoonLabel, locale, timeRe
     }),
     [sunDirection],
   )
-  const auroraTime = useRef(0)
 
-  useFrame((_, rawDelta) => {
-    const delta = Math.min(rawDelta, 0.1)
+  useFrame(() => {
     updateSunDirection()
     const flux = starFlux(worldPosition) * flareLight(timeRef.current)
 
     const surface = surfaceRef.current
     const clouds = cloudsRef.current
 
+    // Ground and gale ride the shared clock as pure phases: a deep link
+    // lands on the same continents a live session would have spun around,
+    // and pause/reversal come from the one clock. Under reduced motion the
+    // surface holds still instead of accumulating.
     if (!reducedMotion) {
-      if (surface) surface.rotation.y += delta * aureliaClock.spin * timeScale
-      if (clouds) clouds.rotation.y += delta * aureliaClock.spin * 1.5 * timeScale
+      if (surface) surface.rotation.y = aureliaSpinPhase(timeRef.current)
+      if (clouds) clouds.rotation.y = aureliaSpinPhase(timeRef.current) * 1.5
     }
 
     const planetRadius = aureliaFrame.planetRadius * (compact ? 0.76 : 1)
@@ -446,9 +447,10 @@ export function Planet({ reducedMotion, timeScale, showMoonLabel, locale, timeRe
       ;(cloudCyclone.uCycloneCenter.value as Vector2).set(cycloneEye.u, cycloneEye.v)
       cloudCyclone.uCycloneSpin.value = timeRef.current * 0.85
     }
-    if (!reducedMotion) auroraTime.current += delta * timeScale
     if (auroraMaterialRef.current) {
-      auroraMaterialRef.current.uniforms.uTime.value = auroraTime.current
+      // The curtains wave on the shared clock; reduced motion holds them in
+      // their resting shape instead of accumulating a private phase.
+      auroraMaterialRef.current.uniforms.uTime.value = reducedMotion ? 0 : timeRef.current
       auroraMaterialRef.current.uniforms.uStarFlux.value = flux
     }
 

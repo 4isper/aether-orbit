@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { Vector3 } from 'three'
-import { aureliaClock, beltAnchorAngle, beltAnchorPosition, beltClock, beltRings, keplerSpeedAroundVesper, moonPhaseAngle, orbitPoint, planetPeriod, planetPosition, starFlux, vesperClock } from './orbits.ts'
+import { aureliaClock, aureliaSpinPhase, beltAnchorAngle, beltAnchorPosition, beltClock, beltRings, keplerSpeedAroundVesper, moonPhaseAngle, orbitPoint, planetPeriod, planetPosition, starFlux, vesperClock } from './orbits.ts'
 import { planetIds } from './planets.ts'
 
 const scratch = new Vector3()
@@ -67,6 +67,17 @@ test('the moon makes a handful of orbits per year, Earth-scale', () => {
     monthsPerYear > 2 && monthsPerYear < 7,
     `${monthsPerYear.toFixed(1)} months per year is outside the plausible band`,
   )
+})
+
+test('the surface phase rides the shared clock like the moon does', () => {
+  // The continents must face the same way for a deep link as for a session
+  // that ran there — pure phase of t, never an accumulator.
+  assert.ok(Math.abs(aureliaSpinPhase(0)) < 1e-12)
+  const day = (Math.PI * 2) / aureliaClock.spin
+  const gain = aureliaSpinPhase(day) - aureliaSpinPhase(0)
+  assert.ok(Math.abs(gain - Math.PI * 2) < 1e-9, `per-day gain ${gain}`)
+  // Negative time (reversed playback) rewinds the phase by the same law.
+  assert.ok(Math.abs(aureliaSpinPhase(-day) - aureliaSpinPhase(0) + Math.PI * 2) < 1e-9)
 })
 
 test('the moon phase angle advances exactly with the shared clock', () => {

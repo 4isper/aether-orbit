@@ -34,11 +34,10 @@ void main() {
 const SLOTS = [9127, 3313, 7717]
 const TRAIL_SAMPLES = 7
 
-export function Meteors({ timeScale }: { timeScale: number }) {
+export function Meteors({ timeRef }: { timeRef: { current: number } }) {
   const materialRef = useRef<ShaderMaterial>(null)
   const positionRef = useRef<BufferAttribute>(null)
   const alphaRef = useRef<BufferAttribute>(null)
-  const clock = useRef(0)
   const point = useMemo(() => new Vector3(), [])
 
   const buffers = useMemo(() => {
@@ -59,15 +58,16 @@ export function Meteors({ timeScale }: { timeScale: number }) {
     [],
   )
 
-  useFrame((state, rawDelta) => {
+  useFrame((state) => {
     const material = materialRef.current
     const positionAttr = positionRef.current
     const alphaAttr = alphaRef.current
     if (!material || !positionAttr || !alphaAttr) return
     material.uniforms.uPixelRatio.value = state.gl.getPixelRatio()
-    // The meteor clock rides the shared time scale: pause freezes a streak
-    // mid-flight, reversing time replays the same deterministic paths back.
-    clock.current += Math.min(rawDelta, 0.1) * timeScale
+    // The meteors ride the shared simulation clock itself: pause freezes a
+    // streak mid-flight, reversing time replays the same deterministic paths
+    // back, and a deep link lands on the very streaks its moment promises.
+    const time = timeRef.current
     const positions = positionAttr.array as Float32Array
     const alphas = alphaAttr.array as Float32Array
 
@@ -87,14 +87,14 @@ export function Meteors({ timeScale }: { timeScale: number }) {
     }
 
     for (let slot = 0; slot < SLOTS.length; slot++) {
-      fillTrail(slot, meteorPhase(SLOTS[slot], clock.current), 1)
+      fillTrail(slot, meteorPhase(SLOTS[slot], time), 1)
     }
     // The rain streams from one radiant, thick and thinning with the veil.
-    const rain = showerIntensity(clock.current)
+    const rain = showerIntensity(time)
     for (let slot = 0; slot < SHOWER_SLOTS.length; slot++) {
       fillTrail(
         SLOTS.length + slot,
-        showerMeteor(SHOWER_SLOTS[slot], clock.current),
+        showerMeteor(SHOWER_SLOTS[slot], time),
         rain,
       )
     }

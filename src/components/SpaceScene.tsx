@@ -343,7 +343,7 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
       <Backdrop />
       <Starfield reducedMotion={reducedMotion} timeScale={timeScale} />
       {/* Meteors are motion — the reduced-motion promise means none at all. */}
-      {!reducedMotion && <Meteors timeScale={timeScale} />}
+      {!reducedMotion && <Meteors timeRef={orbitTime} />}
       <Belt timeRef={orbitTime} />
       <Trojan timeRef={orbitTime} trail={false} />
       <Trojan timeRef={orbitTime} trail />
@@ -352,7 +352,7 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
         <Star timeRef={orbitTime} />
       </group>
       <group ref={(node) => { groupRefs.current.aurelia = node }} position={initialPositions[0]} {...planetEvents('aurelia')}>
-        <Planet reducedMotion={reducedMotion} timeScale={timeScale} showMoonLabel={overview} locale={locale} timeRef={orbitTime} moonWorldRef={moonWorld} />
+        <Planet reducedMotion={reducedMotion} showMoonLabel={overview} locale={locale} timeRef={orbitTime} moonWorldRef={moonWorld} />
       </group>
       <group ref={(node) => { groupRefs.current.cinder = node }} position={initialPositions[1]} {...planetEvents('cinder')}>
         <Cinder reducedMotion={reducedMotion} timeScale={timeScale} timeRef={orbitTime} />

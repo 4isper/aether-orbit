@@ -121,6 +121,14 @@ export function moonPhaseAngle(time: number) {
   return aureliaClock.moonPhase + time * aureliaClock.moonAngularSpeed
 }
 
+/** Aurelia's surface phase on the same clock: pure like the moon's, so a
+ * deep link lands on the same continents a live session would have brought
+ * around, and reversed playback rewinds the ground. The cloud deck rides
+ * 1.5x this rate — a slow gale over the ground (Planet.tsx). */
+export function aureliaSpinPhase(time: number) {
+  return time * aureliaClock.spin
+}
+
 /**
  * Vesper's own clock: the shepherd moon pacing the Cassini gap. Its orbit
  * radius sits inside the gap's core (the ring t in [0.64, 0.70] of the
