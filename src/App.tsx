@@ -6,6 +6,7 @@ import type { FlightTelemetry } from './components/CameraRig'
 import { parsePose, type CameraPose } from './camera-math'
 import { deepLinkUrl, parseModeParam, parseTimeParam } from './deep-link'
 import { loadSession, saveSession } from './session'
+import { readStoredExposure, storeExposure } from './exposure'
 import { addJournalFrame, readJournal, type JournalFrame } from './journal'
 import { t } from './strings'
 import type { EphemerisPayload } from './ephemerides'
@@ -157,6 +158,13 @@ function App() {
   const [speed, setSpeed] = useState(1)
   const [reversed, setReversed] = useState(false)
   const { sound, toggleSound } = useAmbience()
+  // The pilot's exposure: how hard the star burns on their screen. The
+  // preference persists like the locale; the renderer reads it per change.
+  const [exposure, setExposure] = useState(readStoredExposure)
+  const handleExposure = useCallback((value: number) => {
+    setExposure(value)
+    storeExposure(value)
+  }, [])
   const [tour, setTour] = useState(idle)
   const [freeFlight, setFreeFlight] = useState(false)
   const [cinema, setCinema] = useState(idle)
@@ -280,6 +288,7 @@ function App() {
                 initialView={initialView}
                 initialPose={initialPose}
                 initialTime={initialTime}
+                exposure={exposure}
                 timeScale={timeScale}
                 locale={locale}
                 reducedMotion={reducedMotion}
@@ -333,11 +342,13 @@ function App() {
           speed={speed}
           reversed={reversed}
           sound={sound}
+          exposure={exposure}
           onPause={() => setPaused((value) => !value)}
           onReverse={() => setReversed((value) => !value)}
           onSpeed={setSpeed}
           onToggleSound={toggleSound}
           onScrub={scrubTime}
+          onExposure={handleExposure}
         />
 
         <div className="flight-status" role="status" aria-live="polite" aria-atomic="true">

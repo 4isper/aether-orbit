@@ -1030,6 +1030,40 @@ h1 > em {
   box-shadow: 0 0 7px rgba(137, 188, 219, 0.45);
 }
 
+/* The exposure slider: a shorter sibling of the scrub — same track, same
+ * thumb, smaller reach. Viewing comfort, not time. */
+.exposure-scrub {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 64px;
+  height: 44px;
+  margin: 0 10px 0 6px;
+  background: transparent;
+  cursor: ew-resize;
+  pointer-events: auto;
+}
+
+.exposure-scrub::-webkit-slider-runnable-track {
+  height: 2px;
+  border-radius: 1px;
+  background: linear-gradient(
+    90deg,
+    rgba(214, 178, 122, 0.1),
+    rgba(214, 178, 122, 0.42) 50%,
+    rgba(214, 178, 122, 0.1)
+  );
+}
+
+.exposure-scrub::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 9px;
+  height: 9px;
+  margin-top: -3.5px;
+  border-radius: 50%;
+  background: #e2c893;
+  box-shadow: 0 0 7px rgba(255, 208, 140, 0.45);
+}
+
 .time-scrub::-moz-range-track {
   height: 2px;
   border-radius: 1px;

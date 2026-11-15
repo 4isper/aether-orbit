@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { EXPOSURE_MAX, EXPOSURE_MIN } from '../../exposure'
 import { t, type Locale } from '../../strings'
 
 const SPEED_OPTIONS = [0.5, 1, 2, 4]
@@ -18,11 +19,13 @@ export function TimeControls({
   speed,
   reversed,
   sound,
+  exposure,
   onPause,
   onReverse,
   onSpeed,
   onToggleSound,
   onScrub,
+  onExposure,
 }: {
   locale: Locale
   ready: boolean
@@ -30,11 +33,13 @@ export function TimeControls({
   speed: number
   reversed: boolean
   sound: boolean
+  exposure: number
   onPause: () => void
   onReverse: () => void
   onSpeed: (speed: number) => void
   onToggleSound: () => void
   onScrub: (delta: number) => void
+  onExposure: (value: number) => void
 }) {
   // The scrub is a jog wheel: it reads as an offset from the moment the
   // drag started, and it re-centers on release — the clock always flows on
@@ -128,6 +133,17 @@ export function TimeControls({
           <path d="M11.8 1.8c2.5 2.3 2.5 6.1 0 8.4" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
         </svg>
       </button>
+      <input
+        type="range"
+        className="exposure-scrub"
+        min={EXPOSURE_MIN}
+        max={EXPOSURE_MAX}
+        step={0.05}
+        value={exposure}
+        aria-label={t(locale, 'exposureLabel')}
+        title={t(locale, 'exposureLabel')}
+        onChange={(event) => onExposure(Number(event.target.value))}
+      />
     </div>
   )
 }

@@ -11,13 +11,13 @@ import type { SceneView } from './planets'
 import type { CameraPose } from './camera-math'
 import type { Locale } from './strings'
 
-// QA-only camera probe; never commit.
-function QAExpose() {
-  const scene = useThree((state) => state.scene)
-  const camera = useThree((state) => state.camera)
+/** Drives the renderer's tone-mapping exposure: the pilot's brightness
+ * preference lands on the one knob the whole frame obeys. */
+function ExposureDrive({ exposure }: { exposure: number }) {
+  const gl = useThree((state) => state.gl)
   useEffect(() => {
-    ;(window as unknown as Record<string, unknown>).__aether = { scene, camera }
-  }, [scene, camera])
+    gl.toneMappingExposure = exposure
+  }, [gl, exposure])
   return null
 }
 
@@ -35,6 +35,7 @@ type SceneCanvasProps = {
   initialView: SceneView
   initialPose?: CameraPose | null
   initialTime?: number | null
+  exposure: number
   timeScale: number
   locale: Locale
   reducedMotion: boolean
@@ -56,6 +57,7 @@ export default function SceneCanvas({
   initialView,
   initialPose,
   initialTime,
+  exposure,
   timeScale,
   locale,
   reducedMotion,
@@ -100,7 +102,7 @@ export default function SceneCanvas({
         gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
         onCreated={handleCreated}
       >
-      <QAExpose />
+      <ExposureDrive exposure={exposure} />
       <SceneErrorBoundary locale={locale}>
         <PerformanceMonitor
           factor={1}
