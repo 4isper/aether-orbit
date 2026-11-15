@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import { Vector3, type Group } from 'three'
 import { bodies, planetIds, planets, type PlanetId } from '../planets'
-import { orbitPoint, planetPosition, trojanPosition } from '../orbits'
+import { orbitPoint, planetPosition, trojanPosition, trojanTrailingPosition } from '../orbits'
 import { cometOrbitPoint, cometPosition } from '../comet'
 import { erebusOrbitPoint, erebusPosition } from '../erebus'
 import { t, type Locale } from '../strings'
@@ -25,6 +25,7 @@ export function SystemOverview({ onSelect, timeRef, locale }: SystemOverviewProp
   const cometLabelRef = useRef<Group | null>(null)
   const erebusLabelRef = useRef<Group | null>(null)
   const trojanLabelRef = useRef<Group | null>(null)
+  const trojanTrailLabelRef = useRef<Group | null>(null)
   const scratch = useMemo(() => new Vector3(), [])
   const orbits = useMemo(
     () => planetIds.map((id) => {
@@ -80,6 +81,10 @@ export function SystemOverview({ onSelect, timeRef, locale }: SystemOverviewProp
     () => trojanPosition(0, new Vector3()).toArray() as [number, number, number],
     [],
   )
+  const initialTrojanTrailPosition = useMemo(
+    () => trojanTrailingPosition(0, new Vector3()).toArray() as [number, number, number],
+    [],
+  )
 
   useFrame(() => {
     for (const id of planetIds) {
@@ -88,6 +93,7 @@ export function SystemOverview({ onSelect, timeRef, locale }: SystemOverviewProp
     cometLabelRef.current?.position.copy(cometPosition(timeRef.current, scratch))
     erebusLabelRef.current?.position.copy(erebusPosition(timeRef.current, scratch))
     trojanLabelRef.current?.position.copy(trojanPosition(timeRef.current, scratch))
+    trojanTrailLabelRef.current?.position.copy(trojanTrailingPosition(timeRef.current, scratch))
   })
 
   return (
@@ -180,6 +186,11 @@ export function SystemOverview({ onSelect, timeRef, locale }: SystemOverviewProp
       <group ref={trojanLabelRef} position={initialTrojanPosition}>
         <Html center zIndexRange={[1, 1]} style={{ pointerEvents: 'none' }}>
           <span className="system-tag">{t(locale, 'trojanTag')}</span>
+        </Html>
+      </group>
+      <group ref={trojanTrailLabelRef} position={initialTrojanTrailPosition}>
+        <Html center zIndexRange={[1, 1]} style={{ pointerEvents: 'none' }}>
+          <span className="system-tag">{t(locale, 'trojanTagTrail')}</span>
         </Html>
       </group>
     </>

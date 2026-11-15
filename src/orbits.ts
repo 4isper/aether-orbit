@@ -35,9 +35,16 @@ export function planetAngle(id: PlanetId, time: number) {
  * orbit sixty degrees ahead of the planet, forever leading it around Solis.
  */
 export const TROJAN_LEAD_ANGLE = Math.PI / 3
+export const TROJAN_TRAIL_ANGLE = -Math.PI / 3
 
 export function trojanPosition(time: number, target: Vector3) {
   return orbitPoint('aurelia', planetAngle('aurelia', time) + TROJAN_LEAD_ANGLE, target)
+}
+
+/** The trailing twin at L5: the same balance, sixty degrees behind the
+ * planet, forever watching its back. */
+export function trojanTrailingPosition(time: number, target: Vector3) {
+  return orbitPoint('aurelia', planetAngle('aurelia', time) + TROJAN_TRAIL_ANGLE, target)
 }
 
 /** Orbital period of a planet, in time units. */

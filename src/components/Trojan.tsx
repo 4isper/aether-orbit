@@ -1,7 +1,7 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { ShaderMaterial, Vector3, type Mesh } from 'three'
-import { trojanPosition } from '../orbits'
+import { trojanPosition, trojanTrailingPosition } from '../orbits'
 
 const vertexShader = /* glsl */ `
 varying vec3 vWorldPosition;
@@ -40,10 +40,11 @@ void main() {
 `
 
 /**
- * The lone trojan at Aurelia's L4: same orbit, sixty degrees ahead, tumbling
- * slowly on the shared clock so pause, reversal and deep links hold it still.
+ * The trojan twins at Aurelia's L4 and L5: same orbit, sixty degrees ahead
+ * and behind, each tumbling slowly on the shared clock so pause, reversal
+ * and deep links hold them still.
  */
-export function Trojan({ timeRef }: { timeRef: { current: number } }) {
+export function Trojan({ timeRef, trail = false }: { timeRef: { current: number }; trail?: boolean }) {
   const ref = useRef<Mesh>(null)
   const material = useMemo(
     () => new ShaderMaterial({
@@ -57,10 +58,15 @@ export function Trojan({ timeRef }: { timeRef: { current: number } }) {
 
   useFrame(() => {
     if (!ref.current) return
-    trojanPosition(timeRef.current, scratch)
+    if (trail) trojanTrailingPosition(timeRef.current, scratch)
+    else trojanPosition(timeRef.current, scratch)
     ref.current.position.copy(scratch)
     material.uniforms.uCenter.value.copy(scratch)
-    ref.current.rotation.set(timeRef.current * 0.21, timeRef.current * 0.13, 0)
+    // Two stones, two tumbles: the twin's rates differ by a hair so they
+    // never look like copies of one mesh.
+    const spin = trail ? 0.17 : 0.21
+    const wobble = trail ? 0.11 : 0.13
+    ref.current.rotation.set(timeRef.current * spin, timeRef.current * wobble, 0)
   })
 
   return (

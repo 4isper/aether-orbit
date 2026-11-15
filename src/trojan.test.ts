@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { Vector3 } from 'three'
-import { planetPosition, trojanPosition, TROJAN_LEAD_ANGLE } from './orbits.ts'
+import { planetPosition, trojanPosition, trojanTrailingPosition, TROJAN_LEAD_ANGLE, TROJAN_TRAIL_ANGLE } from './orbits.ts'
 
 test('the trojan shares Aurelia\'s orbit and leads it by sixty degrees', () => {
   for (const time of [0, 55, 700, -240]) {
@@ -36,5 +36,47 @@ test('the trojan is deterministic in both time directions', () => {
   assert.equal(
     trojanPosition(120, new Vector3()).x,
     trojanPosition(120, new Vector3()).x,
+  )
+})
+
+test('the trailer shares the orbit and hangs sixty degrees behind', () => {
+  for (const time of [0, 55, 700, -240]) {
+    const trailer = trojanTrailingPosition(time, new Vector3())
+    const planet = planetPosition('aurelia', time, new Vector3())
+    assert.ok(
+      Math.abs(trailer.length() - planet.length()) < 1e-9,
+      'same distance from the star, inclinations included',
+    )
+    const separation = trailer.angleTo(planet)
+    assert.ok(
+      Math.abs(separation - Math.abs(TROJAN_TRAIL_ANGLE)) < 1e-9,
+      `separation ${separation} rad is not the configured ${TROJAN_TRAIL_ANGLE}`,
+    )
+  }
+})
+
+test('the trailer rides the L5 point: behind along the motion, not ahead', () => {
+  assert.equal(TROJAN_TRAIL_ANGLE, -Math.PI / 3)
+  const time = 137
+  const trailer = trojanTrailingPosition(time, new Vector3())
+  const planet = planetPosition('aurelia', time, new Vector3())
+  const next = planetPosition('aurelia', time + 0.01, new Vector3())
+  // The twins hold opposite flanks: 120 degrees apart, forever. Measured
+  // before the sub below mutates the trailer into a planet-relative offset.
+  const leader = trojanPosition(time, new Vector3())
+  const twins = leader.angleTo(trailer)
+  const motion = next.sub(planet)
+  const offset = trailer.sub(planet)
+  assert.ok(offset.dot(motion) < 0, 'the trailer sits behind the planet')
+  assert.ok(
+    Math.abs(twins - (Math.PI * 2) / 3) < 1e-9,
+    `the twins are ${twins} rad apart`,
+  )
+})
+
+test('the trailer is deterministic in both time directions', () => {
+  assert.equal(
+    trojanTrailingPosition(120, new Vector3()).x,
+    trojanTrailingPosition(120, new Vector3()).x,
   )
 })

@@ -345,7 +345,8 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
       {/* Meteors are motion — the reduced-motion promise means none at all. */}
       {!reducedMotion && <Meteors timeScale={timeScale} />}
       <Belt timeRef={orbitTime} />
-      <Trojan timeRef={orbitTime} />
+      <Trojan timeRef={orbitTime} trail={false} />
+      <Trojan timeRef={orbitTime} trail />
       <Comet timeRef={orbitTime} />
       <group {...starEvents}>
         <Star timeRef={orbitTime} />
