@@ -1,5 +1,5 @@
-import { useCallback, useState } from 'react'
-import { Canvas } from '@react-three/fiber'
+import { useCallback, useEffect, useState } from 'react'
+import { Canvas, useThree } from '@react-three/fiber'
 import { PerformanceMonitor } from '@react-three/drei'
 import { ACESFilmicToneMapping, SRGBColorSpace, type WebGLRenderer } from 'three'
 import { SceneErrorBoundary } from './SceneErrorBoundary'
@@ -10,6 +10,17 @@ import { t } from './strings'
 import type { SceneView } from './planets'
 import type { CameraPose } from './camera-math'
 import type { Locale } from './strings'
+
+
+// QA-only camera probe; never commit.
+function QAExpose() {
+  const scene = useThree((state) => state.scene)
+  const camera = useThree((state) => state.camera)
+  useEffect(() => {
+    ;(window as unknown as Record<string, unknown>).__aether = { scene, camera }
+  }, [scene, camera])
+  return null
+}
 
 const MIN_DPR = 0.85
 const MAX_DPR = 1.75
@@ -90,6 +101,7 @@ export default function SceneCanvas({
         gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
         onCreated={handleCreated}
       >
+      <QAExpose />
       <SceneErrorBoundary locale={locale}>
         <PerformanceMonitor
           factor={1}
