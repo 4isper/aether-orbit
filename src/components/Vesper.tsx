@@ -1,11 +1,12 @@
 import { useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { DoubleSide, Vector3, type Group, type Mesh, type ShaderMaterial } from 'three'
+import { AdditiveBlending, Color, DoubleSide, MeshBasicMaterial, Quaternion, Vector3, type Group, type Mesh, type ShaderMaterial } from 'three'
 import { noiseGLSL } from '../shaders/noise'
 import { bodyVertexGLSL, perturbNormalGLSL } from '../shaders/common'
 import { Atmosphere } from './Atmosphere'
 import { RingRocks } from './RingRocks'
 import { shepherdLocalPosition, starFlux } from '../orbits'
+import { plumeStrength, plumeVentLocal, PLUME_VENTS, SHEPHERD_RADIUS } from '../plumes'
 import { flareLight } from '../flare'
 import { useSunDirection } from '../hooks/useSunDirection'
 
@@ -171,6 +172,65 @@ type VesperProps = {
   timeRef: { current: number }
 }
 
+/**
+ * One cryo-plume on the shepherd: a thin additive cone anchored at its
+ * vent, growing out along the surface normal as the vent's turn comes.
+ * The shepherd never rotates, so the vent's spot and direction are fixed
+ * in the mesh's frame and the clock only breathes the scale and the
+ * opacity.
+ */
+function ShepherdPlume({ vent, timeRef }: {
+  vent: number
+  timeRef: { current: number }
+}) {
+  const ref = useRef<Mesh>(null)
+  const material = useMemo(
+    () => new MeshBasicMaterial({
+      color: new Color(0.72, 0.84, 1.0),
+      transparent: true,
+      opacity: 0,
+      blending: AdditiveBlending,
+      depthWrite: false,
+      side: DoubleSide,
+    }),
+    [],
+  )
+  const { base, normal, orientation } = useMemo(() => {
+    const local = plumeVentLocal(vent, new Vector3())
+    const normal = local.clone().normalize()
+    return {
+      base: local,
+      normal,
+      orientation: new Quaternion().setFromUnitVectors(new Vector3(0, 1, 0), normal),
+    }
+  }, [vent])
+  const PLUME_HEIGHT = 0.42
+
+  useFrame(() => {
+    if (!ref.current) return
+    const strength = plumeStrength(vent, timeRef.current)
+    // The cone is centered on its own height: anchoring the base to the
+    // surface means the position rides half the height outward as the
+    // plume grows.
+    ref.current.scale.set(0.55 + strength * 0.7, Math.max(strength, 0.001), 0.55 + strength * 0.7)
+    ref.current.position.copy(base).addScaledVector(normal, (PLUME_HEIGHT / 2) * Math.max(strength, 0.001))
+    material.opacity = strength * 0.8
+  })
+
+  return (
+    <mesh
+      ref={ref}
+      position={base}
+      quaternion={orientation}
+      raycast={() => null}
+      renderOrder={3}
+    >
+      <coneGeometry args={[0.05, PLUME_HEIGHT, 10, 1, true]} />
+      <primitive object={material} attach="material" />
+    </mesh>
+  )
+}
+
 export function Vesper({ reducedMotion, timeScale, timeRef }: VesperProps) {
   const groupRef = useRef<Group>(null)
   const surfaceRef = useRef<Mesh>(null)
@@ -264,7 +324,10 @@ export function Vesper({ reducedMotion, timeScale, timeRef }: VesperProps) {
       {/* The shepherd: a small iced moon keeping the Cassini gap swept,
         * riding the ring plane on the shared clock. */}
       <mesh ref={shepherdRef}>
-        <sphereGeometry args={[0.12, 32, 24]} />
+        <sphereGeometry args={[SHEPHERD_RADIUS, 32, 24]} />
+        {Array.from({ length: PLUME_VENTS }, (_, vent) => (
+          <ShepherdPlume key={vent} vent={vent} timeRef={timeRef} />
+        ))}
         <shaderMaterial
           ref={shepherdMaterialRef}
           vertexShader={bodyVertexGLSL(false)}

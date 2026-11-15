@@ -11,7 +11,6 @@ import type { SceneView } from './planets'
 import type { CameraPose } from './camera-math'
 import type { Locale } from './strings'
 
-
 // QA-only camera probe; never commit.
 function QAExpose() {
   const scene = useThree((state) => state.scene)
