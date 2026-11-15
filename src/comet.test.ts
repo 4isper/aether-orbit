@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { Vector3 } from 'three'
-import { cometOrbit, cometOrbitPoint, cometPosition, nextPerihelion, PERIHELION_RADIUS, tailParticlePosition } from './comet.ts'
+import { keplerSpeed } from './orbits.ts'
+import { cometOrbit, cometOrbitPoint, cometPeriod, cometPosition, nextPerihelion, PERIHELION_RADIUS, tailParticlePosition } from './comet.ts'
 
 const scratch = new Vector3()
 
@@ -19,7 +20,7 @@ test('periapsis and apoapsis match the configured ellipse', () => {
 
 test('the orbit repeats after one period', () => {
   const start = cometPosition(0, new Vector3())
-  const end = cometPosition(cometOrbit.period, scratch)
+  const end = cometPosition(cometPeriod, scratch)
   assert.ok(start.distanceTo(end) < 1e-6)
 })
 
@@ -37,7 +38,7 @@ test('the Kepler solver stays continuous across a full orbit', () => {
 })
 
 test('the comet moves faster near periapsis than near apoapsis (Kepler II)', () => {
-  const meanMotion = (Math.PI * 2) / cometOrbit.period
+  const meanMotion = (Math.PI * 2) / cometPeriod
   const timeAtPeriapsis = ((Math.PI * 2 - cometOrbit.meanAnomalyAtZero) % (Math.PI * 2)) / meanMotion
   const timeAtApoapsis = ((Math.PI - cometOrbit.meanAnomalyAtZero) % (Math.PI * 2)) / meanMotion
   const nearPeri = cometPosition(timeAtPeriapsis - 0.4, new Vector3())
@@ -82,14 +83,16 @@ test('the dust tail curves farther off the anti-sun line than the ion tail', () 
 test('the comet tracks negative time the same as the equivalent positive time', () => {
   // Reversed playback feeds negative time into the same Kepler solver.
   const reversed = cometPosition(-42, new Vector3())
-  const forward = cometPosition(-42 + cometOrbit.period, new Vector3())
+  const forward = cometPosition(-42 + cometPeriod, new Vector3())
   assert.ok(reversed.distanceTo(forward) < 1e-6, `gap ${reversed.distanceTo(forward)}`)
 })
 
 test('nextPerihelion lands on the periapsis, strictly ahead', () => {
   for (let start = 0; start <= 500; start += 23) {
     const event = nextPerihelion(start)
-    assert.ok(event.peak >= start, `peak ${event.peak} behind start ${start}`)
+    // Inside an ongoing blaze window the peak sits behind `now` — the second
+    // half of the same moment; only a future window must lie strictly ahead.
+    assert.ok(event.inProgress || event.peak >= start, `peak ${event.peak} behind start ${start}`)
     const radius = cometPosition(event.peak, new Vector3()).length()
     assert.ok(
       Math.abs(radius - cometOrbit.periapsis) < 1e-3,
@@ -104,7 +107,20 @@ test('perihelion repeats on the orbit period', () => {
   const first = nextPerihelion(0)
   // The next lap is announced once the current blaze window has closed.
   const second = nextPerihelion(first.exit + 1)
-  assert.ok(Math.abs(second.peak - first.peak - cometOrbit.period) < 1e-6, `period drift ${second.peak - first.peak}`)
+  assert.ok(Math.abs(second.peak - first.peak - cometPeriod) < 1e-6, `period drift ${second.peak - first.peak}`)
+})
+
+test('the comet flies the planets\' Kepler-3, not a private clock', () => {
+  // One gravity constant for every heliocentric lap: the period falls out of
+  // keplerSpeed at the semi-major axis, like the planets' own years do.
+  const semiMajor = (cometOrbit.periapsis + cometOrbit.apoapsis) / 2
+  const expected = (Math.PI * 2) / keplerSpeed(semiMajor)
+  const first = nextPerihelion(0)
+  const second = nextPerihelion(first.exit + 1)
+  assert.ok(
+    Math.abs(second.peak - first.peak - expected) < 1e-6,
+    `comet lap ${second.peak - first.peak} vs the honest ${expected}`,
+  )
 })
 
 test('the perihelion window matches the comet actually blazing', () => {

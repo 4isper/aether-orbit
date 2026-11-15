@@ -4,13 +4,16 @@ import { createKeplerOrbit } from './kepler.ts'
 export const cometOrbit = {
   periapsis: 4.6,
   apoapsis: 26,
-  period: 90,
   argumentOfPeriapsis: 2.0,
   inclination: 0.21,
   meanAnomalyAtZero: 2.2,
 }
 
 const comet = createKeplerOrbit(cometOrbit)
+
+/** Full lap around Solis, in time units — Kepler-3 at the ellipse's
+ * semi-major axis, the planets' own law (≈696 units, ~2.2 Aurelia years). */
+export const cometPeriod = comet.period
 
 /**
  * Position on the comet's ellipse for a given mean anomaly — the shared

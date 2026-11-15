@@ -11,7 +11,6 @@ import { createKeplerOrbit } from './kepler.ts'
 export const erebusOrbit = {
   periapsis: 19.2,
   apoapsis: 34,
-  period: 420,
   argumentOfPeriapsis: 1.1,
   inclination: 0.14,
   // Past apoapsis and falling inward: the first plunge is a promise.
@@ -19,6 +18,10 @@ export const erebusOrbit = {
 }
 
 const erebus = createKeplerOrbit(erebusOrbit)
+
+/** Full lap around Solis, in time units — Kepler-3 at the ellipse's
+ * semi-major axis, the planets' own law (≈1596 units, ~5.1 Aurelia years). */
+export const erebusPeriod = erebus.period
 
 /** Position on the ellipse for a given mean anomaly — the overview's orbit
  * line samples this around the whole lap. */

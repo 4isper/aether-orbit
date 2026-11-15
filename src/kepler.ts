@@ -1,18 +1,20 @@
 /**
  * A shared Kepler orbit factory: every eccentric wanderer of the system —
  * the comet, the dwarf beyond Vesper — flies the same solved ellipse, only
- * the elements differ. Newton's equation converges everywhere for e < 0.8;
- * the periapsis window is the analytic event used by the announcements.
+ * the elements differ. The lap is not authored: mean motion follows the
+ * planets' Kepler-3 law (keplerSpeed) at the ellipse's semi-major axis, so
+ * one gravity constant governs every heliocentric orbit. Newton's equation
+ * converges everywhere for e < 0.8; the periapsis window is the analytic
+ * event used by the announcements.
  */
 import { Vector3 } from 'three'
+import { keplerSpeed } from './orbits.ts'
 
 export type KeplerElements = {
   /** Closest approach to the star, scene units. */
   periapsis: number
   /** Farthest excursion, scene units. */
   apoapsis: number
-  /** Full lap, in time units — an exposure choice, not Kepler-3 honest. */
-  period: number
   /** Rotation of the ellipse inside its orbital plane, radians. */
   argumentOfPeriapsis: number
   /** Tilt of the orbital plane, radians. */
@@ -38,7 +40,8 @@ function TWO_PI_MOD(angle: number) {
 export function createKeplerOrbit(elements: KeplerElements) {
   const semiMajor = (elements.periapsis + elements.apoapsis) / 2
   const eccentricity = (elements.apoapsis - elements.periapsis) / (elements.apoapsis + elements.periapsis)
-  const meanMotion = (Math.PI * 2) / elements.period
+  const meanMotion = keplerSpeed(semiMajor)
+  const period = (Math.PI * 2) / meanMotion
   const cosW = Math.cos(elements.argumentOfPeriapsis)
   const sinW = Math.sin(elements.argumentOfPeriapsis)
   const cosI = Math.cos(elements.inclination)
@@ -95,5 +98,5 @@ export function createKeplerOrbit(elements: KeplerElements) {
     }
   }
 
-  return { orbitPoint, position, periapsisWindow, eccentricity, semiMajor, meanMotion }
+  return { orbitPoint, position, periapsisWindow, eccentricity, semiMajor, meanMotion, period }
 }

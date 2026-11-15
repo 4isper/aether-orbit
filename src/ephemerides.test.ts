@@ -44,7 +44,7 @@ test('the same moment reads the same schedule twice (determinism)', () => {
 
 test('every stream of the sky reaches the schedule at every moment', () => {
   // Each scanner promises its next window inside its own horizon (the slowest
-  // is the Cinder→Vesper synodic, ~1462 units); a 1900-unit schedule horizon
+  // is the Cinder→Vesper synodic, ~1462 units); a 3400-unit schedule horizon
   // therefore never comes up thin on any stream, at any moment.
   for (let start = 0; start <= 3000; start += 113) {
     const seen = new Set(listEphemerides(start).map(streamName))
@@ -106,7 +106,10 @@ test('the diary reads only finished windows, most recent first', () => {
     assert.ok(past.length > 0, `the diary is empty at t=${start}`)
     for (const entry of past) {
       assert.ok(entry.exit <= start, `window ${entry.kind} at t=${start} is not finished`)
-      assert.ok(entry.entry >= start - 240, `window ${entry.kind} at t=${start} reaches past the diary`)
+      // The diary keeps what finished within the lookback. A wide window may
+      // have opened long before the boundary — the dwarf's plunge alone runs
+      // ~270 units — what matters is when it ended.
+      assert.ok(entry.exit >= start - 240, `window ${entry.kind} at t=${start} reaches past the diary`)
     }
     for (let i = 1; i < past.length; i++) {
       assert.ok(past[i - 1].exit >= past[i].exit,

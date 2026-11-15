@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { Vector3 } from 'three'
-import { orbitPoint } from './orbits.ts'
-import { EREBUS_PERIAPSIS_RADIUS, erebusPosition, nextErebusPeriapsis } from './erebus.ts'
+import { keplerSpeed, orbitPoint } from './orbits.ts'
+import { EREBUS_PERIAPSIS_RADIUS, erebusOrbit, erebusPeriod, erebusPosition, nextErebusPeriapsis } from './erebus.ts'
 
 test('Erebus rides a deterministic ellipse, reversal included', () => {
   for (const time of [0, 137.4, -420, 900]) {
@@ -16,7 +16,7 @@ test('the ellipse stays tilted and reaches out past Vesper', () => {
   const vesperRadius = orbitPoint('vesper', 0, new Vector3()).length()
   let maxRadius = 0
   let maxTilt = 0
-  for (let t = 0; t < 420; t += 0.5) {
+  for (let t = 0; t < erebusPeriod; t += 0.5) {
     const p = erebusPosition(t, new Vector3())
     maxRadius = Math.max(maxRadius, p.length())
     maxTilt = Math.max(maxTilt, Math.abs(p.y))
@@ -28,7 +28,7 @@ test('the ellipse stays tilted and reaches out past Vesper', () => {
 test('periapsis dips just inside Vesper and matches the window radius', () => {
   const vesperRadius = orbitPoint('vesper', 0, new Vector3()).length()
   let minRadius = Infinity
-  for (let t = 0; t < 420; t += 0.05) {
+  for (let t = 0; t < erebusPeriod; t += 0.05) {
     minRadius = Math.min(minRadius, erebusPosition(t, new Vector3()).length())
   }
   assert.ok(minRadius < vesperRadius, 'periapsis never overtakes Vesper')
@@ -51,6 +51,21 @@ test('nextErebusPeriapsis finds the plunge and its edges', () => {
   assert.ok(edgeOut > EREBUS_PERIAPSIS_RADIUS, 'exit sits outside the window radius')
   const mid = nextErebusPeriapsis(event.peak + 1)
   assert.ok(mid.inProgress, 'the plunge in progress goes unannounced')
-  const far = nextErebusPeriapsis(event.peak + 60)
+  // The honest plunge window runs ±135 units around the peak; well past the
+  // half-width the announcement must let go.
+  const far = nextErebusPeriapsis(event.peak + 140)
   assert.ok(!far.inProgress, 'the window refuses to close')
+})
+
+test('Erebus flies the planets\' Kepler-3 too', () => {
+  // One gravity constant: a dwarf's slow year is keplerSpeed at its
+  // semi-major axis, not an authored pacing choice.
+  const semiMajor = (erebusOrbit.periapsis + erebusOrbit.apoapsis) / 2
+  const expected = (Math.PI * 2) / keplerSpeed(semiMajor)
+  const first = nextErebusPeriapsis(0)
+  const second = nextErebusPeriapsis(first.exit + 1)
+  assert.ok(
+    Math.abs(second.peak - first.peak - expected) < 1e-6,
+    `Erebus year ${second.peak - first.peak} vs the honest ${expected}`,
+  )
 })
