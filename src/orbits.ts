@@ -130,6 +130,30 @@ export function shepherdLocalPosition(time: number, target: Vector3) {
   return target.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius)
 }
 
+export type BeltRingConfig = {
+  /** Inner edge of the ring, scene units. */
+  inner: number
+  /** Outer edge of the ring, scene units. */
+  outer: number
+  /** Number of instanced rocks in the ring. */
+  count: number
+  /** Mean motion at the ring's midline, radians per time unit. */
+  speed: number
+  /** Vertical scatter of the rocks, scene units. */
+  spread: number
+  /** Deterministic seed of the rock placement. */
+  seed: number
+}
+
+/** The belt's three debris rings between Cinder and Vesper. Belt.tsx
+ * instances the rocks; the speeds live here with every other clock of the
+ * system. */
+export const beltRings: BeltRingConfig[] = [
+  { inner: 15.5, outer: 16.7, count: 640, speed: 0.0122, spread: 0.34, seed: 907 },
+  { inner: 16.7, outer: 17.7, count: 540, speed: 0.0112, spread: 0.42, seed: 2903 },
+  { inner: 17.7, outer: 18.6, count: 440, speed: 0.0103, spread: 0.34, seed: 4409 },
+]
+
 /**
  * The belt's own clock: where the camera anchor drifts inside the debris
  * rings. The anchor rides the middle ring's mean motion, so the rocks around

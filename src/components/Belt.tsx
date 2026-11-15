@@ -12,6 +12,7 @@ import {
 } from 'three'
 import { createRandom } from '../random'
 import { noiseGLSL } from '../shaders/noise'
+import { beltRings, type BeltRingConfig } from '../orbits'
 
 const rockVertex = /* glsl */ `
 varying vec3 vWorldPosition;
@@ -52,21 +53,6 @@ void main() {
 }
 `
 
-type RingConfig = {
-  inner: number
-  outer: number
-  count: number
-  speed: number
-  spread: number
-  seed: number
-}
-
-const rings: RingConfig[] = [
-  { inner: 15.5, outer: 16.7, count: 640, speed: 0.0122, spread: 0.34, seed: 907 },
-  { inner: 16.7, outer: 17.7, count: 540, speed: 0.0112, spread: 0.42, seed: 2903 },
-  { inner: 17.7, outer: 18.6, count: 440, speed: 0.0103, spread: 0.34, seed: 4409 },
-]
-
 // Zodiacal light: sunlight scattered by the belt's dust, laid in the belt's
 // own plane. Brightest just outside the star's corona, gone by the outer
 // orbits; kept faint so it reads as haze, not as a solid disc.
@@ -104,7 +90,7 @@ void main() {
 `
 
 type BeltRingProps = {
-  config: RingConfig
+  config: BeltRingConfig
   material: ShaderMaterial
   timeRef: { current: number }
 }
@@ -184,7 +170,7 @@ export function Belt({ timeRef }: BeltProps) {
           blending={AdditiveBlending}
         />
       </mesh>
-      {rings.map((config) => (
+      {beltRings.map((config) => (
         <BeltRing key={config.seed} config={config} material={material} timeRef={timeRef} />
       ))}
     </group>
