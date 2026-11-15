@@ -8,6 +8,16 @@ const orbitConfig: Record<PlanetId, { radius: number; speed: number; phase: numb
   vesper: { radius: 20, speed: 0.006, phase: 1.35, inclination: 0.075 },
 }
 
+/**
+ * Circular-orbit mean motion at a radius under the planets' Kepler-3 law:
+ * speeds fall as a^-1.5 from Aurelia's calibration. Every heliocentric lap
+ * outside the planet table rides this — one gravity constant for the whole
+ * system, so the belt can never drift onto its own clock.
+ */
+export function keplerSpeed(radius: number) {
+  return orbitConfig.aurelia.speed * (orbitConfig.aurelia.radius / radius) ** 1.5
+}
+
 /** Point on a planet's circular orbit, tilted by its inclination around the X axis. */
 export function orbitPoint(id: PlanetId, angle: number, target: Vector3) {
   const { radius, inclination } = orbitConfig[id]
@@ -145,14 +155,20 @@ export type BeltRingConfig = {
   seed: number
 }
 
-/** The belt's three debris rings between Cinder and Vesper. Belt.tsx
- * instances the rocks; the speeds live here with every other clock of the
- * system. */
-export const beltRings: BeltRingConfig[] = [
-  { inner: 15.5, outer: 16.7, count: 640, speed: 0.0122, spread: 0.34, seed: 907 },
-  { inner: 16.7, outer: 17.7, count: 540, speed: 0.0112, spread: 0.42, seed: 2903 },
-  { inner: 17.7, outer: 18.6, count: 440, speed: 0.0103, spread: 0.34, seed: 4409 },
-]
+const beltRingShapes = [
+  { inner: 15.5, outer: 16.7, count: 640, spread: 0.34, seed: 907 },
+  { inner: 16.7, outer: 17.7, count: 540, spread: 0.42, seed: 2903 },
+  { inner: 17.7, outer: 18.6, count: 440, spread: 0.34, seed: 4409 },
+] as const
+
+/** The belt's three debris rings between Cinder and Vesper. The speed is not
+ * authored: each ring rides keplerSpeed at its midline, the planets' own
+ * Kepler-3. Belt.tsx instances the rocks; the clock lives here with every
+ * other clock of the system. */
+export const beltRings: BeltRingConfig[] = beltRingShapes.map((ring) => ({
+  ...ring,
+  speed: keplerSpeed((ring.inner + ring.outer) / 2),
+}))
 
 /**
  * The belt's own clock: where the camera anchor drifts inside the debris
@@ -161,9 +177,9 @@ export const beltRings: BeltRingConfig[] = [
  */
 export const beltClock = {
   /** Anchor orbit radius, scene units — the middle ring's midline. */
-  anchorRadius: 17.0,
+  anchorRadius: (beltRings[1].inner + beltRings[1].outer) / 2,
   /** Anchor mean motion, radians per time unit — the middle ring's speed. */
-  anchorSpeed: 0.0112,
+  anchorSpeed: beltRings[1].speed,
   /** Where the anchor starts on its lap. */
   anchorPhase: 4.2,
 } as const

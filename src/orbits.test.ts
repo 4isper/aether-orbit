@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { Vector3 } from 'three'
-import { aureliaClock, beltAnchorAngle, beltAnchorPosition, beltClock, moonPhaseAngle, orbitPoint, planetPeriod, planetPosition, starFlux } from './orbits.ts'
+import { aureliaClock, beltAnchorAngle, beltAnchorPosition, beltClock, beltRings, moonPhaseAngle, orbitPoint, planetPeriod, planetPosition, starFlux } from './orbits.ts'
 import { planetIds } from './planets.ts'
 
 const scratch = new Vector3()
@@ -140,4 +140,32 @@ test('the belt anchor rides the middle ring between Cinder and Vesper', () => {
   assert.ok(beltClock.anchorRadius > cinderRadius && beltClock.anchorRadius < vesperRadius)
   // It drifts forward with the ring, not backwards with it.
   assert.ok(beltAnchorAngle(10) > beltAnchorAngle(0))
+})
+
+test('the belt rides the same Kepler-3 as the planets', () => {
+  // T ∝ a^1.5 holds for the planets; the debris rings orbit the same star,
+  // so one gravity constant must govern their midlines too.
+  const aureliaRadius = orbitPoint('aurelia', 0, new Vector3()).length()
+  const aureliaSpeed = (Math.PI * 2) / planetPeriod('aurelia')
+  const calibration = aureliaSpeed * aureliaRadius ** 1.5
+  for (const ring of beltRings) {
+    const midline = (ring.inner + ring.outer) / 2
+    const own = ring.speed * midline ** 1.5
+    const deviation = Math.abs(own / calibration - 1)
+    assert.ok(
+      deviation < 0.001,
+      `ring seed=${ring.seed} deviates ${(deviation * 100).toFixed(1)}% from Kepler-3`,
+    )
+  }
+  // Differential rotation: every ring overtakes the one outside it.
+  for (let i = 1; i < beltRings.length; i++) {
+    assert.ok(beltRings[i - 1].speed > beltRings[i].speed, `ring ${i} overtook the ring inside it`)
+  }
+  // The anchor rides the middle ring: its midline and its mean motion.
+  const middle = beltRings[1]
+  assert.ok(Math.abs(beltClock.anchorSpeed - middle.speed) < 1e-12, 'the anchor lost the middle ring')
+  assert.ok(
+    Math.abs(beltClock.anchorRadius - (middle.inner + middle.outer) / 2) < 1e-9,
+    'the anchor left the middle ring midline',
+  )
 })
