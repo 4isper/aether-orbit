@@ -10,6 +10,7 @@ import {
   type ShaderMaterial,
 } from 'three'
 import { cometPosition, tailParticlePosition } from '../comet'
+import { cometDustPosition } from '../dust'
 
 const TAIL_COUNT = 44
 const TAIL_LENGTH_FACTOR = 130
@@ -18,14 +19,20 @@ const MIN_TAIL_LENGTH = 2.2
 const MAX_TAIL_LENGTH = 7.5
 const MIN_TAIL_ACTIVITY = 0.45
 const MAX_TAIL_ACTIVITY = 1.3
-// The ion tail hugs the anti-sun line; the dust tail lags far harder behind
-// the path of motion, which is what curves it along the orbit's wake, and
-// spreads into a broader, dimmer, warmer cloud.
+// The ion tail hugs the anti-sun line, straight from the solar wind. The
+// dust tail is ballistic: every grain left the nucleus with the comet's own
+// motion and flies its private Kepler orbit under radiation-reduced
+// gravity, so the curve along the orbit's wake comes from the physics, not
+// from a lag factor.
 const TAIL_LAG_CURVE = 0.32
 const TAIL_SPREAD = 0.16
 const DUST_COUNT = 52
-const DUST_LAG_CURVE = 1.05
-const DUST_SPREAD = 0.35
+const DUST_BETA_MIN = 0.12
+const DUST_BETA_MAX = 0.42
+/** Grains in flight left the nucleus over the last 24 time units: near
+ * perihelion the comet covers that arc fast, so the trail is long there,
+ * and far out it collapses — as a real dust tail does. */
+const DUST_RELEASE_WINDOW = 24
 
 const comaVertex = /* glsl */ `
 varying vec2 vUv;
@@ -172,8 +179,18 @@ export function Comet({ timeRef }: CometProps) {
       for (let i = 0; i < DUST_COUNT; i++) {
         const t = (i + 1) / DUST_COUNT
         const seed = 40 + i * 7.31
-        const spread = t * tailLength * DUST_SPREAD + 0.06
-        tailParticlePosition(t, tailLength, DUST_LAG_CURVE, spread, head, velocity, antiSun, time, seed, scratch)
+        // One grain per slot: released `t` of the release window ago, with
+        // its own radiation-pressure β — the spread of β fans the syndyne
+        // curve the way real dust tails fan.
+        const beta = DUST_BETA_MIN
+          + (Math.abs(Math.sin(seed) * 43758.5453) % 1) * (DUST_BETA_MAX - DUST_BETA_MIN)
+        cometDustPosition(time - t * DUST_RELEASE_WINDOW, beta, time, scratch)
+        // A whisper of scatter keeps the grains off a mathematically exact
+        // curve: real dust clumps and drifts as it leaves the nucleus.
+        const scatter = 0.04 * t + 0.01
+        scratch.x += Math.sin(time * 0.9 + seed) * scatter
+        scratch.y += Math.cos(time * 1.3 + seed * 1.7) * scatter
+        scratch.z += Math.sin(time * 1.1 + seed * 2.3) * scatter
         tailPositions[i * 3] = scratch.x
         tailPositions[i * 3 + 1] = scratch.y
         tailPositions[i * 3 + 2] = scratch.z
