@@ -78,6 +78,15 @@ export function starFlux(position: Vector3) {
  * orbits. The moon must orbit above the synchronous orbit (its period above
  * the planet's day) or tides would pull it down; with these numbers the day
  * lasts ~60 units, the moon's month ~79, and a year holds ~4 months.
+ *
+ * Declared compact-scale fictions (the scene's scale is artistic, see
+ * README): this clock implies GM(Aurelia) = moonAngularSpeed²·moonOrbitRadius³
+ * ≈ 0.299 scene units against the star's GM ≈ 0.292 (ω²a³ of the planets) —
+ * a mass ratio ≈ 0.51 that breaks the Routh stability limit (0.0385) which
+ * keeps real L4/L5 trojans captive, and puts the moon at ~0.72 of the Hill
+ * radius where prograde long-term stability wants ≲ 0.5. A real planet shows
+ * ~12 months per year, not 4. The trojans below are therefore pinned
+ * kinematically, and the satellite clocks are declared, not derived.
  */
 export const aureliaClock = {
   /** Planet spin, radians per time unit. */

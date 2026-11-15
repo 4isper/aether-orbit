@@ -12,7 +12,7 @@ import {
 } from 'three'
 import { createRandom } from '../random'
 import { noiseGLSL } from '../shaders/noise'
-import { beltRings, type BeltRingConfig } from '../orbits'
+import { beltRings, keplerSpeed, type BeltRingConfig } from '../orbits'
 
 const rockVertex = /* glsl */ `
 varying vec3 vWorldPosition;
@@ -97,6 +97,8 @@ type BeltRingProps = {
 
 function BeltRing({ config, material, timeRef }: BeltRingProps) {
   const ref = useRef<InstancedMesh>(null)
+  const rocks = useRef({ base: new Float32Array(0), omega: new Float32Array(0) })
+  const lastTime = useRef(Number.NaN)
 
   useLayoutEffect(() => {
     const mesh = ref.current
@@ -107,12 +109,23 @@ function BeltRing({ config, material, timeRef }: BeltRingProps) {
     const quaternion = new Quaternion()
     const euler = new Euler()
     const scale = new Vector3()
+    const base = new Float32Array(config.count * 3)
+    const omega = new Float32Array(config.count)
 
     for (let i = 0; i < config.count; i++) {
       const angle = random() * Math.PI * 2
       const radius = config.inner + (config.outer - config.inner) * random()
       const y = (random() - 0.5) * 2 * config.spread * (0.35 + random() * 0.65)
       position.set(Math.cos(angle) * radius, y, Math.sin(angle) * radius)
+      base[i * 3] = position.x
+      base[i * 3 + 1] = position.y
+      base[i * 3 + 2] = position.z
+      // Each rock rides its own Kepler lap: the same mean motion law as the
+      // planets, so the belt shears — inner rocks overtake outer ones —
+      // instead of spinning rigidly. At a ring's midline this lands exactly
+      // on the speed the table declares, and rocks there stay companions of
+      // the camera anchor.
+      omega[i] = keplerSpeed(radius)
       euler.set(random() * Math.PI * 2, random() * Math.PI * 2, random() * Math.PI * 2)
       quaternion.setFromEuler(euler)
       const size = 0.032 + Math.pow(random(), 2.4) * 0.075
@@ -121,10 +134,30 @@ function BeltRing({ config, material, timeRef }: BeltRingProps) {
       mesh.setMatrixAt(i, matrix)
     }
     mesh.instanceMatrix.needsUpdate = true
+    rocks.current = { base, omega }
   }, [config])
 
+  // Per-rock laps on the CPU: one cos/sin pair per rock per frame is cheap,
+  // and JS math is bit-identical across runs — the goldens could never trust
+  // per-vertex SwiftShader transcendentals to hold still. The lap advances
+  // only when the shared clock moves, so pause costs nothing.
   useFrame(() => {
-    if (ref.current) ref.current.rotation.y = timeRef.current * config.speed
+    const mesh = ref.current
+    const time = timeRef.current
+    if (!mesh || time === lastTime.current) return
+    lastTime.current = time
+    const { base, omega } = rocks.current
+    const array = mesh.instanceMatrix.array as Float32Array
+    for (let i = 0; i < config.count; i++) {
+      const angle = time * omega[i]
+      const c = Math.cos(angle)
+      const s = Math.sin(angle)
+      const x = base[i * 3]
+      const z = base[i * 3 + 2]
+      array[i * 16 + 12] = c * x - s * z
+      array[i * 16 + 14] = s * x + c * z
+    }
+    mesh.instanceMatrix.needsUpdate = true
   })
 
   return (

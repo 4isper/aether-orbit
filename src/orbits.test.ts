@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { Vector3 } from 'three'
-import { aureliaClock, beltAnchorAngle, beltAnchorPosition, beltClock, beltRings, moonPhaseAngle, orbitPoint, planetPeriod, planetPosition, starFlux } from './orbits.ts'
+import { aureliaClock, beltAnchorAngle, beltAnchorPosition, beltClock, beltRings, moonPhaseAngle, orbitPoint, planetPeriod, planetPosition, starFlux, vesperClock } from './orbits.ts'
 import { planetIds } from './planets.ts'
 
 const scratch = new Vector3()
@@ -140,6 +140,25 @@ test('the belt anchor rides the middle ring between Cinder and Vesper', () => {
   assert.ok(beltClock.anchorRadius > cinderRadius && beltClock.anchorRadius < vesperRadius)
   // It drifts forward with the ring, not backwards with it.
   assert.ok(beltAnchorAngle(10) > beltAnchorAngle(0))
+})
+
+test('satellite clocks imply the declared compact-scale masses', () => {
+  // The satellite speeds are declared, not derived from a mass table — the
+  // scene's scale is artistic (see the fictions note in orbits.ts). Pin the
+  // GMs their clocks imply, so any retune shows up here as a deliberate
+  // change of the planets' implied masses, never as a silent drift.
+  const starGM = ((Math.PI * 2) / planetPeriod('aurelia')) ** 2 * 9 ** 3
+  const moonGM = aureliaClock.moonAngularSpeed ** 2 * aureliaClock.moonOrbitRadius ** 3
+  const shepherdGM = vesperClock.shepherdAngularSpeed ** 2 * vesperClock.shepherdOrbitRadius ** 3
+  assert.ok(Math.abs(starGM - 0.2916) < 1e-3, `star GM ${starGM}`)
+  assert.ok(Math.abs(moonGM - 0.2986) < 1e-3, `Aurelia GM ${moonGM}`)
+  assert.ok(Math.abs(shepherdGM - 0.1811) < 1e-3, `Vesper GM ${shepherdGM}`)
+  // The trojans ride a kinematic pin: the implied mass ratio breaks the
+  // Routh limit (0.0385) that keeps real L4/L5 captives stable. Documented
+  // fiction — this assertion keeps it declared rather than forgotten.
+  const routhLimit = 0.0385
+  const aureliaRatio = moonGM / (starGM + moonGM)
+  assert.ok(aureliaRatio > routhLimit, `Aurelia ratio ${aureliaRatio} slipped under Routh — update the trojan story`)
 })
 
 test('the belt rides the same Kepler-3 as the planets', () => {
