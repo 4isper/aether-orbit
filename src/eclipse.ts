@@ -9,6 +9,7 @@
  */
 import { Euler, Quaternion, Vector3 } from 'three'
 import { FLIGHT_BODY_RADII } from './camera-math.ts'
+import { smoothstep } from './cycles.ts'
 import { aureliaClock, aureliaFrame, moonPhaseAngle, planetPeriod, planetPosition } from './orbits.ts'
 
 const qWorld = new Quaternion().setFromEuler(new Euler(...aureliaFrame.worldRotation))
@@ -81,23 +82,39 @@ const STAR_RADIUS = FLIGHT_BODY_RADII.star
 const TRANSIT_MOON_RADIUS = aureliaFrame.moonRadius
 
 /**
- * Eclipse of the moon: the depth of Nox inside Aurelia's shadow cylinder,
- * measured from the planet along the anti-sun ray, in planet radii. The
- * rendered penumbra on the moon fades over 0.82–1.04 radii, so the
- * geometric threshold of 1.0 sits mid-penumbra — the moon is already a
- * quarter as bright, which reads as an eclipse worth announcing.
+ * Eclipse of the moon: how bright Nox stands inside Aurelia's shadow, from
+ * MOON_UMBRA_LIGHT in the umbra to 1 fully lit — the exact measure the moon
+ * shader renders (Moon.tsx), so the announced window and the visible
+ * darkening agree by construction. The shadow is a cone, not a cylinder:
+ * Solis outgrows Aurelia, so the umbra narrows behind the planet (apex at
+ * D·R_p/(R_s−R_p)) while the penumbra diverges as R_p + d·(R_s+R_p)/D — a
+ * cylinder overstates both.
  */
-export const ECLIPSE_THRESHOLD_PLANET_RADII = 1.0
+export const MOON_UMBRA_LIGHT = 0.08
 
-export function moonShadowDepth(time: number) {
+/** The announce cut: a quarter of full brightness — mid-fade of the cone
+ * the moon actually renders, the same "worth announcing" reading the old
+ * mid-penumbra threshold had. */
+export const ECLIPSE_THRESHOLD_BRIGHTNESS = 0.25
+
+export function moonLight(time: number) {
   planetPosition('aurelia', time, planetScratch)
   moonWorldPosition(time, moonScratch)
+  const sunPlanet = planetScratch.length()
   const offset = shadowOffsetScratch.copy(moonScratch).sub(planetScratch)
-  // The planet's shadow runs from the planet straight away from the star.
-  const antiSun = sunScratch.copy(planetScratch).normalize()
-  const along = offset.dot(antiSun)
-  if (along <= 0) return Number.POSITIVE_INFINITY
-  return Math.sqrt(Math.max(offset.lengthSq() - along * along, 0)) / aureliaFrame.planetRadius
+  // The cone runs from the planet straight away from the star.
+  const axis = sunScratch.copy(planetScratch).normalize()
+  const along = offset.dot(axis)
+  if (along <= 0) return 1
+  const perp = Math.sqrt(Math.max(offset.lengthSq() - along * along, 0))
+  const planetRadius = aureliaFrame.planetRadius
+  const penumbra = planetRadius + along * (STAR_RADIUS + planetRadius) / sunPlanet
+  const umbra = Math.max(
+    planetRadius * (1 - along * (STAR_RADIUS - planetRadius) / (sunPlanet * planetRadius)),
+    0,
+  )
+  const lit = smoothstep(umbra, penumbra, perp)
+  return MOON_UMBRA_LIGHT + (1 - MOON_UMBRA_LIGHT) * lit
 }
 
 const SCAN_STEP = 0.5
@@ -226,13 +243,13 @@ export function nextTransit(now: number): TransitEvent | null {
 
 /**
  * The next eclipse at or after `now`: Nox crossing into Aurelia's shadow,
- * going visibly dark from the moon's orbit. Geometry matches the penumbra
- * the moon surface actually renders.
+ * going visibly dark from the moon's orbit. The measure is the moon's own
+ * brightness in the shadow cone — the scan's peak is the darkest moment.
  */
 export function nextEclipse(now: number): TransitEvent | null {
   return nextWindow(now, {
-    measure: moonShadowDepth,
-    threshold: ECLIPSE_THRESHOLD_PLANET_RADII,
+    measure: moonLight,
+    threshold: ECLIPSE_THRESHOLD_BRIGHTNESS,
     horizon: ECLIPSE_SCAN_HORIZON,
   })
 }

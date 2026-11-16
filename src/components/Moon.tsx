@@ -8,6 +8,7 @@ import { bodyVertexGLSL, perturbNormalGLSL } from '../shaders/common'
 const moonFragment = /* glsl */ `
 uniform vec3 uPlanetPosition;
 uniform float uPlanetRadius;
+uniform float uSunRadius;
 uniform float uStarFlux;
 varying vec3 vObjectPosition;
 varying vec3 vWorldPosition;
@@ -34,12 +35,20 @@ void main() {
   vec3 N = perturbNormal(vWorldPosition, geometricN, elevation);
 
   vec3 L = normalize(-vWorldPosition);
-  vec3 toPlanet = uPlanetPosition - vWorldPosition;
-  float planetAlong = dot(toPlanet, L);
+  // The eclipse shadow is a cone, matching eclipse.ts's moonLight term for
+  // term: Solis outgrows Aurelia, so the umbra narrows behind the planet
+  // (apex at D·Rp/(Rs−Rp)) while the penumbra diverges — a cylinder would
+  // overstate both.
+  vec3 axis = normalize(uPlanetPosition);
+  vec3 offset = vWorldPosition - uPlanetPosition;
+  float along = dot(offset, axis);
   float lit = 1.0;
-  if (planetAlong > 0.0) {
-    float perp = sqrt(max(dot(toPlanet, toPlanet) - planetAlong * planetAlong, 0.0));
-    lit = 1.0 - (1.0 - smoothstep(uPlanetRadius * 0.82, uPlanetRadius * 1.04, perp)) * 0.92;
+  if (along > 0.0) {
+    float perp = length(offset - axis * along);
+    float sunPlanet = length(uPlanetPosition);
+    float penumbraR = uPlanetRadius + along * (uSunRadius + uPlanetRadius) / sunPlanet;
+    float umbraR = uPlanetRadius * max(1.0 - along * (uSunRadius - uPlanetRadius) / (sunPlanet * uPlanetRadius), 0.0);
+    lit = 0.08 + 0.92 * smoothstep(umbraR, penumbraR, perp);
   }
 
   float diffuse = max(dot(N, L), 0.0);
@@ -63,6 +72,7 @@ export function Moon({ radius = aureliaFrame.moonRadius, ref, materialRef, child
     () => ({
       uPlanetPosition: { value: new Vector3() },
       uPlanetRadius: { value: 2 },
+      uSunRadius: { value: 2.35 },
       uStarFlux: { value: 1 },
     }),
     [],

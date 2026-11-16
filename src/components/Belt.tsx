@@ -42,7 +42,7 @@ void main() {
   float ndl = max(dot(N, L), 0.0);
 
   // Starlight falloff, unity at Aurelia's 9 u orbit, exponent 1.5 (see orbits.ts).
-  float flux = pow(9.0 / max(length(vInstanceOffset), 0.0001), 1.5);
+  float flux = pow(9.0 / max(length(vInstanceOffset), 0.0001), 2.0);
   float h = fract(sin(dot(vInstanceOffset, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
   vec3 albedo = mix(vec3(0.21, 0.19, 0.17), vec3(0.42, 0.38, 0.33), h);
 

@@ -27,6 +27,13 @@ export function cometPosition(time: number, target: Vector3) {
   return comet.position(time, target)
 }
 
+/** The comet's own velocity at simulation time — the factory's vis-viva
+ * tangent, exact. The dust grains leave the nucleus with this state of
+ * motion (dust.ts). */
+export function cometVelocity(time: number, target: Vector3) {
+  return comet.velocity(time, target)
+}
+
 /**
  * The comet's blaze window: within this radius of the star the tails are
  * visibly burning (1.3× periapsis). It is the event's own threshold, the
@@ -57,30 +64,26 @@ export function nextPerihelion(now: number): PerihelionEvent {
 const scratchAntiSun = new Vector3()
 
 /**
- * Position of one tail particle: it streams anti-sunward along `antiSun`,
- * falls back along the path of motion by a quadratic lag (`lagCurve` decides
- * how strongly - the dust tail lags far harder than the ion tail, which is
- * what curves it away from the straight anti-sun line), and wobbles by
+ * Position of one ion-tail particle: it streams anti-sunward along
+ * `antiSun` — the solar wind is radial, so the ion tail carries no lag
+ * along the path of motion (the dust tail's ballistic curve lives in
+ * dust.ts, where each grain flies its own Kepler orbit) — and wobbles by
  * `spread` on a per-particle seed. `t` runs 0..1 from the head outward.
  */
 export function tailParticlePosition(
   t: number,
   tailLength: number,
-  lagCurve: number,
   spread: number,
   head: Vector3,
-  velocity: Vector3,
   antiSun: Vector3,
   clock: number,
   seed: number,
   target: Vector3,
 ): Vector3 {
-  const lag = t * t * tailLength * lagCurve
   scratchAntiSun.copy(antiSun).normalize()
   return target
     .copy(head)
     .addScaledVector(scratchAntiSun, t * tailLength)
-    .addScaledVector(velocity, -lag)
     .add({
       x: Math.sin(clock * 0.9 + seed) * spread,
       y: Math.cos(clock * 1.3 + seed * 1.7) * spread,

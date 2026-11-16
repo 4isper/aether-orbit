@@ -5,7 +5,7 @@ import { noiseGLSL } from '../shaders/noise'
 import { bodyVertexGLSL, perturbNormalGLSL } from '../shaders/common'
 import { Atmosphere } from './Atmosphere'
 import { RingRocks } from './RingRocks'
-import { shepherdLocalPosition, starFlux } from '../orbits'
+import { shepherdLocalPosition, starFlux, vesperSpinPhase } from '../orbits'
 import { plumeStrength, plumeVentLocal, PLUME_VENTS, SHEPHERD_RADIUS } from '../plumes'
 import { flareLight } from '../flare'
 import { useSunDirection } from '../hooks/useSunDirection'
@@ -168,7 +168,6 @@ void main() {
 
 type VesperProps = {
   reducedMotion: boolean
-  timeScale: number
   timeRef: { current: number }
 }
 
@@ -231,7 +230,7 @@ function ShepherdPlume({ vent, timeRef }: {
   )
 }
 
-export function Vesper({ reducedMotion, timeScale, timeRef }: VesperProps) {
+export function Vesper({ reducedMotion, timeRef }: VesperProps) {
   const groupRef = useRef<Group>(null)
   const surfaceRef = useRef<Mesh>(null)
   const shepherdRef = useRef<Mesh>(null)
@@ -268,8 +267,7 @@ export function Vesper({ reducedMotion, timeScale, timeRef }: VesperProps) {
   )
   const shepherdScratch = useMemo(() => new Vector3(), [])
 
-  useFrame((_, rawDelta) => {
-    const delta = Math.min(rawDelta, 0.1)
+  useFrame(() => {
     updateSunDirection()
     const flux = starFlux(worldPosition) * flareLight(timeRef.current)
     if (surfaceMaterialRef.current) surfaceMaterialRef.current.uniforms.uStarFlux.value = flux
@@ -288,7 +286,7 @@ export function Vesper({ reducedMotion, timeScale, timeRef }: VesperProps) {
     }
 
     if (!reducedMotion && surfaceRef.current) {
-      surfaceRef.current.rotation.y += delta * 0.005 * timeScale
+      surfaceRef.current.rotation.y = vesperSpinPhase(timeRef.current)
     }
   })
 

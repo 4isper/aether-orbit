@@ -136,16 +136,12 @@ export function Comet({ timeRef }: CometProps) {
   const comaUniforms = useMemo(() => ({ uActivity: { value: 1 } }), [])
 
   const head = useMemo(() => new Vector3(), [])
-  const previous = useMemo(() => new Vector3(), [])
-  const velocity = useMemo(() => new Vector3(), [])
   const antiSun = useMemo(() => new Vector3(), [])
   const scratch = useMemo(() => new Vector3(), [])
 
   useFrame((state) => {
     const time = timeRef.current
     cometPosition(time, head)
-    cometPosition(time - 0.6, previous)
-    velocity.copy(head).sub(previous)
     antiSun.copy(head).normalize()
     const distance = head.length()
     const tailLength = Math.min(MAX_TAIL_LENGTH, Math.max(MIN_TAIL_LENGTH, TAIL_LENGTH_FACTOR / (distance * distance)))
@@ -162,7 +158,7 @@ export function Comet({ timeRef }: CometProps) {
         const t = (i + 1) / TAIL_COUNT
         const seed = i * 12.9898
         const spread = t * tailLength * TAIL_SPREAD + 0.05
-        tailParticlePosition(t, tailLength, 0, spread, head, velocity, antiSun, time, seed, scratch)
+        tailParticlePosition(t, tailLength, spread, head, antiSun, time, seed, scratch)
         tailPositions[i * 3] = scratch.x
         tailPositions[i * 3 + 1] = scratch.y
         tailPositions[i * 3 + 2] = scratch.z

@@ -341,7 +341,7 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
     <>
       <color attach="background" args={['#010205']} />
       <Backdrop />
-      <Starfield reducedMotion={reducedMotion} timeScale={timeScale} />
+      <Starfield reducedMotion={reducedMotion} timeRef={orbitTime} />
       {/* Meteors are motion — the reduced-motion promise means none at all. */}
       {!reducedMotion && <Meteors timeRef={orbitTime} />}
       <Belt timeRef={orbitTime} />
@@ -355,12 +355,12 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
         <Planet reducedMotion={reducedMotion} showMoonLabel={overview} locale={locale} timeRef={orbitTime} moonWorldRef={moonWorld} />
       </group>
       <group ref={(node) => { groupRefs.current.cinder = node }} position={initialPositions[1]} {...planetEvents('cinder')}>
-        <Cinder reducedMotion={reducedMotion} timeScale={timeScale} timeRef={orbitTime} />
+        <Cinder reducedMotion={reducedMotion} timeRef={orbitTime} />
       </group>
       <group ref={(node) => { groupRefs.current.vesper = node }} position={initialPositions[2]} {...planetEvents('vesper')}>
-        <Vesper reducedMotion={reducedMotion} timeScale={timeScale} timeRef={orbitTime} />
+        <Vesper reducedMotion={reducedMotion} timeRef={orbitTime} />
       </group>
-      <Erebus reducedMotion={reducedMotion} timeScale={timeScale} timeRef={orbitTime} />
+      <Erebus reducedMotion={reducedMotion} timeRef={orbitTime} />
       <CameraRig
         initialView={initialView}
         initialPose={initialPose}

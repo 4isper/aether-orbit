@@ -12,7 +12,10 @@ export function seededCycle(seed: number, minPeriod: number, maxPeriod: number) 
   return { period, offset: random() * period }
 }
 
-function smoothstep(edge0: number, edge1: number, x: number) {
+/** Monotone smooth 0→1 ramp between two edges — the same shape the GLSL
+ * smoothstep builtins render, so a JS measure and a shader's fade agree
+ * term for term. */
+export function smoothstep(edge0: number, edge1: number, x: number) {
   const t = Math.min(Math.max((x - edge0) / (edge1 - edge0), 0), 1)
   return t * t * (3 - 2 * t)
 }

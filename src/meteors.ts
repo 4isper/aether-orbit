@@ -9,6 +9,7 @@
  * rise-hold-decay envelope — announced ahead through the shared window scan.
  */
 import { Vector3 } from 'three'
+import { cometPosition } from './comet.ts'
 import { createRandom } from './random.ts'
 import { cycleEnvelope, seededCycle } from './cycles.ts'
 import { nextWindow } from './eclipse.ts'
@@ -159,21 +160,23 @@ function showerSlotTiming(slotSeed: number) {
   return timing
 }
 
+const scratchRadiant = new Vector3()
+/** How far behind the comet its wake hangs: the trail the rain radiates
+ * from, in time units before the shower's own start. */
+const RADIANT_TRAIL_LAG = 12
+
 /**
- * The sky point every streak of one shower flies away from: a unit
- * direction seeded per shower, so each rain has its own radiant. The seed
- * goes through mixSeed: early simulation times yield negative shower
- * indexes, and a negative seed would poison the LCG with negative draws.
+ * The sky point every streak of one shower flies away from: the direction
+ * toward Boreas's wake at the shower's start — real showers radiate from
+ * the debris trail their parent comet left, and here the parent is the
+ * comet the scene already flies. Deterministic per shower: the trail is a
+ * pure function of the shared clock, so early simulation times (negative
+ * shower indexes) rewind the comet honestly instead of poisoning a seed.
  */
 export function showerRadiant(showerIndex: number, target: Vector3): Vector3 {
-  const random = createRandom(mixSeed(5501, showerIndex))
-  const theta = random() * Math.PI * 2
-  const phi = Math.acos(2 * random() - 1)
-  return target.set(
-    Math.sin(phi) * Math.cos(theta),
-    Math.cos(phi),
-    Math.sin(phi) * Math.sin(theta),
-  )
+  const showerStart = showerCycle.offset + showerIndex * showerCycle.period
+  cometPosition(showerStart - RADIANT_TRAIL_LAG, scratchRadiant)
+  return target.copy(scratchRadiant).normalize()
 }
 
 /**

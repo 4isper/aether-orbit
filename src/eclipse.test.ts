@@ -8,8 +8,9 @@ import {
   moonWorldPosition,
   TRANSIT_THRESHOLD_MOON_RADII,
   nextEclipse,
-  moonShadowDepth,
-  ECLIPSE_THRESHOLD_PLANET_RADII,
+  moonLight,
+  MOON_UMBRA_LIGHT,
+  ECLIPSE_THRESHOLD_BRIGHTNESS,
   ECLIPSE_SCAN_HORIZON,
 } from './eclipse.ts'
 
@@ -118,19 +119,29 @@ test('nextTransit after an event finds the next month, strictly ahead', () => {
   assert.ok(!after.inProgress)
 })
 
+test('the moon brightness measure stays inside the cone band', () => {
+  // The measure mirrors the shader term for term: fully lit away from the
+  // shadow, dimmed to the umbra floor inside it, never NaN in between.
+  for (let t = 0; t < 500; t += 1.3) {
+    const light = moonLight(t)
+    assert.ok(Number.isFinite(light), `non-finite brightness at t=${t}`)
+    assert.ok(light >= MOON_UMBRA_LIGHT - 1e-12 && light <= 1 + 1e-12, `out of range at t=${t}: ${light}`)
+  }
+})
+
 test("nextEclipse finds windows where Nox enters Aurelia's shadow", () => {
   // Walk years of simulation time window by window: every scan must return
   // an event, every window must bracket real crossings, and the peak must
-  // be the deepest point of the umbra pass.
+  // be the darkest point of the cone pass.
   let cursor = 0
   for (let i = 0; i < 40; i++) {
     const event = nextEclipse(cursor)
     assert.ok(event, `no eclipse found from t=${cursor}`)
     assert.ok(event.entry >= cursor, `event from t=${cursor} starts in the past`)
     assert.ok(event.entry < event.peak && event.peak < event.exit, 'window is not ordered')
-    assert.ok(moonShadowDepth(event.peak) <= ECLIPSE_THRESHOLD_PLANET_RADII + 1e-9, 'peak is not inside the shadow')
-    assert.ok(moonShadowDepth(event.entry - 0.2) > ECLIPSE_THRESHOLD_PLANET_RADII, 'entry is not a real crossing')
-    assert.ok(moonShadowDepth(event.exit + 0.2) > ECLIPSE_THRESHOLD_PLANET_RADII, 'exit is not a real crossing')
+    assert.ok(moonLight(event.peak) <= ECLIPSE_THRESHOLD_BRIGHTNESS + 1e-9, 'peak is not inside the shadow')
+    assert.ok(moonLight(event.entry - 0.2) > ECLIPSE_THRESHOLD_BRIGHTNESS, 'entry is not a real crossing')
+    assert.ok(moonLight(event.exit + 0.2) > ECLIPSE_THRESHOLD_BRIGHTNESS, 'exit is not a real crossing')
     cursor = event.exit + 0.5
   }
 })

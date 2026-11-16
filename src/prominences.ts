@@ -1,4 +1,5 @@
 import { Vector3 } from 'three'
+import { cycleEnvelope } from './cycles.ts'
 
 /**
  * Geometry and lifecycle math for Solis prominences: plasma loops arcing
@@ -12,21 +13,12 @@ const RISE_END = 0.2
 const HOLD_END = 0.4
 const ACTIVE_END = 0.6
 
-function smoothstep(edge0: number, edge1: number, x: number) {
-  const t = Math.min(Math.max((x - edge0) / (edge1 - edge0), 0), 1)
-  return t * t * (3 - 2 * t)
-}
-
 /**
  * Brightness of one prominence at phase `phase` (one full period maps to [0, 1),
  * phase may be any real number): 0 while dormant, 1 while held.
  */
 export function prominenceEnvelope(phase: number) {
-  const p = ((phase % 1) + 1) % 1
-  if (p >= ACTIVE_END) return 0
-  const rise = smoothstep(0, RISE_END, p)
-  const fall = 1 - smoothstep(HOLD_END, ACTIVE_END, p)
-  return Math.min(rise, fall)
+  return cycleEnvelope(phase, RISE_END, HOLD_END, ACTIVE_END)
 }
 
 /** Slerp between unit directions, with fallbacks for near-parallel inputs. */

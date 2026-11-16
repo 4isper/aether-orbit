@@ -7,7 +7,6 @@ import { cometOrbit, cometOrbitPoint, cometPeriod, cometPosition, nextPerihelion
 const scratch = new Vector3()
 
 const HEAD = new Vector3(4, 0.5, -2)
-const VELOCITY = new Vector3(0.8, -0.2, 0.4)
 const ANTI_SUN = HEAD.clone().normalize()
 const TAIL_LENGTH = 6
 
@@ -49,31 +48,17 @@ test('the comet moves faster near periapsis than near apoapsis (Kepler II)', () 
 })
 
 test('tail particles stream away from the star', () => {
-  const point = tailParticlePosition(
-    1, TAIL_LENGTH, 0, 0, HEAD, new Vector3(), ANTI_SUN, 0, 0, new Vector3(),
-  )
+  const point = tailParticlePosition(1, TAIL_LENGTH, 0, HEAD, ANTI_SUN, 0, 0, new Vector3())
   const expected = HEAD.clone().addScaledVector(ANTI_SUN, TAIL_LENGTH)
   assert.ok(point.distanceTo(expected) < 1e-9, `point ${point.toArray()}`)
 })
 
-test('velocity lag pulls tail particles back along the path of motion', () => {
-  const noLag = tailParticlePosition(
-    1, TAIL_LENGTH, 0, 0, HEAD, VELOCITY, ANTI_SUN, 0, 0, new Vector3(),
-  )
-  const lagged = tailParticlePosition(
-    1, TAIL_LENGTH, 0.32, 0, HEAD, VELOCITY, ANTI_SUN, 0, 0, new Vector3(),
-  )
-  const shift = lagged.clone().sub(noLag)
-  assert.ok(shift.dot(VELOCITY) < 0, `shift ${shift.toArray()} opposes velocity`)
-})
-
 test('the ion tail is exactly anti-sunward, whatever the motion', () => {
-  // The solar wind is radial: zero lag means every particle sits on the
-  // straight anti-sun line, whatever the comet's velocity says.
+  // The solar wind is radial: every particle sits on the straight anti-sun
+  // line; the dust tail's ballistic curve is dust.ts's business, not the
+  // ion tail's.
   for (const t of [0.3, 0.7, 1]) {
-    const point = tailParticlePosition(
-      t, TAIL_LENGTH, 0, 0, HEAD, VELOCITY, ANTI_SUN, 0, 0, new Vector3(),
-    )
+    const point = tailParticlePosition(t, TAIL_LENGTH, 0, HEAD, ANTI_SUN, 0, 0, new Vector3())
     const expected = HEAD.clone().addScaledVector(ANTI_SUN, t * TAIL_LENGTH)
     assert.ok(point.distanceTo(expected) < 1e-9, `ion particle at t=${t} left the radial line`)
   }

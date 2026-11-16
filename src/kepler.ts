@@ -1,11 +1,12 @@
 /**
  * A shared Kepler orbit factory: every eccentric wanderer of the system —
- * the comet, the dwarf beyond Vesper — flies the same solved ellipse, only
- * the elements differ. The lap is not authored: mean motion follows the
- * planets' Kepler-3 law (keplerSpeed) at the ellipse's semi-major axis, so
- * one gravity constant governs every heliocentric orbit. Newton's equation
- * converges everywhere for e < 0.8; the periapsis window is the analytic
- * event used by the announcements.
+ * the three planets, the comet, the dwarf beyond Vesper — flies the same
+ * solved ellipse, only the elements differ. The lap is not authored: mean
+ * motion follows the system's Kepler-3 law (keplerSpeed) at the ellipse's
+ * semi-major axis, so one gravity constant governs every heliocentric
+ * orbit. Newton's equation converges everywhere for e < 0.8; the velocity
+ * is the vis-viva tangent on the same frame, and the periapsis window is
+ * the analytic event used by the announcements.
  */
 import { Vector3 } from 'three'
 import { keplerSpeed } from './orbits.ts'
@@ -47,19 +48,23 @@ export function createKeplerOrbit(elements: KeplerElements) {
   const cosI = Math.cos(elements.inclination)
   const sinI = Math.sin(elements.inclination)
 
-  /**
-   * Position on the ellipse for a given mean anomaly. Kepler's equation is
-   * solved with Newton iterations; eccentricity stays below 0.8 so this
-   * converges everywhere.
-   */
-  const orbitPoint = (meanAnomaly: number, target: Vector3) => {
+  /** Kepler's equation solved with Newton iterations from the mean anomaly;
+   * eccentricity stays below 0.8 so this converges everywhere. */
+  const eccentricAnomaly = (meanAnomaly: number) => {
     const normalized = meanAnomaly % (Math.PI * 2)
     let eccentric = normalized
     for (let i = 0; i < 10; i++) {
       eccentric -= (eccentric - eccentricity * Math.sin(eccentric) - normalized)
         / (1 - eccentricity * Math.cos(eccentric))
     }
+    return eccentric
+  }
 
+  /**
+   * Position on the ellipse for a given mean anomaly.
+   */
+  const orbitPoint = (meanAnomaly: number, target: Vector3) => {
+    const eccentric = eccentricAnomaly(meanAnomaly)
     const planeX = semiMajor * (Math.cos(eccentric) - eccentricity)
     const planeY = semiMajor * Math.sqrt(1 - eccentricity * eccentricity) * Math.sin(eccentric)
     const rotatedX = planeX * cosW - planeY * sinW
@@ -69,6 +74,27 @@ export function createKeplerOrbit(elements: KeplerElements) {
 
   const position = (time: number, target: Vector3) => {
     return orbitPoint(elements.meanAnomalyAtZero + meanMotion * time, target)
+  }
+
+  /**
+   * Velocity on the ellipse for the same mean anomaly, the same tilt
+   * convention as orbitPoint: the vis-viva tangent
+   * n·a/(1−e·cosE)·(−sinE, √(1−e²)·cosE), rotated and inclined exactly like
+   * the position. The dust releases its grains with this — the comet's own
+   * state of motion, exact rather than a finite difference.
+   */
+  const orbitVelocity = (meanAnomaly: number, target: Vector3) => {
+    const eccentric = eccentricAnomaly(meanAnomaly)
+    const speed = meanMotion * semiMajor / (1 - eccentricity * Math.cos(eccentric))
+    const planeX = -Math.sin(eccentric) * speed
+    const planeY = Math.sqrt(1 - eccentricity * eccentricity) * Math.cos(eccentric) * speed
+    const rotatedX = planeX * cosW - planeY * sinW
+    const rotatedY = planeX * sinW + planeY * cosW
+    return target.set(rotatedX, rotatedY * sinI, rotatedY * cosI)
+  }
+
+  const velocity = (time: number, target: Vector3) => {
+    return orbitVelocity(elements.meanAnomalyAtZero + meanMotion * time, target)
   }
 
   // r = a(1 − e·cosE) crosses `radius` at ±E*, swept in mean anomaly by
@@ -98,5 +124,5 @@ export function createKeplerOrbit(elements: KeplerElements) {
     }
   }
 
-  return { orbitPoint, position, periapsisWindow, eccentricity, semiMajor, meanMotion, period }
+  return { orbitPoint, orbitVelocity, position, velocity, periapsisWindow, eccentricity, semiMajor, meanMotion, period }
 }

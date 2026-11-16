@@ -525,6 +525,7 @@ export function Planet({ reducedMotion, showMoonLabel, locale, timeRef, moonWorl
       if (moonMaterialRef.current) {
         moonMaterialRef.current.uniforms.uPlanetPosition.value.copy(worldPosition)
         moonMaterialRef.current.uniforms.uPlanetRadius.value = planetRadius
+        moonMaterialRef.current.uniforms.uSunRadius.value = FLIGHT_BODY_RADII.star
         moonMaterialRef.current.uniforms.uStarFlux.value = starFlux(moonWorld) * flareLight(timeRef.current)
       }
     }

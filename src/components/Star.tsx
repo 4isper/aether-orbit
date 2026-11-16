@@ -63,9 +63,10 @@ void main() {
   color = mix(color, color * vec3(1.25, 0.85, 0.7), umbra);
   color *= limb * 1.45;
   color += vec3(1.0, 0.32, 0.05) * pow(1.0 - mu, 2.4) * 0.55;
-  // A flare lifts the whole disc: the photosphere burns a touch hotter and
-  // whiter while the burst holds (flare.ts owns the schedule).
-  color *= 1.0 + uFlare * 0.3;
+  // A flare burns where the activity is: a modest lift across the disc,
+  // concentrated on the spot field's own penumbrae and umbrae — the active
+  // regions glow first (flare.ts owns the schedule).
+  color *= 1.0 + uFlare * (0.15 + 0.45 * (penumbraFibers + umbra));
 
   gl_FragColor = vec4(color, 1.0);
   #include <tonemapping_fragment>

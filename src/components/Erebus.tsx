@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { Vector3, type Group, type Mesh, type ShaderMaterial } from 'three'
 import { noiseGLSL } from '../shaders/noise'
 import { bodyVertexGLSL, perturbNormalGLSL } from '../shaders/common'
-import { starFlux } from '../orbits'
+import { erebusSpinPhase, starFlux } from '../orbits'
 import { flareLight } from '../flare'
 import { erebusPosition } from '../erebus'
 import { useSunDirection } from '../hooks/useSunDirection'
@@ -44,9 +44,8 @@ void main() {
 }
 `
 
-export function Erebus({ reducedMotion, timeScale, timeRef }: {
+export function Erebus({ reducedMotion, timeRef }: {
   reducedMotion: boolean
-  timeScale: number
   timeRef: { current: number }
 }) {
   const groupRef = useRef<Group>(null)
@@ -62,10 +61,9 @@ export function Erebus({ reducedMotion, timeScale, timeRef }: {
     [sunDirection],
   )
 
-  useFrame((_, rawDelta) => {
-    const delta = Math.min(rawDelta, 0.1)
+  useFrame(() => {
     // The dwarf rides the shared clock like every body: pause, reverse and
-    // ?t= land it on the same point of the ellipse.
+    // ?t= land it on the same point of the ellipse — and on the same face.
     erebusPosition(timeRef.current, worldPosition)
     groupRef.current?.position.copy(worldPosition)
     updateSunDirection()
@@ -73,7 +71,7 @@ export function Erebus({ reducedMotion, timeScale, timeRef }: {
       materialRef.current.uniforms.uStarFlux.value = starFlux(worldPosition) * flareLight(timeRef.current)
     }
     if (!reducedMotion && surfaceRef.current) {
-      surfaceRef.current.rotation.y += delta * 0.02 * timeScale
+      surfaceRef.current.rotation.y = erebusSpinPhase(timeRef.current)
     }
   })
 

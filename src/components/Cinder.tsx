@@ -5,7 +5,7 @@ import { RepeatWrapping, SRGBColorSpace, type Group, type Mesh, type ShaderMater
 import { noiseGLSL } from '../shaders/noise'
 import { bodyVertexGLSL, perturbNormalGLSL } from '../shaders/common'
 import { useSunDirection } from '../hooks/useSunDirection'
-import { starFlux } from '../orbits'
+import { cinderSpinPhase, starFlux } from '../orbits'
 import { stormIntensity } from '../storms'
 import { flareLight } from '../flare'
 import { Atmosphere } from './Atmosphere'
@@ -53,11 +53,10 @@ void main() {
 
 type CinderProps = {
   reducedMotion: boolean
-  timeScale: number
   timeRef: { current: number }
 }
 
-export function Cinder({ reducedMotion, timeScale, timeRef }: CinderProps) {
+export function Cinder({ reducedMotion, timeRef }: CinderProps) {
   const groupRef = useRef<Group>(null)
   const surfaceRef = useRef<Mesh>(null)
   const surfaceMaterialRef = useRef<ShaderMaterial>(null)
@@ -86,8 +85,7 @@ export function Cinder({ reducedMotion, timeScale, timeRef }: CinderProps) {
     [sunDirection, dayMap],
   )
 
-  useFrame((_, rawDelta) => {
-    const delta = Math.min(rawDelta, 0.1)
+  useFrame(() => {
     updateSunDirection()
     if (surfaceMaterialRef.current) {
       surfaceMaterialRef.current.uniforms.uStarFlux.value = starFlux(worldPosition) * flareLight(timeRef.current)
@@ -95,7 +93,7 @@ export function Cinder({ reducedMotion, timeScale, timeRef }: CinderProps) {
     }
 
     if (!reducedMotion && surfaceRef.current) {
-      surfaceRef.current.rotation.y += delta * 0.004 * timeScale
+      surfaceRef.current.rotation.y = cinderSpinPhase(timeRef.current)
     }
   })
 

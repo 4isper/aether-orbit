@@ -87,3 +87,56 @@ test('one grain is a pure function of the clock', () => {
   const past = cometDustPosition(74, 0.3, 74.5, new Vector3())
   assert.ok(forward.distanceTo(past) > 1e-6, 'the grain refuses to move')
 })
+
+test('the elliptic solver stays on the ellipse past half a lap', () => {
+  // The mean anomaly grows unboundedly with flight time; the wrapped
+  // anomaly must keep landing on the same periodic point, not on the
+  // bisection bracket's edge.
+  const { position, velocity } = cometState(77.7)
+  const orbit = dustOrbit(position, velocity, 0.2)
+  const period = (Math.PI * 2) / orbit.meanMotion
+  const reference = dustPositionAt(orbit, 10, new Vector3())
+  for (const laps of [1, 2, 5]) {
+    const later = dustPositionAt(orbit, 10 + laps * period, new Vector3())
+    assert.ok(reference.distanceTo(later) < 1e-6, `wrap drift ${reference.distanceTo(later)} after ${laps} laps`)
+  }
+})
+
+test('the near-parabolic edge lands on the true Kepler solution', () => {
+  // e → 1 flattens the equation's gradient near periapsis and stalls the
+  // Newton starter: whatever branch or fallback the solver takes, the
+  // position must match an independently bisected eccentric anomaly.
+  const semiMajor = 5000
+  const eccentricity = 0.99999
+  const mu = (1 - 0.15) * STAR_GM
+  const meanMotion = Math.sqrt(mu / semiMajor ** 3)
+  const orbit = {
+    semiMajor,
+    eccentricity,
+    periapsis: new Vector3(1, 0, 0),
+    planeNormal: new Vector3(0, 0, 1),
+    meanAnomaly: 0,
+    meanMotion,
+    hyperbolic: false,
+  }
+  const bisectedE = (m: number) => {
+    let lo = -Math.PI
+    let hi = Math.PI
+    for (let i = 0; i < 200; i++) {
+      const mid = (lo + hi) / 2
+      if (mid - eccentricity * Math.sin(mid) < m) lo = mid
+      else hi = mid
+    }
+    return (lo + hi) / 2
+  }
+  for (const m of [1e-5, 1e-3, 0.05, 0.5, Math.PI - 0.01, -0.5, -Math.PI + 0.01]) {
+    const point = dustPositionAt(orbit, m / meanMotion, new Vector3())
+    const e = bisectedE(m)
+    const expected = new Vector3(
+      semiMajor * (Math.cos(e) - eccentricity),
+      semiMajor * Math.sqrt(1 - eccentricity ** 2) * Math.sin(e),
+      0,
+    )
+    assert.ok(point.distanceTo(expected) < semiMajor * 1e-6, `M=${m}: off by ${point.distanceTo(expected)}`)
+  }
+})

@@ -47,7 +47,7 @@ void main() {
 
 type StarfieldProps = {
   reducedMotion: boolean
-  timeScale: number
+  timeRef: { current: number }
 }
 
 // The Milky Way: most stars gather along a great circle whose plane is
@@ -58,7 +58,7 @@ const BAND_SHARE = 0.62
 const BAND_LATITUDE_SIGMA = 0.16
 const bandDirection = new Vector3()
 
-export function Starfield({ reducedMotion, timeScale }: StarfieldProps) {
+export function Starfield({ reducedMotion, timeRef }: StarfieldProps) {
   const materialRef = useRef<ShaderMaterial>(null)
   const compact = useThree((state) => state.size.width < 700)
   const count = compact ? 2800 : 5400
@@ -106,10 +106,12 @@ export function Starfield({ reducedMotion, timeScale }: StarfieldProps) {
     [],
   )
 
-  useFrame((state, rawDelta) => {
+  useFrame((state) => {
     if (!materialRef.current) return
     materialRef.current.uniforms.uPixelRatio.value = state.gl.getPixelRatio()
-    if (!reducedMotion) materialRef.current.uniforms.uTime.value += Math.min(rawDelta, 0.1) * timeScale
+    // The sky keeps the one clock: the twinkle is a pure phase of the
+    // simulation time, so pause freezes it and reversal rewinds it.
+    if (!reducedMotion) materialRef.current.uniforms.uTime.value = timeRef.current
   })
 
   return (

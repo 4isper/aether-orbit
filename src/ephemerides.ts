@@ -63,8 +63,8 @@ const STREAMS: EventStream[] = [
 
 /**
  * How far ahead the schedule reaches, in time units. The slowest sky clock
- * is the Cinder→Vesper conjunction: the two outer years (≈610 and ≈1047)
- * put their synodic meeting ≈1462 units apart, and its scan horizon adds a
+ * is the Cinder→Vesper conjunction: the two outer years (≈610 and ≈1041)
+ * put their synodic meeting ≈1471 units apart, and its scan horizon adds a
  * quarter for safety. The deepest reach belongs to Erebus: its honest
  * Kepler-3 year is ≈1596 units, so a second plunge window lands ≈3057 units
  * out — 3400 covers two meetings of every stream.

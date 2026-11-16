@@ -1,12 +1,14 @@
 import { Vector3 } from 'three'
+import { createKeplerOrbit, type KeplerElements } from './kepler.ts'
 import type { PlanetId } from './planets'
 
-const orbitConfig: Record<PlanetId, { radius: number; speed: number; phase: number; inclination: number }> = {
-  // Speeds follow Kepler-3 relative to Aurelia: w ∝ a^-1.5.
-  aurelia: { radius: 9, speed: 0.02, phase: 3.6, inclination: 0.028 },
-  cinder: { radius: 14, speed: 0.0103, phase: 5.8, inclination: 0.05 },
-  vesper: { radius: 20, speed: 0.006, phase: 1.35, inclination: 0.075 },
-}
+/** Aurelia's calibration, the system's gravity constant in scene units:
+ * every heliocentric lap — planets, belt, comet, dwarf, dust — rides
+ * keplerSpeed at its own semi-major axis, so the law stays one. The same
+ * axis is where starlight reads unity (starFlux) and the pilot's eye
+ * meters (exposure.ts). */
+export const AURELIA_SEMI_MAJOR = 9
+const AURELIA_SPEED = 0.02
 
 /**
  * Circular-orbit mean motion at a radius under the planets' Kepler-3 law:
@@ -15,34 +17,77 @@ const orbitConfig: Record<PlanetId, { radius: number; speed: number; phase: numb
  * system, so the belt can never drift onto its own clock.
  */
 export function keplerSpeed(radius: number) {
-  return orbitConfig.aurelia.speed * (orbitConfig.aurelia.radius / radius) ** 1.5
+  return AURELIA_SPEED * (AURELIA_SEMI_MAJOR / radius) ** 1.5
 }
 
-/** Point on a planet's circular orbit, tilted by its inclination around the X axis. */
-export function orbitPoint(id: PlanetId, angle: number, target: Vector3) {
-  const { radius, inclination } = orbitConfig[id]
-  const cos = Math.cos(angle)
-  const sin = Math.sin(angle)
-  return target.set(
-    cos * radius,
-    sin * radius * Math.sin(inclination),
-    sin * radius * Math.cos(inclination),
-  )
+/**
+ * The planets' orbits: light ellipses on the shared Kepler-3 clock. The
+ * semi-major axes keep the old circular radii, so every period stays at its
+ * calibration — Aurelia's lap is exactly the 0.02 the whole system is
+ * scaled to (mean motion rides keplerSpeed at the semi-major axis, which
+ * the authored circle speeds approximated to 0.7%). Kepler II now breathes
+ * through the inner system too: every world runs fastest at periapsis and
+ * the star's light at each of them sways with the year. The periapsis
+ * longitudes are spread so no two conjunction clocks sync.
+ */
+const orbitConfig: Record<PlanetId, KeplerElements> = {
+  aurelia: {
+    periapsis: 8.811, // 9·(1−0.021), Earth-like
+    apoapsis: 9.189, // 9·(1+0.021)
+    argumentOfPeriapsis: 0.9,
+    inclination: 0.028,
+    meanAnomalyAtZero: 3.6,
+  },
+  cinder: {
+    periapsis: 13.37, // 14·(1−0.045)
+    apoapsis: 14.63, // 14·(1+0.045)
+    argumentOfPeriapsis: 2.3,
+    inclination: 0.05,
+    meanAnomalyAtZero: 5.8,
+  },
+  vesper: {
+    periapsis: 18.88, // 20·(1−0.056), Saturn-like
+    apoapsis: 21.12, // 20·(1+0.056)
+    argumentOfPeriapsis: 4.1,
+    inclination: 0.075,
+    meanAnomalyAtZero: 1.35,
+  },
+}
+
+const orbitFactories = {
+  aurelia: createKeplerOrbit(orbitConfig.aurelia),
+  cinder: createKeplerOrbit(orbitConfig.cinder),
+  vesper: createKeplerOrbit(orbitConfig.vesper),
+} as const
+
+/** Point on a planet's ellipse for a mean anomaly — the same solved-ellipse
+ * machinery every eccentric wanderer rides. Uniform sampling traces the
+ * whole curve (denser near periapsis, like the comet's orbit line). */
+export function orbitPoint(id: PlanetId, meanAnomaly: number, target: Vector3) {
+  return orbitFactories[id].orbitPoint(meanAnomaly, target)
 }
 
 export function planetPosition(id: PlanetId, time: number, target: Vector3) {
-  return orbitPoint(id, planetAngle(id, time), target)
+  return orbitFactories[id].position(time, target)
 }
 
-/** Angle on a planet's circular orbit at simulation time — the same angle
- * orbitPoint and planetPosition parametrize. */
+/** Mean anomaly on a planet's ellipse at simulation time — the same
+ * parameter orbitPoint consumes. */
 export function planetAngle(id: PlanetId, time: number) {
-  return orbitConfig[id].phase + time * orbitConfig[id].speed
+  return orbitConfig[id].meanAnomalyAtZero + time * orbitFactories[id].meanMotion
+}
+
+/** Orbital period of a planet, in time units. */
+export function planetPeriod(id: PlanetId) {
+  return orbitFactories[id].period
 }
 
 /**
  * Aurelia's L4 trojan: a captive of the gravity balance, riding the same
- * orbit sixty degrees ahead of the planet, forever leading it around Solis.
+ * ellipse sixty degrees of *mean anomaly* ahead of the planet. On an
+ * ellipse the pin librates in true longitude around ±60° — the tadpole
+ * breathing real trojans show — while the satellite-clock fiction of the
+ * aureliaClock note keeps it captive.
  */
 export const TROJAN_LEAD_ANGLE = Math.PI / 3
 export const TROJAN_TRAIL_ANGLE = -Math.PI / 3
@@ -57,20 +102,16 @@ export function trojanTrailingPosition(time: number, target: Vector3) {
   return orbitPoint('aurelia', planetAngle('aurelia', time) + TROJAN_TRAIL_ANGLE, target)
 }
 
-/** Orbital period of a planet, in time units. */
-export function planetPeriod(id: PlanetId) {
-  return (Math.PI * 2) / orbitConfig[id].speed
-}
-
 /**
  * Starlight flux at a world position, unity at Aurelia's orbit. Bodies
- * multiply their diffuse light by this so outer worlds are genuinely dimmer
- * than the inner ones. The exponent 1.5 is an exposure compromise: a full
- * inverse-square law (Vesper at 0.20) reads as near-black up close, 1.5
- * keeps the falloff while the ice giant stays legible.
+ * multiply their diffuse light by this so outer worlds are genuinely
+ * dimmer than the inner ones — the honest inverse square now. The
+ * legibility lives where it belongs: the pilot's eye meters the frame
+ * (exposure.ts eyeAdaptation), so Vesper sits in real twilight instead of
+ * reading as near-black.
  */
 export function starFlux(position: Vector3) {
-  return (orbitConfig.aurelia.radius / Math.max(position.length(), 1e-4)) ** 1.5
+  return (AURELIA_SEMI_MAJOR / Math.max(position.length(), 1e-4)) ** 2
 }
 
 /**
@@ -130,6 +171,22 @@ export function aureliaSpinPhase(time: number) {
 }
 
 /**
+ * Cinder's own clock: how fast the ash world spins. Declared like every
+ * satellite clock, but a pure phase of the shared time like Aurelia's —
+ * pause freezes it, reversal rewinds it and a deep link lands on the same
+ * face a live session would have brought around.
+ */
+export const cinderClock = {
+  /** Planet spin, radians per time unit. */
+  spin: 0.004,
+} as const
+
+/** Cinder's surface phase on the shared clock: pure like Aurelia's spin. */
+export function cinderSpinPhase(time: number) {
+  return time * cinderClock.spin
+}
+
+/**
  * Vesper's own clock: the shepherd moon pacing the Cassini gap. Its orbit
  * radius sits inside the gap's core (the ring t in [0.64, 0.70] of the
  * density shared by Vesper.tsx) — one body, one story: the moon is what
@@ -143,7 +200,28 @@ export const vesperClock = {
   shepherdAngularSpeed: 0.065,
   /** Where in its lap the shepherd starts. */
   shepherdPhase: 1.9,
+  /** Planet spin, radians per time unit — pure phase, like the rest. */
+  spin: 0.005,
 } as const
+
+/** Vesper's surface phase on the shared clock: pure like Aurelia's spin. */
+export function vesperSpinPhase(time: number) {
+  return time * vesperClock.spin
+}
+
+/**
+ * Erebus's own clock: the dark dwarf turns slowly, most of its year spent
+ * far out past the belt. A pure phase of the shared time like the rest.
+ */
+export const erebusClock = {
+  /** Dwarf spin, radians per time unit. */
+  spin: 0.02,
+} as const
+
+/** Erebus's surface phase on the shared clock: pure like Aurelia's spin. */
+export function erebusSpinPhase(time: number) {
+  return time * erebusClock.spin
+}
 
 /** The shepherd's angle on the shared clock: pure like the moon's phase. */
 export function shepherdAngle(time: number) {

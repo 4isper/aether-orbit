@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Canvas, useThree } from '@react-three/fiber'
+import { useCallback, useMemo, useState } from 'react'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { PerformanceMonitor } from '@react-three/drei'
-import { ACESFilmicToneMapping, SRGBColorSpace, type WebGLRenderer } from 'three'
+import { ACESFilmicToneMapping, SRGBColorSpace, Vector3, type WebGLRenderer } from 'three'
 import { SceneErrorBoundary } from './SceneErrorBoundary'
 import { SpaceScene, type EventAnnouncement } from './components/SpaceScene'
 import type { EphemerisPayload } from './ephemerides'
@@ -10,14 +10,20 @@ import { t } from './strings'
 import type { SceneView } from './planets'
 import type { CameraPose } from './camera-math'
 import type { Locale } from './strings'
+import { eyeAdaptation } from './exposure'
 
 /** Drives the renderer's tone-mapping exposure: the pilot's brightness
- * preference lands on the one knob the whole frame obeys. */
+ * preference times the eye's metering — a pure function of the camera's
+ * distance from Solis, so a deep link reproduces the frame bit for bit.
+ * Flight and pose drags move the camera continuously, so the meter reads
+ * as smooth as the eye's own. */
 function ExposureDrive({ exposure }: { exposure: number }) {
   const gl = useThree((state) => state.gl)
-  useEffect(() => {
-    gl.toneMappingExposure = exposure
-  }, [gl, exposure])
+  const cameraPosition = useMemo(() => new Vector3(), [])
+  useFrame((state) => {
+    state.camera.getWorldPosition(cameraPosition)
+    gl.toneMappingExposure = exposure * eyeAdaptation(cameraPosition.length())
+  })
   return null
 }
 

@@ -6,17 +6,24 @@ import { planetIds } from './planets.ts'
 
 const scratch = new Vector3()
 
-test('planets stay on a circle of constant radius', () => {
+test('planets stay on their ellipse between periapsis and apoapsis', () => {
   for (const id of planetIds) {
-    const radius = planetPosition(id, 0, new Vector3()).length()
-    assert.ok(radius > 0, `${id} radius should be positive`)
+    // Mean anomaly 0 is the periapsis, π the apoapsis — the solved
+    // ellipse's own extremes, whatever the periapsis longitude says.
+    const peri = orbitPoint(id, 0, new Vector3()).length()
+    const apo = orbitPoint(id, Math.PI, new Vector3()).length()
+    assert.ok(apo > peri, `${id} elements are inverted`)
     for (let t = 0; t <= 500; t += 7.3) {
       const distance = planetPosition(id, t, scratch).length()
       assert.ok(
-        Math.abs(distance - radius) < 1e-9,
-        `${id} drifted off its orbit radius at t=${t}`,
+        distance >= peri - 1e-6 && distance <= apo + 1e-6,
+        `${id} left its ellipse at t=${t}: ${distance}`,
       )
     }
+    // The ellipse repeats exactly on its own period.
+    const start = planetPosition(id, 120, new Vector3())
+    const lap = planetPosition(id, 120 + planetPeriod(id), scratch)
+    assert.ok(start.distanceTo(lap) < 1e-6, `${id} period drift ${start.distanceTo(lap)}`)
   }
 })
 
@@ -32,11 +39,13 @@ test('orbits are tilted but stay close to the ecliptic', () => {
   }
 })
 
-test('angle 0 sits on the +X axis', () => {
-  const point = orbitPoint('aurelia', 0, new Vector3())
-  assert.ok(point.y === 0)
-  assert.ok(point.z === 0)
-  assert.ok(point.x > 0)
+test('mean anomaly 0 sits at the periapsis radius', () => {
+  // The elements pin Aurelia at a = 9, e = 0.021: mean anomaly 0 must land
+  // on the periapsis, π on the apoapsis, whatever the longitude says.
+  const peri = orbitPoint('aurelia', 0, new Vector3()).length()
+  const apo = orbitPoint('aurelia', Math.PI, new Vector3()).length()
+  assert.ok(Math.abs(peri - 8.811) < 1e-6, `periapsis ${peri}`)
+  assert.ok(Math.abs(apo - 9.189) < 1e-6, `apoapsis ${apo}`)
 })
 
 test('planet positions move continuously', () => {
@@ -101,31 +110,33 @@ test('a year of Aurelia holds several day-night cycles', () => {
   )
 })
 
-test('planet speeds follow Kepler-3 relative to Aurelia', () => {
-  // T ∝ a^1.5, so the mean motion must fall off as a^-1.5 across the system.
-  const aurelia = {
-    radius: orbitPoint('aurelia', 0, new Vector3()).length(),
-    speed: (Math.PI * 2) / planetPeriod('aurelia'),
+test('planet speeds follow Kepler-3 at their semi-major axes', () => {
+  // T ∝ a^1.5 at the ellipse's semi-major axis — the same law the belt,
+  // the comet and the dwarf ride, now exact for the planets too.
+  const aureliaSpeed = (Math.PI * 2) / planetPeriod('aurelia')
+  const expected = {
+    cinder: aureliaSpeed * (9 / 14) ** 1.5,
+    vesper: aureliaSpeed * (9 / 20) ** 1.5,
   }
   for (const id of ['cinder', 'vesper'] as const) {
-    const radius = orbitPoint(id, 0, new Vector3()).length()
     const speed = (Math.PI * 2) / planetPeriod(id)
-    const expected = aurelia.speed * Math.pow(aurelia.radius / radius, 1.5)
-    const deviation = Math.abs(speed / expected - 1)
+    const deviation = Math.abs(speed / expected[id] - 1)
     assert.ok(
-      deviation < 0.01,
-      `${id} speed deviates ${(deviation * 100).toFixed(1)}% from Kepler-3`,
+      deviation < 1e-9,
+      `${id} speed deviates ${(deviation * 1e9).toFixed(3)}e-9 from Kepler-3`,
     )
   }
 })
 
-test('starlight falls off with distance, unity at Aurelia', () => {
+test('starlight falls off with the honest inverse square, unity at Aurelia', () => {
   assert.ok(Math.abs(starFlux(new Vector3(9, 0, 0)) - 1) < 1e-9)
   const cinder = starFlux(new Vector3(14, 0, 0))
   const vesper = starFlux(new Vector3(20, 0, 0))
-  assert.ok(Math.abs(cinder - (9 / 14) ** 1.5) < 1e-9, `Cinder flux ${cinder}`)
-  assert.ok(Math.abs(vesper - (9 / 20) ** 1.5) < 1e-9, `Vesper flux ${vesper}`)
+  assert.ok(Math.abs(cinder - (9 / 14) ** 2) < 1e-9, `Cinder flux ${cinder}`)
+  assert.ok(Math.abs(vesper - (9 / 20) ** 2) < 1e-9, `Vesper flux ${vesper}`)
   assert.ok(cinder > vesper, 'inner worlds must receive more light')
+  // The legibility compensation lives in the pilot's eye, not in the law.
+  assert.ok(vesper > 0.19 && vesper < 0.21, `Vesper sits in twilight: ${vesper}`)
 })
 
 test('the belt anchor rides the middle ring between Cinder and Vesper', () => {
@@ -190,10 +201,11 @@ test('Vesper ring ice rides the shepherd\'s own Kepler law', () => {
 
 test('the belt rides the same Kepler-3 as the planets', () => {
   // T ∝ a^1.5 holds for the planets; the debris rings orbit the same star,
-  // so one gravity constant must govern their midlines too.
-  const aureliaRadius = orbitPoint('aurelia', 0, new Vector3()).length()
+  // so one gravity constant must govern their midlines too. The
+  // calibration lives at Aurelia's semi-major axis (9), not the momentary
+  // radius the ellipse happens to be at.
   const aureliaSpeed = (Math.PI * 2) / planetPeriod('aurelia')
-  const calibration = aureliaSpeed * aureliaRadius ** 1.5
+  const calibration = aureliaSpeed * 9 ** 1.5
   for (const ring of beltRings) {
     const midline = (ring.inner + ring.outer) / 2
     const own = ring.speed * midline ** 1.5

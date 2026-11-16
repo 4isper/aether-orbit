@@ -26,12 +26,18 @@ test('the ellipse stays tilted and reaches out past Vesper', () => {
 })
 
 test('periapsis dips just inside Vesper and matches the window radius', () => {
-  const vesperRadius = orbitPoint('vesper', 0, new Vector3()).length()
+  // Vesper is an ellipse now: the plunge is measured against its
+  // semi-major axis, and the honest extra is that Erebus's periapsis sits
+  // inside Vesper's own apoapsis — the two worlds really can meet.
+  const vesperPeri = orbitPoint('vesper', 0, new Vector3()).length()
+  const vesperApo = orbitPoint('vesper', Math.PI, new Vector3()).length()
+  const vesperSemiMajor = (vesperPeri + vesperApo) / 2
   let minRadius = Infinity
   for (let t = 0; t < erebusPeriod; t += 0.05) {
     minRadius = Math.min(minRadius, erebusPosition(t, new Vector3()).length())
   }
-  assert.ok(minRadius < vesperRadius, 'periapsis never overtakes Vesper')
+  assert.ok(minRadius < vesperSemiMajor, 'periapsis never overtakes Vesper')
+  assert.ok(minRadius < vesperApo, 'the plunge never reaches the space Vesper itself visits')
   assert.ok(
     Math.abs(minRadius - 19.2) < 0.05,
     `closest approach ${minRadius} disagrees with the periapsis constant`,

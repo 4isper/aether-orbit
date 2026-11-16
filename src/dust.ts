@@ -1,6 +1,7 @@
 /**
  * The dust tail's ballistic grains: each one leaves the nucleus with the
- * comet's own state of motion and then flies its private Kepler orbit under
+ * comet's own state of motion — position and the factory's analytic vis-viva
+ * velocity (comet.ts) — and then flies its private Kepler orbit under
  * radiation-reduced gravity μ' = (1−β)·STAR_GM — radiation pressure buys the
  * grain a lighter sun. Near perihelion a big enough β pushes the grain past
  * escape velocity, so the solver carries both branches: the elliptic
@@ -9,16 +10,14 @@
  * the same tail.
  */
 import { Vector3 } from 'three'
-import { cometPosition } from './comet.ts'
+import { cometPosition, cometVelocity } from './comet.ts'
 import { keplerSpeed } from './orbits.ts'
 
 /** Solis's gravity in scene units, straight from the planets' Kepler-3
  * calibration: one law of gravity for the dust too. */
 export const STAR_GM = keplerSpeed(1) ** 2
 
-/** How widely the release state samples the comet's motion for its
- * velocity: a centered finite difference, like the component's old tail. */
-const VELOCITY_STEP = 0.05
+const scratchVelocity = new Vector3()
 
 export type DustOrbit = {
   /** Positive semi-major axis; eccentricity ≥ 1 means the grain escapes. */
@@ -109,17 +108,23 @@ export function dustPositionAt(orbit: DustOrbit, timeSinceRelease: number, targe
     px = orbit.semiMajor * (orbit.eccentricity - Math.cosh(F))
     py = orbit.semiMajor * Math.sqrt(orbit.eccentricity ** 2 - 1) * Math.sinh(F)
   } else {
-    let E = M + orbit.eccentricity * Math.sin(M)
+    // M grows unboundedly with flight time, but the fallback bracket is
+    // [−π, π]: wrap the anomaly into [−π, π) — the ellipse is 2π-periodic
+    // in E, so the wrapped anomaly finds the same point under a bracket
+    // that always contains the root.
+    const wrapped = ((M % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)
+    const ellipticM = wrapped > Math.PI ? wrapped - Math.PI * 2 : wrapped
+    let E = ellipticM + orbit.eccentricity * Math.sin(ellipticM)
     for (let i = 0; i < 10; i++) {
       const gradient = 1 - orbit.eccentricity * Math.cos(E)
-      E -= (E - orbit.eccentricity * Math.sin(E) - M) / gradient
+      E -= (E - orbit.eccentricity * Math.sin(E) - ellipticM) / gradient
     }
-    if (Math.abs(E - orbit.eccentricity * Math.sin(E) - M) > 1e-9) {
+    if (Math.abs(E - orbit.eccentricity * Math.sin(E) - ellipticM) > 1e-9) {
       let lo = -Math.PI
       let hi = Math.PI
       for (let i = 0; i < 80; i++) {
         const mid = (lo + hi) / 2
-        if (mid - orbit.eccentricity * Math.sin(mid) < M) lo = mid
+        if (mid - orbit.eccentricity * Math.sin(mid) < ellipticM) lo = mid
         else hi = mid
       }
       E = (lo + hi) / 2
@@ -135,13 +140,11 @@ export function dustPositionAt(orbit: DustOrbit, timeSinceRelease: number, targe
 }
 
 /** One grain: released by the comet at `releaseTime` with the comet's own
- * state of motion, flying under radiation-reduced gravity, evaluated at
- * `now`. */
+ * analytic state of motion, flying under radiation-reduced gravity,
+ * evaluated at `now`. */
 export function cometDustPosition(releaseTime: number, beta: number, now: number, target: Vector3): Vector3 {
   const releasePosition = cometPosition(releaseTime, target)
-  const before = cometPosition(releaseTime - VELOCITY_STEP, new Vector3())
-  const after = cometPosition(releaseTime + VELOCITY_STEP, new Vector3())
-  const releaseVelocity = after.sub(before).divideScalar(VELOCITY_STEP * 2)
+  const releaseVelocity = cometVelocity(releaseTime, scratchVelocity)
   const orbit = dustOrbit(releasePosition, releaseVelocity, beta)
   return dustPositionAt(orbit, now - releaseTime, target)
 }
