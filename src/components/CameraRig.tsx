@@ -546,13 +546,16 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
           if (steer.done) free.current.autopilot = null
         }
       }
-      // Thrust and the speed ceiling ride the pilot's distance: the reach
-      // grows as the void opens, the same feel a planetary flight sim keeps.
-      const span = Math.max(st.position.length(), 1)
+      // Thrust and the speed ceiling ride the pilot's clearance to the
+      // nearest surface — not the heliocentric radius: hovering over a moon
+      // stays gentle however deep the system's radius runs, and the reach
+      // only opens once the pilot pulls away into the void.
+      const nearest = nearestFlightBody(st.position, moonWorldRef.current, time)
+      const clearance = Math.max(nearest.distance, 0.5)
       const params = {
         ...FREE_FLIGHT_PARAMS,
-        accel: Math.max(FREE_FLIGHT_PARAMS.accel, span * 0.5),
-        maxSpeed: Math.max(FREE_FLIGHT_PARAMS.maxSpeed, span * 0.4),
+        accel: Math.max(FREE_FLIGHT_PARAMS.accel, clearance * 2.5),
+        maxSpeed: Math.max(FREE_FLIGHT_PARAMS.maxSpeed, clearance * 2),
       }
       stepFreeFlight(st, input, free.current.look, delta, params)
       // Publish the HUD readout at a calm throttle, only when something
@@ -561,7 +564,6 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
         flightInfoTimer.current += delta
         if (flightInfoTimer.current >= FLIGHT_INFO_INTERVAL) {
           flightInfoTimer.current = 0
-          const nearest = nearestFlightBody(st.position, moonWorldRef.current, time)
           const info: FlightTelemetry = {
             speed: st.velocity.length(),
             nearestId: nearest.id,
