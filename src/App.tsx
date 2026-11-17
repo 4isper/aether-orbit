@@ -163,7 +163,7 @@ function App() {
     setEphemeris(payload)
   }, [])
   const [paused, setPaused] = useState(false)
-  const [speed, setSpeed] = useState(1)
+  const [speed, setSpeed] = useState(0.25)
   const [reversed, setReversed] = useState(false)
   const { sound, toggleSound } = useAmbience()
   // The pilot's exposure: how hard the star burns on their screen. The

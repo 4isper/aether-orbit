@@ -2,13 +2,13 @@ import { useRef, useState } from 'react'
 import { EXPOSURE_MAX, EXPOSURE_MIN } from '../../exposure'
 import { t, type Locale } from '../../strings'
 
-const SPEED_OPTIONS = [0.5, 1, 2, 4]
+const SPEED_OPTIONS = [0.25, 0.5, 1, 2]
 
 /** The jog wheel's reach: half a moon-month (about 14 days) either way. */
 const SCRUB_REACH = 14
 
 function formatSpeed(speed: number) {
-  return speed === 0.5 ? '½' : String(speed)
+  return speed === 0.125 ? '⅛' : speed === 0.25 ? '¼' : speed === 0.5 ? '½' : String(speed)
 }
 
 /** The clock: pause, reverse, speed, the time scrub and the ambience switch. */
