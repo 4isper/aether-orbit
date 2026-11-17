@@ -22,6 +22,8 @@ export const EREBUS_VIEW_DISTANCE = 8.2 * BODY_RADII.erebus
 export const EREBUS_MIN_ZOOM = 5.8
 export const EREBUS_MAX_ZOOM = 14.4
 export const STAR_VIEW_DISTANCE = 4.9 * SOLIS_RADIUS
+export const STAR_MIN_ZOOM = 3.23 * SOLIS_RADIUS
+export const STAR_MAX_ZOOM = 5.36 * SOLIS_RADIUS
 export const COMET_VIEW_DISTANCE = 2.5
 export const MOON_VIEW_DISTANCE = 5 * BODY_RADII.moon
 export const MIN_ZOOM = 3.8 * BODY_RADII.aurelia
@@ -84,7 +86,7 @@ export function pinchZoom(zoom: number, startDistance: number, nextDistance: num
  * keeps the planet defaults because the overview has its own pose.
  */
 export function viewZoomBounds(view: SceneView) {
-  if (view === 'star') return { distance: STAR_VIEW_DISTANCE, min: MIN_ZOOM, max: MAX_ZOOM }
+  if (view === 'star') return { distance: STAR_VIEW_DISTANCE, min: STAR_MIN_ZOOM, max: STAR_MAX_ZOOM }
   if (view === 'comet') return { distance: COMET_VIEW_DISTANCE, min: COMET_MIN_ZOOM, max: COMET_MAX_ZOOM }
   if (view === 'moon') return { distance: MOON_VIEW_DISTANCE, min: MOON_MIN_ZOOM, max: MOON_MAX_ZOOM }
   if (view === 'belt') return { distance: BELT_VIEW_DISTANCE, min: BELT_MIN_ZOOM, max: BELT_MAX_ZOOM }
