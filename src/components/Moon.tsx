@@ -2,10 +2,13 @@ import { useMemo, type ReactNode } from 'react'
 import type { Ref } from 'react'
 import { Vector3, type Mesh, type ShaderMaterial } from 'three'
 import { aureliaFrame } from '../orbits'
+import { FLIGHT_BODY_RADII } from '../camera-math'
 import { noiseGLSL } from '../shaders/noise'
 import { bodyVertexGLSL, perturbNormalGLSL } from '../shaders/common'
 
-const moonFragment = /* glsl */ `
+const moonFragment = /* glsl */`#include <common>
+#include <logdepthbuf_pars_fragment>
+
 uniform vec3 uPlanetPosition;
 uniform float uPlanetRadius;
 uniform float uSunRadius;
@@ -17,6 +20,7 @@ ${noiseGLSL}
 ${perturbNormalGLSL}
 
 void main() {
+#include <logdepthbuf_fragment>
   vec3 p = normalize(vObjectPosition);
   vec3 geometricN = normalize(vWorldNormal);
   vec3 V = normalize(cameraPosition - vWorldPosition);
@@ -31,8 +35,8 @@ void main() {
 
   float micro = fbm4(p * 60.0 + vec3(1.7, 8.2, -3.4));
   float bumpFade = smoothstep(0.08, 0.34, max(dot(geometricN, V), 0.0));
-  float elevation = micro * 0.004 * bumpFade;
-  vec3 N = perturbNormal(vWorldPosition, geometricN, elevation);
+  float elevation = micro * 0.0022 * bumpFade;
+  vec3 N = perturbNormal(vObjectPosition, geometricN, elevation);
 
   vec3 L = normalize(-vWorldPosition);
   // The eclipse shadow is a cone, matching eclipse.ts's moonLight term for
@@ -71,8 +75,8 @@ export function Moon({ radius = aureliaFrame.moonRadius, ref, materialRef, child
   const uniforms = useMemo(
     () => ({
       uPlanetPosition: { value: new Vector3() },
-      uPlanetRadius: { value: 2 },
-      uSunRadius: { value: 2.35 },
+      uPlanetRadius: { value: aureliaFrame.planetRadius },
+      uSunRadius: { value: FLIGHT_BODY_RADII.star },
       uStarFlux: { value: 1 },
     }),
     [],

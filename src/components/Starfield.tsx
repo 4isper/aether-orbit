@@ -1,10 +1,12 @@
 import { useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { AdditiveBlending, Vector3, type ShaderMaterial } from 'three'
+import { AdditiveBlending, Vector3, type Group, type ShaderMaterial } from 'three'
 import { createRandom } from '../random'
 import { galacticBandDirection } from '../galactic'
 
-const starVertex = /* glsl */ `
+const starVertex = /* glsl */`#include <common>
+#include <logdepthbuf_pars_vertex>
+
 attribute float aSize;
 attribute float aSeed;
 attribute vec3 aColor;
@@ -19,18 +21,22 @@ void main() {
   float twinkle = 0.84 + 0.16 * sin(uTime * (0.45 + aSeed) + aSeed * 40.0);
   gl_PointSize = min(9.0, aSize * uPixelRatio * (85.0 / -mvPosition.z));
   gl_Position = projectionMatrix * mvPosition;
+#include <logdepthbuf_vertex>
   vColor = aColor;
   vBrightness = max(0.0, (aSize - 0.6) / 2.8);
   vTwinkle = twinkle;
 }
 `
 
-const starFragment = /* glsl */ `
+const starFragment = /* glsl */`#include <common>
+#include <logdepthbuf_pars_fragment>
+
 varying vec3 vColor;
 varying float vBrightness;
 varying float vTwinkle;
 
 void main() {
+#include <logdepthbuf_fragment>
   vec2 uv = gl_PointCoord - 0.5;
   float distanceToCenter = length(uv);
   float core = smoothstep(0.5, 0.0, distanceToCenter);
@@ -50,6 +56,12 @@ type StarfieldProps = {
   timeRef: { current: number }
 }
 
+/** The stars live on the sky: the shell rides the camera's position each
+ * frame (stars are at infinity — no parallax), keeping its world
+ * orientation so the Milky Way band stays put. Rendered first, so every
+ * opaque body still covers it. */
+const SKY_RENDER_ORDER = -10
+
 // The Milky Way: most stars gather along a great circle whose plane is
 // chosen so the band projects onto the backdrop nebula's ribbon (y = -0.18x)
 // from the system's home direction; the rest stay spread uniformly.
@@ -60,6 +72,7 @@ const bandDirection = new Vector3()
 
 export function Starfield({ reducedMotion, timeRef }: StarfieldProps) {
   const materialRef = useRef<ShaderMaterial>(null)
+  const groupRef = useRef<null | Group>(null)
   const compact = useThree((state) => state.size.width < 700)
   const count = compact ? 2800 : 5400
 
@@ -112,10 +125,14 @@ export function Starfield({ reducedMotion, timeRef }: StarfieldProps) {
     // The sky keeps the one clock: the twinkle is a pure phase of the
     // simulation time, so pause freezes it and reversal rewinds it.
     if (!reducedMotion) materialRef.current.uniforms.uTime.value = timeRef.current
+    // The shell rides the camera (runs after CameraRig by mount order, so
+    // this is the frame's final camera pose — no sky lag).
+    groupRef.current?.position.copy(state.camera.position)
   })
 
   return (
-    <points frustumCulled={false}>
+    <group ref={groupRef}>
+      <points frustumCulled={false} renderOrder={SKY_RENDER_ORDER}>
       <bufferGeometry>
         <bufferAttribute attach="attributes-position" args={[geometry.positions, 3]} />
         <bufferAttribute attach="attributes-aSize" args={[geometry.sizes, 1]} />
@@ -132,6 +149,7 @@ export function Starfield({ reducedMotion, timeRef }: StarfieldProps) {
         blending={AdditiveBlending}
         toneMapped={false}
       />
-    </points>
+      </points>
+    </group>
   )
 }

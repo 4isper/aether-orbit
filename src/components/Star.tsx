@@ -13,11 +13,14 @@ import {
 } from 'three'
 import { noiseGLSL } from '../shaders/noise'
 import { bodyVertexGLSL } from '../shaders/common'
+import { SOLIS_RADIUS } from '../orbits'
 import { arcPoint, prominenceEnvelope } from '../prominences'
 import { glareFactor } from '../glare'
 import { flareIntensity } from '../flare'
 
-const surfaceFragment = /* glsl */ `
+const surfaceFragment = /* glsl */`#include <common>
+#include <logdepthbuf_pars_fragment>
+
 uniform float uTime;
 uniform float uSpotTime;
 uniform float uFlare;
@@ -27,6 +30,7 @@ varying vec3 vWorldNormal;
 ${noiseGLSL}
 
 void main() {
+#include <logdepthbuf_fragment>
   vec3 p = normalize(vObjectPosition);
   vec3 V = normalize(cameraPosition - vWorldPosition);
 
@@ -74,15 +78,20 @@ void main() {
 }
 `
 
-const glowVertex = /* glsl */ `
+const glowVertex = /* glsl */`#include <common>
+#include <logdepthbuf_pars_vertex>
+
 varying vec2 vUv;
 void main() {
   vUv = uv;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+#include <logdepthbuf_vertex>
 }
 `
 
-const glowFragment = /* glsl */ `
+const glowFragment = /* glsl */`#include <common>
+#include <logdepthbuf_pars_fragment>
+
 uniform float uTime;
 uniform float uGlare;
 uniform float uFlare;
@@ -90,6 +99,7 @@ varying vec2 vUv;
 ${noiseGLSL}
 
 void main() {
+#include <logdepthbuf_fragment>
   vec2 p = (vUv - 0.5) * 2.0;
   float d = length(p);
   float t = uTime * 0.32;
@@ -125,24 +135,30 @@ void main() {
   // geometry (glare.ts), the flood itself rides this billboard.
   alpha += uGlare * (exp(-d * 7.0) * 0.9 + exp(-d * 2.2) * 0.3);
   vec3 color = mix(vec3(1.0, 0.76, 0.52), vec3(1.0, 0.97, 0.93), core);
-  gl_FragColor = vec4(color * alpha, alpha);
+  gl_FragColor = vec4(color, alpha);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }
 `
 
-const rimVertex = /* glsl */ `
+const rimVertex = /* glsl */`#include <common>
+#include <logdepthbuf_pars_vertex>
+
 varying vec3 vViewNormal;
 void main() {
   vViewNormal = normalize(normalMatrix * normal);
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+#include <logdepthbuf_vertex>
 }
 `
 
-const rimFragment = /* glsl */ `
+const rimFragment = /* glsl */`#include <common>
+#include <logdepthbuf_pars_fragment>
+
 varying vec3 vViewNormal;
 
 void main() {
+#include <logdepthbuf_fragment>
   float intensity = pow(max(0.72 - dot(vViewNormal, vec3(0.0, 0.0, 1.0)), 0.0), 2.6);
   vec3 color = mix(vec3(1.0, 0.42, 0.10), vec3(1.0, 0.72, 0.36), clamp(intensity * 0.3, 0.0, 1.0));
   gl_FragColor = vec4(color * intensity * 0.95, 1.0);
@@ -151,7 +167,9 @@ void main() {
 }
 `
 
-const prominenceVertex = /* glsl */ `
+const prominenceVertex = /* glsl */`#include <common>
+#include <logdepthbuf_pars_vertex>
+
 varying vec2 vUv;
 varying vec3 vViewNormal;
 varying vec3 vWorldPosition;
@@ -161,10 +179,13 @@ void main() {
   vec4 world = modelMatrix * vec4(position, 1.0);
   vWorldPosition = world.xyz;
   gl_Position = projectionMatrix * viewMatrix * world;
+#include <logdepthbuf_vertex>
 }
 `
 
-const prominenceFragment = /* glsl */ `
+const prominenceFragment = /* glsl */`#include <common>
+#include <logdepthbuf_pars_fragment>
+
 uniform float uTime;
 uniform float uEnergy;
 uniform float uBrightness;
@@ -174,6 +195,7 @@ varying vec3 vWorldPosition;
 ${noiseGLSL}
 
 void main() {
+#include <logdepthbuf_fragment>
   // The star sits at the world origin, so the radial direction of a loop
   // point is its bearing on the photosphere.
   vec3 anchor = normalize(vWorldPosition);
@@ -191,13 +213,13 @@ void main() {
 
   float alpha = uEnergy * limb * soft * body * (0.5 + 0.5 * flow) * uBrightness;
   vec3 color = mix(vec3(1.0, 0.16, 0.06), vec3(1.0, 0.55, 0.3), clamp(flow * 0.7 + uEnergy * 0.3, 0.0, 1.0));
-  gl_FragColor = vec4(color * alpha, alpha);
+  gl_FragColor = vec4(color, alpha);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }
 `
 
-const PROMINENCE_RADIUS = 2.35
+const PROMINENCE_RADIUS = SOLIS_RADIUS
 
 function buildLoopGeometry(spec: ProminenceSpec) {
   const a = new Vector3(...spec.a).normalize()
@@ -226,13 +248,13 @@ type ProminenceSpec = {
  * half the set is alive at once.
  */
 const PROMINENCES: ProminenceSpec[] = [
-  { a: [0.98, 0.14, 0.14], b: [0.93, 0.28, 0.26], apex: 0.34, tube: 0.042, period: 34, offset: 0.05, brightness: 2.6 },
-  { a: [0.53, 0.78, 0.33], b: [0.62, 0.76, 0.19], apex: 0.24, tube: 0.034, period: 41, offset: 0.35, brightness: 2.0 },
-  { a: [-0.28, -0.87, 0.4], b: [-0.12, -0.93, 0.36], apex: 0.4, tube: 0.048, period: 47, offset: 0.6, brightness: 2.8 },
-  { a: [-0.83, 0.32, -0.45], b: [-0.68, 0.45, -0.58], apex: 0.26, tube: 0.038, period: 30, offset: 0.8, brightness: 2.2 },
-  { a: [-0.12, 0.55, -0.83], b: [0.05, 0.62, -0.78], apex: 0.36, tube: 0.04, period: 44, offset: 0.5, brightness: 2.4 },
-  { a: [0.42, -0.72, -0.55], b: [0.56, -0.66, -0.5], apex: 0.3, tube: 0.044, period: 38, offset: 0.72, brightness: 2.9 },
-  { a: [-0.96, -0.1, 0.26], b: [-0.9, -0.22, 0.37], apex: 0.22, tube: 0.034, period: 52, offset: 0.22, brightness: 2.1 },
+  { a: [0.98, 0.14, 0.14], b: [0.93, 0.28, 0.26], apex: 0.34, tube: 1.95, period: 34, offset: 0.05, brightness: 2.6 },
+  { a: [0.53, 0.78, 0.33], b: [0.62, 0.76, 0.19], apex: 0.24, tube: 1.58, period: 41, offset: 0.35, brightness: 2.0 },
+  { a: [-0.28, -0.87, 0.4], b: [-0.12, -0.93, 0.36], apex: 0.4, tube: 2.23, period: 47, offset: 0.6, brightness: 2.8 },
+  { a: [-0.83, 0.32, -0.45], b: [-0.68, 0.45, -0.58], apex: 0.26, tube: 1.77, period: 30, offset: 0.8, brightness: 2.2 },
+  { a: [-0.12, 0.55, -0.83], b: [0.05, 0.62, -0.78], apex: 0.36, tube: 1.86, period: 44, offset: 0.5, brightness: 2.4 },
+  { a: [0.42, -0.72, -0.55], b: [0.56, -0.66, -0.5], apex: 0.3, tube: 2.04, period: 38, offset: 0.72, brightness: 2.9 },
+  { a: [-0.96, -0.1, 0.26], b: [-0.9, -0.22, 0.37], apex: 0.22, tube: 1.58, period: 52, offset: 0.22, brightness: 2.1 },
 ]
 
 function ProminenceLoop({ spec, timeRef }: {
@@ -283,6 +305,7 @@ export function Star({ timeRef }: StarProps) {
   const glowRef = useRef<Mesh>(null)
   const surfaceMaterialRef = useRef<ShaderMaterial>(null)
   const glowMaterialRef = useRef<ShaderMaterial>(null)
+  const detailRef = useRef<Group>(null)
   const surfaceUniforms = useMemo(() => ({ uTime: { value: 0 }, uSpotTime: { value: 0 }, uFlare: { value: 0 } }), [])
   const glowUniforms = useMemo(() => ({ uTime: { value: 0 }, uGlare: { value: 0 }, uFlare: { value: 0 } }), [])
   const forwardScratch = useMemo(() => new Vector3(), [])
@@ -291,7 +314,15 @@ export function Star({ timeRef }: StarProps) {
     // spot drift, the corona, the loops' rotation — so a deep link lands on
     // the same boiling phase, pause freezes it and reversal replays it.
     const time = timeRef.current
-    if (rotationRef.current) rotationRef.current.rotation.y = time * 0.004
+    // The star turns in 25 days, the real solar equatorial lap.
+    if (rotationRef.current) rotationRef.current.rotation.y = time * ((Math.PI * 2) / 25)
+    // Far-field honesty: from other orbits the star is a sub-pixel ball, and
+    // the standard depth buffer has no precision to sort the rim and loops
+    // against the photosphere at those distances — so the detailed surface
+    // only exists within the star's neighborhood, and distant views read the
+    // corona billboard alone (a real far star is a glowing point).
+    const farAway = state.camera.position.length() > SOLIS_RADIUS * 15
+    if (detailRef.current) detailRef.current.visible = !farAway
     if (surfaceMaterialRef.current) {
       // Granulation churns every few scene-minutes; spot groups drift ~30x
       // slower, for days.
@@ -306,7 +337,7 @@ export function Star({ timeRef }: StarProps) {
     const glow = glowRef.current
     if (glow) {
       glow.quaternion.copy(state.camera.quaternion)
-      glow.position.copy(state.camera.position).normalize().multiplyScalar(2.42)
+      glow.position.copy(state.camera.position).normalize().multiplyScalar(SOLIS_RADIUS * 1.03)
     }
     // The white-out of looking into the star: camera geometry, not the clock.
     state.camera.getWorldDirection(forwardScratch)
@@ -322,7 +353,7 @@ export function Star({ timeRef }: StarProps) {
   return (
     <>
       <mesh ref={glowRef} renderOrder={-1} raycast={() => null}>
-        <planeGeometry args={[9, 9]} />
+        <planeGeometry args={[SOLIS_RADIUS * 3.83, SOLIS_RADIUS * 3.83]} />
         <shaderMaterial
           ref={glowMaterialRef}
           vertexShader={glowVertex}
@@ -333,22 +364,24 @@ export function Star({ timeRef }: StarProps) {
           blending={AdditiveBlending}
         />
       </mesh>
-      <group ref={rotationRef}>
-        <mesh rotation={[0, 0.6, 0]}>
-          <sphereGeometry args={[2.35, 96, 96]} />
-          <shaderMaterial
-            ref={surfaceMaterialRef}
-            vertexShader={bodyVertexGLSL(false)}
-            fragmentShader={surfaceFragment}
-            uniforms={surfaceUniforms}
-          />
-        </mesh>
-        {PROMINENCES.map((spec, index) => (
-          <ProminenceLoop key={index} spec={spec} timeRef={timeRef} />
-        ))}
+      <group ref={detailRef}>
+        <group ref={rotationRef}>
+          <mesh rotation={[0, 0.6, 0]}>
+            <sphereGeometry args={[SOLIS_RADIUS, 96, 96]} />
+            <shaderMaterial
+              ref={surfaceMaterialRef}
+              vertexShader={bodyVertexGLSL(false)}
+              fragmentShader={surfaceFragment}
+              uniforms={surfaceUniforms}
+            />
+          </mesh>
+          {PROMINENCES.map((spec, index) => (
+            <ProminenceLoop key={index} spec={spec} timeRef={timeRef} />
+          ))}
+        </group>
       </group>
       <mesh raycast={() => null}>
-        <sphereGeometry args={[2.75, 64, 64]} />
+        <sphereGeometry args={[SOLIS_RADIUS * 1.07, 64, 64]} />
         <shaderMaterial
           vertexShader={rimVertex}
           fragmentShader={rimFragment}

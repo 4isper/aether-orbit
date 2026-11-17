@@ -1,15 +1,17 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { Vector3 } from 'three'
-import { planetPeriod, shepherdAngle, shepherdLocalPosition, vesperClock } from './orbits.ts'
+import { VESPER_GAP_CORE, VESPER_RING_INNER, VESPER_RING_OUTER, planetPeriod, shepherdAngle, shepherdLocalPosition, vesperClock } from './orbits.ts'
 
 test('the shepherd patrols inside the Cassini gap core', () => {
   // The ring t and the gap edges mirror vesperRingDensity in Vesper.tsx:
-  // t = (r - 2.5) / 1.5, the gap core is t in [0.64, 0.70]. One body, one
-  // story: the moon is what keeps the gap swept clear.
+  // t = (r − inner) / span of the honest ring span, the gap core is t in
+  // [0.64, 0.70]. One body, one story: the moon is what keeps the gap swept
+  // clear.
   const { shepherdOrbitRadius } = vesperClock
-  const inner = 2.5 + 0.64 * 1.5
-  const outer = 2.5 + 0.7 * 1.5
+  const span = VESPER_RING_OUTER - VESPER_RING_INNER
+  const inner = VESPER_RING_INNER + 0.64 * span
+  const outer = VESPER_RING_INNER + VESPER_GAP_CORE * span
   assert.ok(
     shepherdOrbitRadius >= inner && shepherdOrbitRadius <= outer,
     `${shepherdOrbitRadius} is outside the gap core [${inner}, ${outer}]`,

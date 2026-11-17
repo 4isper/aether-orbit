@@ -3,7 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { MathUtils, Vector3, type PerspectiveCamera } from 'three'
 import { type SceneView } from '../planets'
 import { stepAutopilot, wrapPi } from '../autopilot'
-import { beltAnchorPosition, planetPosition } from '../orbits'
+import { SOLIS_RADIUS, beltAnchorPosition, planetPosition } from '../orbits'
 import { cometPosition } from '../comet'
 import { erebusPosition } from '../erebus'
 import {
@@ -18,6 +18,7 @@ import {
   OVERVIEW_MAX_ZOOM,
   OVERVIEW_MIN_ZOOM,
   pinchZoom,
+  pitchLimit,
   rotateOverviewPose,
   shiftIntoFrame,
   stepFreeFlight,
@@ -60,15 +61,19 @@ const FLIGHT_INFO_INTERVAL = 0.25
 const autopilotTarget = new Vector3()
 const BASE_FOV = 36
 
-/** Free-flight tuning: system scale runs from the 8.4-unit star out to the
- * overview framing, so the bounds keep the camera off the star's surface and
- * inside a comfortable sphere. */
+/**
+ * Free-flight tuning on the honest scale: the bounds keep the camera off
+ * the star's photosphere (109.2) and out to a full system crossing, while
+ * the thrust and speed ceiling scale with the pilot's distance — the same
+ * logarithmic reach real flight sims use, so crossing 90 000 units takes
+ * seconds and hovering over a moon takes finesse.
+ */
 const FREE_FLIGHT_PARAMS = {
   accel: 16,
   damping: 2.6,
   maxSpeed: 13,
-  minRadius: 9.5,
-  maxRadius: 65,
+  minRadius: SOLIS_RADIUS * 1.03,
+  maxRadius: 120_000,
   lookRate: 7,
   boost: 3,
 }
@@ -98,7 +103,9 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
   const initial = useMemo(
     () => ({
       yaw: restored?.yaw ?? 0,
-      pitch: restored?.pitch ?? 0,
+      // The belt view opens looking down on the ring plane; every other
+      // view opens on the orbit itself.
+      pitch: restored?.pitch ?? (initialView === 'belt' ? 0.35 : 0),
       zoom: restored?.zoom ?? viewZoomBounds(initialView).distance,
     }),
     [restored, initialView],
@@ -163,8 +170,11 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
     journey.startLook.copy(lookAt.current)
     journey.startUp.copy((cameraRef as PerspectiveCamera).up)
     const initialZoom = viewZoomBounds(destination).distance
-    target.current = { yaw: 0, pitch: 0, zoom: initialZoom }
-    current.current = { yaw: 0, pitch: 0, zoom: initialZoom }
+    // The belt opens looking down on the ring plane, wherever it is entered
+    // from; the orbit views open on the orbit itself.
+    const initialPitch = destination === 'belt' ? 0.35 : 0
+    target.current = { yaw: 0, pitch: initialPitch, zoom: initialZoom }
+    current.current = { yaw: 0, pitch: initialPitch, zoom: initialZoom }
     overviewTarget.current = { yaw: 0, pitch: 0, zoom: 1 }
     overviewCurrent.current = { yaw: 0, pitch: 0, zoom: 1 }
     pointer.current = { x: 0, y: 0 }
@@ -265,8 +275,9 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
         overviewTarget.current.yaw = MathUtils.clamp(overviewTarget.current.yaw - dx * 0.0035, -Math.PI, Math.PI)
         overviewTarget.current.pitch = MathUtils.clamp(overviewTarget.current.pitch + dy * 0.0022, -0.6, 0.6)
       } else {
+        const pitch = pitchLimit(currentView.current)
         target.current.yaw = MathUtils.clamp(target.current.yaw - dx * 0.0028, -0.32, 0.32)
-        target.current.pitch = MathUtils.clamp(target.current.pitch + dy * 0.0022, -0.18, 0.18)
+        target.current.pitch = MathUtils.clamp(target.current.pitch + dy * 0.0022, -pitch, pitch)
       }
       drag.current.x = event.clientX
       drag.current.y = event.clientY
@@ -335,8 +346,9 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
       if (event.key === 'ArrowDown') target.current.pitch += 0.025
       if (event.key === '+' || event.key === '=') target.current.zoom -= 0.25
       if (event.key === '-') target.current.zoom += 0.25
+      const pitch = pitchLimit(currentView.current)
       target.current.yaw = MathUtils.clamp(target.current.yaw, -0.32, 0.32)
-      target.current.pitch = MathUtils.clamp(target.current.pitch, -0.18, 0.18)
+      target.current.pitch = MathUtils.clamp(target.current.pitch, -pitch, pitch)
       const bounds = viewZoomBounds(currentView.current)
       target.current.zoom = MathUtils.clamp(target.current.zoom, bounds.min, bounds.max)
     }
@@ -404,12 +416,14 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
     const journey = flight.current
     const time = timeRef.current
     // Small bodies are framed in screen space (see SMALL_BODY_FRAMING); the
-    // planets and the star keep their world-space composition offset.
+    // planets and the star keep their world-space composition offset, scaled
+    // to the framed body's own radius.
     const framed = journey.active ? destination : currentView.current
     const small = framed === 'comet' || framed === 'moon'
     const screenFrame = small ? SMALL_BODY_FRAMING[framed] : null
     if (!small) {
-      compOffset.set(compact ? -0.45 : -1.8, compact ? 1.3 : 0.5, 0)
+      const framedRadius = framed in FLIGHT_BODY_RADII ? FLIGHT_BODY_RADII[framed as keyof typeof FLIGHT_BODY_RADII] : null
+      compOffset.set(-1.8, 0.5, 0).multiplyScalar(framedRadius ? framedRadius / 2 : 0.2)
     }
 
     if (destination !== requestedView.current) {
@@ -444,13 +458,16 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
       const progress = reducedMotion ? 1 : Math.min(journey.elapsed / FLIGHT_DURATION, 1)
       const eased = progress * progress * (3 - 2 * progress)
       const arc = Math.sin(progress * Math.PI) ** 2
+      // The belt arrives looking down on the ring plane, matching the pose
+      // the live-orbit block resumes with.
+      const arrivalPitch = destination === 'belt' ? 0.35 : 0
       if (destination === 'system') {
         journey.endLook.copy(overviewPose.target)
         journey.endPosition.copy(overviewPose.position)
         journey.endUp.copy(overviewPose.up)
       } else if (destination === 'star') {
         journey.endLook.copy(compOffset)
-        orbitOffset(journey.endLook, 0, 0, viewZoomBounds(destination).distance + (compact ? 0.55 : 0), journey.endPosition)
+        orbitOffset(journey.endLook, 0, arrivalPitch, viewZoomBounds(destination).distance * (compact ? 1.18 : 1), journey.endPosition)
         journey.endUp.set(0, 1, 0)
       } else {
         if (destination === 'comet') {
@@ -467,15 +484,19 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
           planetPosition(destination, time, journey.endLook)
         }
         if (!small) journey.endLook.add(compOffset)
-        orbitOffset(journey.endLook, 0, 0, viewZoomBounds(destination).distance + (compact ? 0.55 : 0), journey.endPosition)
+        orbitOffset(journey.endLook, 0, arrivalPitch, viewZoomBounds(destination).distance * (compact ? 1.18 : 1), journey.endPosition)
         journey.endUp.set(0, 1, 0)
         if (screenFrame) {
           shiftIntoFrame(journey.endLook, journey.endPosition, journey.endUp, screenFrame.x, screenFrame.y, BASE_FOV, aspect)
         }
       }
       camera.position.lerpVectors(journey.startPosition, journey.endPosition, eased)
-      camera.position.y += arc * 2.8
-      camera.position.z += arc * 10.5
+      // The journey's arc rides the flight span: a hop between moons lifts a
+      // little, the crossing from Aurelia to the belt lifts wide.
+      const flightSpan = journey.startPosition.distanceTo(journey.endPosition)
+      const lift = Math.max(flightSpan * 0.12, 1.5)
+      camera.position.y += arc * lift * 0.267
+      camera.position.z += arc * lift
       lookAt.current.lerpVectors(journey.startLook, journey.endLook, eased)
       camera.up.lerpVectors(journey.startUp, journey.endUp, eased).normalize()
       camera.lookAt(lookAt.current)
@@ -525,7 +546,15 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
           if (steer.done) free.current.autopilot = null
         }
       }
-      stepFreeFlight(st, input, free.current.look, delta, FREE_FLIGHT_PARAMS)
+      // Thrust and the speed ceiling ride the pilot's distance: the reach
+      // grows as the void opens, the same feel a planetary flight sim keeps.
+      const span = Math.max(st.position.length(), 1)
+      const params = {
+        ...FREE_FLIGHT_PARAMS,
+        accel: Math.max(FREE_FLIGHT_PARAMS.accel, span * 0.5),
+        maxSpeed: Math.max(FREE_FLIGHT_PARAMS.maxSpeed, span * 0.4),
+      }
+      stepFreeFlight(st, input, free.current.look, delta, params)
       // Publish the HUD readout at a calm throttle, only when something
       // the pilot could notice has actually changed.
       if (onFlightTelemetry) {
@@ -608,7 +637,7 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
     current.current.pitch = MathUtils.damp(current.current.pitch, target.current.pitch, 4, delta)
     current.current.zoom = MathUtils.damp(current.current.zoom, target.current.zoom, 3, delta)
 
-    const distance = current.current.zoom + (compact ? 0.55 : 0) + (1 - introEase) * 2.4
+    const distance = current.current.zoom * (compact ? 1.18 : 1) + (1 - introEase) * current.current.zoom * 0.3
     const yaw = current.current.yaw + parallaxX * 0.018 + idleX
     const pitch = current.current.pitch - parallaxY * 0.012 + idleY
     if (currentView.current === 'star') {
@@ -631,8 +660,8 @@ export function CameraRig({ initialView, initialPose, reducedMotion, destination
       // is on its orbit.
       shiftIntoFrame(scratch, camera.position, camera.up, screenFrame.x, screenFrame.y, BASE_FOV, aspect)
     }
-    camera.position.x += parallaxX * 0.06
-    camera.position.y += parallaxY * 0.04
+    camera.position.x += parallaxX * distance * 0.007
+    camera.position.y += parallaxY * distance * 0.005
     lookAt.current.copy(scratch)
     camera.lookAt(lookAt.current)
   })

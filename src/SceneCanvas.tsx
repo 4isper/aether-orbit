@@ -110,7 +110,7 @@ export default function SceneCanvas({
     <>
       <Canvas
         aria-label={label}
-        camera={{ position: [0, 0, 11.4], fov: 36, near: 0.1, far: 160 }}
+        camera={{ position: [0, 0, 11.4], fov: 36, near: 0.1, far: 500_000 }}
         dpr={dpr}
         gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
         onCreated={handleCreated}

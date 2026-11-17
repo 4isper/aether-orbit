@@ -5,6 +5,7 @@ import {
   AdditiveBlending,
   FrontSide,
   NoColorSpace,
+  Quaternion,
   RepeatWrapping,
   SRGBColorSpace,
   Vector2,
@@ -22,7 +23,7 @@ import { Moon } from './Moon'
 import { lightningStrikes, LIGHTNING_CELLS, type LightningStrike } from '../lightning'
 import { cycloneCenter, cycloneIntensity } from '../cyclone'
 import { flareLight } from '../flare'
-import { aureliaFrame, aureliaClock, aureliaSpinPhase, moonPhaseAngle, starFlux } from '../orbits'
+import { aureliaFrame, aureliaClock, aureliaSpinPhase, moonOrbitLocalQuaternion, moonPhaseAngle, starFlux } from '../orbits'
 import { useSunDirection } from '../hooks/useSunDirection'
 import { t, type Locale } from '../strings'
 
@@ -34,7 +35,9 @@ const textureUrls = [
   '/textures/earth-clouds.webp',
 ]
 
-const surfaceFragment = /* glsl */ `
+const surfaceFragment = /* glsl */`#include <common>
+#include <logdepthbuf_pars_fragment>
+
 uniform sampler2D uDayMap;
 uniform sampler2D uNightMap;
 uniform sampler2D uNormalMap;
@@ -46,7 +49,7 @@ uniform vec3 uMoonPosition;
 uniform float uMoonRadius;
 uniform float uSunRadius;
 uniform vec3 uPlanetCenter;
-uniform float uGroupScale;
+uniform float uDeckRadius;
 uniform float uDeckSpin;
 uniform float uStarFlux;
 uniform float uTime;
@@ -87,6 +90,7 @@ float geometrySchlickGGX(float NoV, float roughness) {
 }
 
 void main() {
+#include <logdepthbuf_fragment>
   vec3 p = normalize(vObjectPosition);
   vec3 albedo = texture2D(uDayMap, vUv).rgb;
   float oceanMask = texture2D(uSpecularMap, vUv).r;
@@ -102,8 +106,8 @@ void main() {
 
   float micro = fbm4(p * 84.0 + vec3(1.7, 8.2, -3.4));
   float bumpFade = smoothstep(0.08, 0.34, max(dot(geometricN, V), 0.0));
-  float elevation = land * micro * 0.0035 * bumpFade;
-  vec3 N = perturbNormal(vWorldPosition, mappedN, elevation);
+  float elevation = land * micro * 0.002 * bumpFade;
+  vec3 N = perturbNormal(vObjectPosition, mappedN, elevation);
 
   vec3 L = normalize(uSunDirection);
   float ndl = dot(geometricN, L);
@@ -114,16 +118,16 @@ void main() {
   // radius above the surface — straight overhead only at the sub-solar
   // point, stretched far along the slant near the terminator. The hit's map
   // UV is read in the deck's own spinning frame.
-  vec3 centerToFragment = (vWorldPosition - uPlanetCenter) / uGroupScale;
+  vec3 centerToFragment = vWorldPosition - uPlanetCenter;
   vec3 rayDir = normalize(-vWorldPosition);
   float b = dot(centerToFragment, rayDir);
-  float tHit = -b + sqrt(max(b * b + 2.025 * 2.025 - dot(centerToFragment, centerToFragment), 0.0));
+  float tHit = -b + sqrt(max(b * b + uDeckRadius * uDeckRadius - dot(centerToFragment, centerToFragment), 0.0));
   vec3 hitLocal = centerToFragment + rayDir * tHit;
   float cD = cos(uDeckSpin);
   float sD = sin(uDeckSpin);
   vec3 hitDeck = vec3(cD * hitLocal.x - sD * hitLocal.z, hitLocal.y, sD * hitLocal.x + cD * hitLocal.z);
   float hitU = fract(atan(hitDeck.z, -hitDeck.x) / 6.28318530718);
-  float hitV = acos(clamp(hitDeck.y / 2.025, -1.0, 1.0)) / 3.14159265359;
+  float hitV = acos(clamp(hitDeck.y / uDeckRadius, -1.0, 1.0)) / 3.14159265359;
   float cloudDensity = texture2D(uCloudMap, vec2(hitU, hitV)).r;
   float cloudShadow = 1.0 - smoothstep(0.06, 0.76, cloudDensity) * 0.42;
   // The cyclone shades the water itself: the same vortex, read in the map
@@ -199,7 +203,9 @@ void main() {
 }
 `
 
-const cloudFragment = /* glsl */ `
+const cloudFragment = /* glsl */`#include <common>
+#include <logdepthbuf_pars_fragment>
+
 uniform sampler2D uCloudMap;
 uniform vec3 uSunDirection;
 uniform vec3 uMoonPosition;
@@ -215,6 +221,7 @@ varying vec3 vWorldPosition;
 varying vec3 vWorldNormal;
 
 void main() {
+#include <logdepthbuf_fragment>
   float density = texture2D(uCloudMap, vUv).r;
 
   // The cyclone: a spiral wound into the deck around its own eye, pinned to
@@ -292,7 +299,9 @@ void main() {
 }
 `
 
-const auroraVertex = /* glsl */ `
+const auroraVertex = /* glsl */`#include <common>
+#include <logdepthbuf_pars_vertex>
+
 varying vec3 vObjectPosition;
 varying vec3 vWorldPosition;
 varying vec3 vWorldNormal;
@@ -302,10 +311,13 @@ void main() {
   vWorldPosition = worldPosition.xyz;
   vWorldNormal = normalize(mat3(modelMatrix) * normal);
   gl_Position = projectionMatrix * viewMatrix * worldPosition;
+#include <logdepthbuf_vertex>
 }
 `
 
-const auroraFragment = /* glsl */ `
+const auroraFragment = /* glsl */`#include <common>
+#include <logdepthbuf_pars_fragment>
+
 uniform vec3 uSunDirection;
 uniform float uTime;
 uniform float uStarFlux;
@@ -315,6 +327,7 @@ varying vec3 vWorldNormal;
 ${noiseGLSL}
 
 void main() {
+#include <logdepthbuf_fragment>
   vec3 p = normalize(vObjectPosition);
   vec3 N = normalize(vWorldNormal);
   vec3 L = normalize(uSunDirection);
@@ -335,7 +348,7 @@ void main() {
   vec3 color = mix(vec3(0.25, 1.0, 0.55), vec3(0.5, 0.3, 1.0), streaks * 0.8);
   float alpha = energy * 0.55;
 
-  gl_FragColor = vec4(color * alpha, alpha);
+  gl_FragColor = vec4(color, alpha);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }
@@ -356,11 +369,10 @@ export function Planet({ reducedMotion, showMoonLabel, locale, timeRef, moonWorl
   const surfaceRef = useRef<Mesh>(null)
   const cloudsRef = useRef<Mesh>(null)
   const moonRef = useRef<Mesh>(null)
+  const moonOrbitRef = useRef<Group>(null)
   const surfaceMaterialRef = useRef<ShaderMaterial>(null)
   const cloudMaterialRef = useRef<ShaderMaterial>(null)
   const moonMaterialRef = useRef<ShaderMaterial>(null)
-  const { width, height } = useThree((state) => state.viewport)
-  const compact = useThree((state) => state.size.width < 700) || width / height < 0.9
   const gl = useThree((state) => state.gl)
   const configureTextures = useCallback(
     (textures: MappedTextureType<typeof textureUrls>) => {
@@ -387,6 +399,7 @@ export function Planet({ reducedMotion, showMoonLabel, locale, timeRef, moonWorl
 
   const { sunDirection, worldPosition, updateSunDirection } = useSunDirection(groupRef)
   const moonWorld = useMemo(() => new Vector3(), [])
+  const moonOrbitScratch = useMemo(() => new Quaternion(), [])
   const surfaceUniforms = useMemo(
     () => ({
       uSunDirection: { value: sunDirection },
@@ -397,10 +410,10 @@ export function Planet({ reducedMotion, showMoonLabel, locale, timeRef, moonWorl
       uCloudMap: { value: cloudMap },
       uCloudOffset: { value: 0 },
       uMoonPosition: { value: new Vector3() },
-      uMoonRadius: { value: 0.34 },
+      uMoonRadius: { value: aureliaFrame.moonRadius },
       uSunRadius: { value: FLIGHT_BODY_RADII.star },
       uPlanetCenter: { value: worldPosition },
-      uGroupScale: { value: 1 },
+      uDeckRadius: { value: aureliaFrame.planetRadius * 1.0125 },
       uDeckSpin: { value: 0 },
       uStarFlux: { value: 1 },
       uTime: { value: 0 },
@@ -441,6 +454,13 @@ export function Planet({ reducedMotion, showMoonLabel, locale, timeRef, moonWorl
   useFrame(() => {
     updateSunDirection()
     const flux = starFlux(worldPosition) * flareLight(timeRef.current)
+    // The moon's orbit plane regresses (the honest nodal precession): the
+    // group rides the same quaternion eclipse.ts mirrors, so pause,
+    // reversal and deep links replay the same sky.
+    if (moonOrbitRef.current) {
+      moonOrbitLocalQuaternion(timeRef.current, moonOrbitScratch)
+      moonOrbitRef.current.quaternion.copy(moonOrbitScratch)
+    }
 
     const surface = surfaceRef.current
     const clouds = cloudsRef.current
@@ -454,7 +474,7 @@ export function Planet({ reducedMotion, showMoonLabel, locale, timeRef, moonWorl
       if (clouds) clouds.rotation.y = aureliaSpinPhase(timeRef.current) * 1.5
     }
 
-    const planetRadius = aureliaFrame.planetRadius * (compact ? 0.76 : 1)
+    const planetRadius = aureliaFrame.planetRadius
     // The cyclone rides the shared clock like the lightning: pause and
     // reversal replay the same weather, deep links land on the same spiral.
     const cyclone = cycloneIntensity(timeRef.current)
@@ -462,9 +482,7 @@ export function Planet({ reducedMotion, showMoonLabel, locale, timeRef, moonWorl
     if (surfaceMaterialRef.current) {
       surfaceMaterialRef.current.uniforms.uCloudOffset.value =
         surface && clouds ? (surface.rotation.y - clouds.rotation.y) / (Math.PI * 2) : 0
-      // The projected cloud shadow reads the deck's live frame: the group's
-      // scale and the deck's own spin.
-      surfaceMaterialRef.current.uniforms.uGroupScale.value = compact ? 0.76 : 1
+      // The projected cloud shadow reads the deck's live spin.
       if (clouds) surfaceMaterialRef.current.uniforms.uDeckSpin.value = clouds.rotation.y
       surfaceMaterialRef.current.uniforms.uStarFlux.value = flux
       // Waves ride the shared clock: a deep-linked t= lands on the same sea.
@@ -513,7 +531,7 @@ export function Planet({ reducedMotion, showMoonLabel, locale, timeRef, moonWorl
       moon.getWorldPosition(moonWorld)
       moonWorldRef?.current.copy(moonWorld)
 
-      const moonWorldRadius = aureliaFrame.moonRadius * (compact ? 0.76 : 1)
+      const moonWorldRadius = aureliaFrame.moonRadius
       if (surfaceMaterialRef.current) {
         surfaceMaterialRef.current.uniforms.uMoonPosition.value.copy(moonWorld)
         surfaceMaterialRef.current.uniforms.uMoonRadius.value = moonWorldRadius
@@ -532,13 +550,9 @@ export function Planet({ reducedMotion, showMoonLabel, locale, timeRef, moonWorl
   })
 
   return (
-    <group
-      ref={groupRef}
-      scale={compact ? 0.76 : 1}
-      rotation={aureliaFrame.worldRotation}
-    >
+    <group ref={groupRef} rotation={aureliaFrame.worldRotation}>
       <mesh ref={surfaceRef} rotation={[0, -1.15, 0]}>
-        <sphereGeometry args={[2, 160, 160]} />
+        <sphereGeometry args={[aureliaFrame.planetRadius, 160, 160]} />
         <shaderMaterial
           ref={surfaceMaterialRef}
           vertexShader={bodyVertexGLSL(true)}
@@ -548,7 +562,7 @@ export function Planet({ reducedMotion, showMoonLabel, locale, timeRef, moonWorl
       </mesh>
 
       <mesh ref={cloudsRef} rotation={[0, -1.1, 0]} renderOrder={1}>
-        <sphereGeometry args={[2.025, 128, 128]} />
+        <sphereGeometry args={[aureliaFrame.planetRadius * 1.0125, 128, 128]} />
         <shaderMaterial
           ref={cloudMaterialRef}
           vertexShader={bodyVertexGLSL(true)}
@@ -561,7 +575,7 @@ export function Planet({ reducedMotion, showMoonLabel, locale, timeRef, moonWorl
       </mesh>
 
       <mesh renderOrder={2} raycast={() => null}>
-        <sphereGeometry args={[2.04, 96, 96]} />
+        <sphereGeometry args={[aureliaFrame.planetRadius * 1.02, 96, 96]} />
         <shaderMaterial
           ref={auroraMaterialRef}
           vertexShader={auroraVertex}
@@ -573,10 +587,10 @@ export function Planet({ reducedMotion, showMoonLabel, locale, timeRef, moonWorl
         />
       </mesh>
 
-      <group rotation={aureliaFrame.moonOrbitRotation}>
+      <group ref={moonOrbitRef}>
         <Moon ref={moonRef} materialRef={moonMaterialRef}>
           {showMoonLabel && (
-            <Html center position={[0, 2.4, 0]} zIndexRange={[1, 1]} style={{ pointerEvents: 'none' }}>
+            <Html center position={[0, 0.5, 0]} zIndexRange={[1, 1]} style={{ pointerEvents: 'none' }}>
               <span className="moon-label" aria-hidden="true">{t(locale, 'moon')}</span>
             </Html>
           )}

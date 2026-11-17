@@ -284,19 +284,20 @@ test('free flight turns toward the look target with pitch clamped', () => {
 })
 
 test('nearest flight body reads signed distance to the surface', () => {
-  // 1.5 units from Aurelia's center: inside the radius, so the reading is
-  // negative — and no other body can beat it (the moon keeps 3.6−1.5−0.34).
+  // 0.8 units from Aurelia's center: inside the 1.12 radius, so the reading
+  // is negative — and no other body can beat it (the moon keeps
+  // 67.5 − 0.8 − 0.19 of clearance).
   const anchor = planetPosition('aurelia', 100, new Vector3())
-  const parked = anchor.addScaledVector(anchor.clone().normalize(), -1.5)
+  const parked = anchor.addScaledVector(anchor.clone().normalize(), -0.8)
   const near = nearestFlightBody(parked, moonWorldPosition(100, new Vector3()), 100)
   assert.equal(near.id, 'aurelia')
-  assert.ok(Math.abs(near.distance - -0.5) < 1e-9, `distance ${near.distance}`)
+  assert.ok(Math.abs(near.distance - -0.32) < 1e-9, `distance ${near.distance}`)
 
   // At a body's center the reading goes negative: the pilot is inside it.
   const moon = moonWorldPosition(55, new Vector3())
   const inside = nearestFlightBody(moon, moon, 55)
   assert.equal(inside.id, 'moon')
-  assert.ok(Math.abs(inside.distance - -0.34) < 1e-9, `distance ${inside.distance}`)
+  assert.ok(Math.abs(inside.distance - -0.19) < 1e-9, `distance ${inside.distance}`)
 })
 
 test('nearest flight body always returns a flyable body', () => {

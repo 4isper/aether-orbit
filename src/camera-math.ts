@@ -2,32 +2,41 @@ import { MathUtils, Vector3 } from 'three'
 import { cometOrbitPoint, cometPosition } from './comet.ts'
 import { erebusPosition } from './erebus.ts'
 import { planetIds, type SceneView } from './planets.ts'
-import { orbitPoint, planetPosition } from './orbits.ts'
+import { BODY_RADII, ORBIT_SCALE, SOLIS_RADIUS, orbitPoint, planetPosition } from './orbits.ts'
 
-export const PLANET_VIEW_DISTANCE = 9
-/** The belt view floats inside the debris rings: closer than the planets,
- * the camera drifts along the middle ring with the rocks around it. */
-export const BELT_VIEW_DISTANCE = 5.5
-export const BELT_MIN_ZOOM = 3.6
-export const BELT_MAX_ZOOM = 9
+/**
+ * View framing on the honest scale: every distance keeps the old angular
+ * framing (the same body fills the same fraction of the frame), so the
+ * views read exactly as they did — only the numbers grew to the real
+ * proportions. Planets frame at 4.5 planetary radii, the star at 4.9 solar
+ * radii, the moon at 5 lunar radii.
+ */
+export const PLANET_VIEW_DISTANCE = 4.5 * BODY_RADII.aurelia
+/** The belt view floats inside the debris rings: the camera drifts along
+ * the middle ring with the rocks around it, at rock scale. */
+export const BELT_VIEW_DISTANCE = 0.4
+export const BELT_MIN_ZOOM = 0.15
+export const BELT_MAX_ZOOM = 1.2
 /** Erebus is a small cold dwarf: the camera hangs close, like at the comet. */
-export const EREBUS_VIEW_DISTANCE = 4.5
-export const EREBUS_MIN_ZOOM = 3.2
-export const EREBUS_MAX_ZOOM = 8
-export const STAR_VIEW_DISTANCE = 11.5
-export const COMET_VIEW_DISTANCE = 3.4
-export const MOON_VIEW_DISTANCE = 1.7
-export const MIN_ZOOM = 7.6
-export const MAX_ZOOM = 12.6
-export const COMET_MIN_ZOOM = 2.2
-export const COMET_MAX_ZOOM = 4.6
-export const MOON_MIN_ZOOM = 1.0
-export const MOON_MAX_ZOOM = 3.2
+export const EREBUS_VIEW_DISTANCE = 8.2 * BODY_RADII.erebus
+export const EREBUS_MIN_ZOOM = 5.8
+export const EREBUS_MAX_ZOOM = 14.4
+export const STAR_VIEW_DISTANCE = 4.9 * SOLIS_RADIUS
+export const COMET_VIEW_DISTANCE = 2.5
+export const MOON_VIEW_DISTANCE = 5 * BODY_RADII.moon
+export const MIN_ZOOM = 3.8 * BODY_RADII.aurelia
+export const MAX_ZOOM = 6.3 * BODY_RADII.aurelia
+export const COMET_MIN_ZOOM = 1.4
+export const COMET_MAX_ZOOM = 3.6
+export const MOON_MIN_ZOOM = 3 * BODY_RADII.moon
+export const MOON_MAX_ZOOM = 9.4 * BODY_RADII.moon
 const FLIGHT_TIME = 4.2
 const INTRO_TIME = 4.5
 const OVERVIEW_HALF_FOV_DEG = 18
-const PLANET_FRAMING_MARGIN = 3
-const COMET_FRAMING_MARGIN = 2.4
+/** Overview framing margins keep the orbit lines inside the frame; they
+ * ride the same honest scale as the orbits themselves. */
+const PLANET_FRAMING_MARGIN = 3 * ORBIT_SCALE
+const COMET_FRAMING_MARGIN = 2.4 * ORBIT_SCALE
 
 export const FLIGHT_DURATION = FLIGHT_TIME
 export const INTRO_DURATION = INTRO_TIME
@@ -95,13 +104,22 @@ export type CameraPose = {
 
 const YAW_LIMIT = 0.32
 const PITCH_LIMIT = 0.18
+/** The belt view floats inside the rings: it can look down on the plane the
+ * others orbit around. */
+const BELT_PITCH_LIMIT = 0.6
+
+/** Pitch reach for a view: the belt surveys the plane from above. */
+export function pitchLimit(view: SceneView): number {
+  return view === 'belt' ? BELT_PITCH_LIMIT : PITCH_LIMIT
+}
 
 /** Clamp a pose to what the orbit controls can actually reach for this view. */
 export function clampPose(pose: CameraPose, view: SceneView): CameraPose {
   const bounds = viewZoomBounds(view)
+  const pitch = pitchLimit(view)
   return {
     yaw: MathUtils.clamp(pose.yaw, -YAW_LIMIT, YAW_LIMIT),
-    pitch: MathUtils.clamp(pose.pitch, -PITCH_LIMIT, PITCH_LIMIT),
+    pitch: MathUtils.clamp(pose.pitch, -pitch, pitch),
     zoom: MathUtils.clamp(pose.zoom, bounds.min, bounds.max),
   }
 }
@@ -237,19 +255,20 @@ export function stepFreeFlight(
 export type OverviewRotation = { position: Vector3; up: Vector3 }
 
 /**
- * Scene-space surface radii of the flyable bodies, mirroring the mesh
- * geometry of the components (star photosphere 2.35, planets 2 × their
- * group scale, moon 0.34, comet 0.14). The flight HUD reports how far the
- * pilot is from each surface; compact-screen scales are ignored as noise.
+ * Scene-space surface radii of the flyable bodies — the honest physics
+ * table from orbits.ts (Solis 109.2, planets in Earth radii, moon 0.19,
+ * comet nucleus 0.002). The flight HUD reports how far the pilot is from
+ * each surface; the meshes render these exact numbers, so telemetry,
+ * geometry and HUD are one truth.
  */
 export const FLIGHT_BODY_RADII = {
-  star: 2.35,
-  aurelia: 2,
-  cinder: 1.84,
-  vesper: 2.16,
-  moon: 0.34,
-  comet: 0.14,
-  erebus: 0.55,
+  star: SOLIS_RADIUS,
+  aurelia: BODY_RADII.aurelia,
+  cinder: BODY_RADII.cinder,
+  vesper: BODY_RADII.vesper,
+  moon: BODY_RADII.moon,
+  comet: BODY_RADII.comet,
+  erebus: BODY_RADII.erebus,
 } as const
 
 /** A body the free-flight HUD tracks: every solid destination. The belt is
@@ -376,7 +395,9 @@ export function shiftIntoFrame(
 export function computeOverviewPose(width: number, height: number): OverviewPose {
   const aspect = width / height
   const portrait = aspect < 0.9
-  const direction = new Vector3(0, 0.42, 1).normalize()
+  // A steeper vantage than the compact scene kept: at the honest scale the
+  // worlds hug their orbit lines, and a shallow angle squashes the disc.
+  const direction = new Vector3(0, 0.7, 1).normalize()
   const up = portrait ? new Vector3(-1, 0, 0) : new Vector3(0, 1, 0)
   const right = new Vector3().crossVectors(up, direction).normalize()
   const screenUp = new Vector3().crossVectors(direction, right)

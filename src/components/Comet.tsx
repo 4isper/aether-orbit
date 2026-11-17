@@ -10,14 +10,17 @@ import {
   type ShaderMaterial,
 } from 'three'
 import { cometPosition, tailParticlePosition } from '../comet'
+import { BODY_RADII } from '../orbits'
 import { cometDustPosition } from '../dust'
 
-const TAIL_COUNT = 44
-const TAIL_LENGTH_FACTOR = 130
-const TAIL_ACTIVITY_FACTOR = 150
-const MIN_TAIL_LENGTH = 2.2
-const MAX_TAIL_LENGTH = 7.5
-const MIN_TAIL_ACTIVITY = 0.45
+const TAIL_COUNT = 120
+// Honest tails: the ion tail reaches ~0.6 AU at perihelion (14 000 Earth
+// radii) and collapses with the inverse square as the comet climbs out.
+const TAIL_LENGTH_FACTOR = 2.0e12
+const TAIL_ACTIVITY_FACTOR = 1.87e8
+const MIN_TAIL_LENGTH = 0
+const MAX_TAIL_LENGTH = 14_000
+const MIN_TAIL_ACTIVITY = 0.02
 const MAX_TAIL_ACTIVITY = 1.3
 // The ion tail hugs the anti-sun line, straight from the solar wind: the
 // wind is radial, so no lag along the path of motion. The dust tail is
@@ -25,8 +28,10 @@ const MAX_TAIL_ACTIVITY = 1.3
 // flies its private Kepler orbit under radiation-reduced gravity, so the
 // curve along the orbit's wake comes from the physics, not from a lag
 // factor.
-const TAIL_SPREAD = 0.16
-const DUST_COUNT = 52
+// The ion tail is a narrow cone: real ion tails stay within a few degrees
+// of the anti-sun line.
+const TAIL_SPREAD = 0.05
+const DUST_COUNT = 140
 const DUST_BETA_MIN = 0.12
 const DUST_BETA_MAX = 0.42
 /** Grains in flight left the nucleus over the last 24 time units: near
@@ -34,19 +39,25 @@ const DUST_BETA_MAX = 0.42
  * and far out it collapses — as a real dust tail does. */
 const DUST_RELEASE_WINDOW = 24
 
-const comaVertex = /* glsl */ `
+const comaVertex = /* glsl */`#include <common>
+#include <logdepthbuf_pars_vertex>
+
 varying vec2 vUv;
 void main() {
   vUv = uv;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+#include <logdepthbuf_vertex>
 }
 `
 
-const comaFragment = /* glsl */ `
+const comaFragment = /* glsl */`#include <common>
+#include <logdepthbuf_pars_fragment>
+
 uniform float uActivity;
 varying vec2 vUv;
 
 void main() {
+#include <logdepthbuf_fragment>
   vec2 p = (vUv - 0.5) * 2.0;
   float d = length(p);
   float glow = (exp(-d * 6.5) * 0.55 + exp(-d * 2.2) * 0.12) * uActivity;
@@ -55,7 +66,9 @@ void main() {
 }
 `
 
-const tailVertex = /* glsl */ `
+const tailVertex = /* glsl */`#include <common>
+#include <logdepthbuf_pars_vertex>
+
 attribute float aSize;
 attribute float aAlpha;
 uniform float uPixelRatio;
@@ -63,23 +76,29 @@ varying float vAlpha;
 
 void main() {
   vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-  gl_PointSize = min(14.0, aSize * uPixelRatio * (60.0 / -mvPosition.z));
+  // The honest tail spans thousands of units, so the glow sprites keep a
+  // constant screen size — a streak of beads, not a shrinking trail.
+  gl_PointSize = min(16.0, aSize * uPixelRatio);
   gl_Position = projectionMatrix * mvPosition;
+#include <logdepthbuf_vertex>
   vAlpha = aAlpha;
 }
 `
 
-const tailFragment = /* glsl */ `
+const tailFragment = /* glsl */`#include <common>
+#include <logdepthbuf_pars_fragment>
+
 uniform vec3 uColor;
 varying float vAlpha;
 
 void main() {
+#include <logdepthbuf_fragment>
   vec2 uv = gl_PointCoord - 0.5;
   float d = length(uv) * 2.0;
   float core = smoothstep(1.0, 0.0, d);
   float alpha = core * core * vAlpha;
   if (alpha < 0.01) discard;
-  gl_FragColor = vec4(uColor * alpha, alpha);
+  gl_FragColor = vec4(uColor, alpha);
 }
 `
 
@@ -101,7 +120,8 @@ export function Comet({ timeRef }: CometProps) {
     const values = new Float32Array(TAIL_COUNT)
     for (let i = 0; i < TAIL_COUNT; i++) {
       const t = (i + 1) / TAIL_COUNT
-      values[i] = 0.72 - t * 0.5
+      // Screen-space bead sizes: the honest tail is a long streak of glow.
+      values[i] = (0.72 - t * 0.5) * 14
     }
     return values
   }, [])
@@ -111,7 +131,7 @@ export function Comet({ timeRef }: CometProps) {
     const values = new Float32Array(DUST_COUNT)
     for (let i = 0; i < DUST_COUNT; i++) {
       const t = (i + 1) / DUST_COUNT
-      values[i] = 0.95 - t * 0.4
+      values[i] = (0.95 - t * 0.4) * 12
     }
     return values
   }, [])
@@ -157,7 +177,7 @@ export function Comet({ timeRef }: CometProps) {
       for (let i = 0; i < TAIL_COUNT; i++) {
         const t = (i + 1) / TAIL_COUNT
         const seed = i * 12.9898
-        const spread = t * tailLength * TAIL_SPREAD + 0.05
+        const spread = t * tailLength * TAIL_SPREAD + tailLength * 0.01
         tailParticlePosition(t, tailLength, spread, head, antiSun, time, seed, scratch)
         tailPositions[i * 3] = scratch.x
         tailPositions[i * 3 + 1] = scratch.y
@@ -183,7 +203,7 @@ export function Comet({ timeRef }: CometProps) {
         cometDustPosition(time - t * DUST_RELEASE_WINDOW, beta, time, scratch)
         // A whisper of scatter keeps the grains off a mathematically exact
         // curve: real dust clumps and drifts as it leaves the nucleus.
-        const scatter = 0.04 * t + 0.01
+        const scatter = tailLength * (0.04 * t + 0.01)
         scratch.x += Math.sin(time * 0.9 + seed) * scatter
         scratch.y += Math.cos(time * 1.3 + seed * 1.7) * scatter
         scratch.z += Math.sin(time * 1.1 + seed * 2.3) * scatter
@@ -200,6 +220,9 @@ export function Comet({ timeRef }: CometProps) {
     if (comaRef.current) {
       comaRef.current.position.copy(head)
       comaRef.current.quaternion.copy(state.camera.quaternion)
+      // The coma swells with the comet's activity: a bright perihelion coma
+      // spans ~1.5 units (~100 000 km), far out it shrinks to a haze.
+      comaRef.current.scale.setScalar(0.15 + activity * 0.85)
     }
     if (ionMaterialRef.current) {
       ionMaterialRef.current.uniforms.uPixelRatio.value = state.gl.getPixelRatio()
@@ -212,11 +235,12 @@ export function Comet({ timeRef }: CometProps) {
   return (
     <group>
       <mesh ref={headRef} raycast={() => null}>
-        <sphereGeometry args={[0.14, 16, 16]} />
+        {/* The honest nucleus: ~13 km across, a dot the coma outshines. */}
+        <sphereGeometry args={[BODY_RADII.comet, 16, 16]} />
         <meshBasicMaterial color={headColor} toneMapped={false} />
       </mesh>
       <mesh ref={comaRef} renderOrder={2} raycast={() => null}>
-        <planeGeometry args={[2.6, 2.6]} />
+        <planeGeometry args={[1.8, 1.8]} />
         <shaderMaterial
           ref={comaMaterialRef}
           vertexShader={comaVertex}

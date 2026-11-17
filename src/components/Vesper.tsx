@@ -1,21 +1,28 @@
 import { useMemo, useRef } from 'react'
-import { useFrame, useThree } from '@react-three/fiber'
+import { useFrame } from '@react-three/fiber'
 import { AdditiveBlending, Color, DoubleSide, MeshBasicMaterial, Quaternion, Vector3, type Group, type Mesh, type ShaderMaterial } from 'three'
 import { noiseGLSL } from '../shaders/noise'
 import { bodyVertexGLSL, perturbNormalGLSL } from '../shaders/common'
 import { Atmosphere } from './Atmosphere'
 import { RingRocks } from './RingRocks'
-import { shepherdLocalPosition, starFlux, vesperSpinPhase } from '../orbits'
+import { BODY_RADII, shepherdLocalPosition, starFlux, vesperSpinPhase, VESPER_RING_INNER, VESPER_RING_OUTER } from '../orbits'
+import { RING_INNER, RING_OUTER } from '../ring-rocks'
 import { plumeStrength, plumeVentLocal, PLUME_VENTS, SHEPHERD_RADIUS } from '../plumes'
 import { flareLight } from '../flare'
 import { useSunDirection } from '../hooks/useSunDirection'
 
 /**
- * Ring density as a function of the normalized radius t = (r - 2.5) / 1.5,
- * shared by the ring shader and the planet's ring-shadow term so the shadow
- * carries the same bands and Cassini gap the rings themselves show. The band
- * pattern is exposed separately: the ring color grades by it directly.
+ * Ring density as a function of the normalized radius t = (r − inner)/span
+ * of the honest ring span, shared by the ring shader and the planet's
+ * ring-shadow term so the shadow carries the same bands and Cassini gap the
+ * rings themselves show. The band pattern is exposed separately: the ring
+ * color grades by it directly.
  */
+const RING_CONSTANTS_GLSL = /* glsl */ `
+const float RING_INNER = ${VESPER_RING_INNER.toFixed(6)};
+const float RING_SPAN = ${(VESPER_RING_OUTER - VESPER_RING_INNER).toFixed(6)};
+const float PLANET_R = ${BODY_RADII.vesper.toFixed(6)};
+`
 const ringDensityGLSL = /* glsl */ `
 float vesperRingBand(float t) {
   return smoothstep(0.25, 0.75, fbm4(vec3(t * 70.0, 3.0, 9.0)) * 0.5 + 0.5);
@@ -30,7 +37,9 @@ float vesperRingEdge(float t) {
 }
 `
 
-const surfaceFragment = /* glsl */ `
+const surfaceFragment = /* glsl */`#include <common>
+#include <logdepthbuf_pars_fragment>
+
 uniform vec3 uSunDirection;
 uniform float uStarFlux;
 uniform vec3 uRingNormal;
@@ -41,9 +50,11 @@ varying vec3 vWorldPosition;
 varying vec3 vWorldNormal;
 ${noiseGLSL}
 ${perturbNormalGLSL}
+${RING_CONSTANTS_GLSL}
 ${ringDensityGLSL}
 
 void main() {
+#include <logdepthbuf_fragment>
   vec3 p = normalize(vObjectPosition);
   float warp = fbm4(p * 3.0) * 0.5;
   float bands = fbm4(vec3(p.y * 9.0 + warp, p.x * 0.6, p.z * 0.6));
@@ -64,8 +75,8 @@ void main() {
 
   float micro = fbm4(p * 84.0 + vec3(1.7, 8.2, -3.4));
   float bumpFade = smoothstep(0.08, 0.34, max(dot(geometricN, V), 0.0));
-  float elevation = micro * 0.002 * bumpFade;
-  vec3 N = perturbNormal(vWorldPosition, geometricN, elevation);
+  float elevation = micro * 0.0012 * bumpFade;
+  vec3 N = perturbNormal(vObjectPosition, geometricN, elevation);
 
   vec3 L = normalize(uSunDirection);
   float diffuse = max(dot(N, L), 0.0);
@@ -78,7 +89,7 @@ void main() {
   float crosses = step(1e-4, abs(planeDot)) * step(0.0, crossingT);
   vec3 crossing = vWorldPosition + L * crossingT;
   float ringRadius = length(crossing - uRingCenter) / uGroupScale;
-  float ringT = (ringRadius - 2.5) / 1.5;
+  float ringT = (ringRadius - RING_INNER) / RING_SPAN;
   float shadow = 1.0 - crosses * vesperRingEdge(ringT) * vesperRingDensity(ringT) * 0.75;
 
   vec3 color = albedo * (0.006 + diffuse * shadow * 1.1 * uStarFlux);
@@ -89,7 +100,9 @@ void main() {
 }
 `
 
-const ringVertexShader = /* glsl */ `
+const ringVertexShader = /* glsl */`#include <common>
+#include <logdepthbuf_pars_vertex>
+
 varying vec3 vLocalPosition;
 varying vec3 vWorldPosition;
 varying vec3 vWorldNormal;
@@ -104,10 +117,13 @@ void main() {
   vCenter = (modelMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
   vScale = length(modelMatrix[0].xyz);
   gl_Position = projectionMatrix * viewMatrix * worldPosition;
+#include <logdepthbuf_vertex>
 }
 `
 
-const shepherdFragment = /* glsl */ `
+const shepherdFragment = /* glsl */`#include <common>
+#include <logdepthbuf_pars_fragment>
+
 uniform vec3 uSunDirection;
 uniform float uStarFlux;
 varying vec3 vObjectPosition;
@@ -116,6 +132,7 @@ varying vec3 vWorldNormal;
 ${noiseGLSL}
 
 void main() {
+#include <logdepthbuf_fragment>
   // A small iced world: marble bands from the same noise family as the
   // rings it herds, lit from the star with the same flux falloff.
   float marble = fbm4(normalize(vObjectPosition) * 6.0);
@@ -128,7 +145,9 @@ void main() {
 }
 `
 
-const ringFragment = /* glsl */ `
+const ringFragment = /* glsl */`#include <common>
+#include <logdepthbuf_pars_fragment>
+
 uniform vec3 uSunDirection;
 uniform float uStarFlux;
 varying vec3 vLocalPosition;
@@ -137,11 +156,13 @@ varying vec3 vWorldNormal;
 varying vec3 vCenter;
 varying float vScale;
 ${noiseGLSL}
+${RING_CONSTANTS_GLSL}
 ${ringDensityGLSL}
 
 void main() {
+#include <logdepthbuf_fragment>
   float radius = length(vLocalPosition.xy);
-  float t = (radius - 2.5) / 1.5;
+  float t = (radius - RING_INNER) / RING_SPAN;
   float band = vesperRingBand(t);
   float density = vesperRingDensity(t);
   float edge = vesperRingEdge(t);
@@ -153,7 +174,7 @@ void main() {
   float along = dot(d, L);
   float perp = length(d - L * along);
   float shadow = along < 0.0
-    ? smoothstep(2.0 * vScale * 0.97, 2.0 * vScale * 1.03, perp)
+    ? smoothstep(PLANET_R * vScale * 0.97, PLANET_R * vScale * 1.03, perp)
     : 1.0;
 
   vec3 color = mix(vec3(0.62, 0.60, 0.55), vec3(0.86, 0.84, 0.78), band)
@@ -203,7 +224,7 @@ function ShepherdPlume({ vent, timeRef }: {
       orientation: new Quaternion().setFromUnitVectors(new Vector3(0, 1, 0), normal),
     }
   }, [vent])
-  const PLUME_HEIGHT = 0.42
+  const PLUME_HEIGHT = 0.18
 
   useFrame(() => {
     if (!ref.current) return
@@ -224,7 +245,7 @@ function ShepherdPlume({ vent, timeRef }: {
       raycast={() => null}
       renderOrder={3}
     >
-      <coneGeometry args={[0.05, PLUME_HEIGHT, 10, 1, true]} />
+      <coneGeometry args={[0.02, PLUME_HEIGHT, 10, 1, true]} />
       <primitive object={material} attach="material" />
     </mesh>
   )
@@ -237,8 +258,6 @@ export function Vesper({ reducedMotion, timeRef }: VesperProps) {
   const surfaceMaterialRef = useRef<ShaderMaterial>(null)
   const ringMaterialRef = useRef<ShaderMaterial>(null)
   const shepherdMaterialRef = useRef<ShaderMaterial>(null)
-  const { width, height } = useThree((state) => state.viewport)
-  const compact = useThree((state) => state.size.width < 700) || width / height < 0.9
 
   const { sunDirection, worldPosition, updateSunDirection } = useSunDirection(groupRef)
   const surfaceUniforms = useMemo(
@@ -293,11 +312,10 @@ export function Vesper({ reducedMotion, timeRef }: VesperProps) {
   return (
     <group
       ref={groupRef}
-      scale={compact ? 0.8 : 1.08}
       rotation={[0.42, 0, -0.16]}
     >
       <mesh ref={surfaceRef}>
-        <sphereGeometry args={[2, 128, 128]} />
+        <sphereGeometry args={[BODY_RADII.vesper, 128, 128]} />
         <shaderMaterial
           ref={surfaceMaterialRef}
           vertexShader={bodyVertexGLSL(false)}
@@ -307,7 +325,7 @@ export function Vesper({ reducedMotion, timeRef }: VesperProps) {
       </mesh>
 
       <mesh rotation-x={-Math.PI / 2} renderOrder={1}>
-        <ringGeometry args={[2.5, 4, 180, 1]} />
+        <ringGeometry args={[RING_INNER, RING_OUTER, 180, 1]} />
         <shaderMaterial
           ref={ringMaterialRef}
           vertexShader={ringVertexShader}

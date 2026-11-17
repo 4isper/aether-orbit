@@ -5,7 +5,9 @@
 
 /** Vertex stage: object-space direction, world position and world normal, with optional uv. */
 export function bodyVertexGLSL(withUv: boolean) {
-  return /* glsl */ `
+  return /* glsl */`#include <common>
+#include <logdepthbuf_pars_vertex>
+
 ${withUv ? 'varying vec2 vUv;' : ''}
 varying vec3 vObjectPosition;
 varying vec3 vWorldPosition;
@@ -18,11 +20,16 @@ ${withUv ? '  vUv = uv;' : ''}
   vWorldPosition = worldPosition.xyz;
   vWorldNormal = normalize(mat3(modelMatrix) * normal);
   gl_Position = projectionMatrix * viewMatrix * worldPosition;
+#include <logdepthbuf_vertex>
 }
 `
 }
 
-/** Tangent-space normal perturbation for micro-relief shading. */
+/** Tangent-space normal perturbation for micro-relief shading. The tangent
+ * frame is built from *object-space* derivatives: the surface position in
+ * world space sits at ~1e4 from Solis, and float32 quantization there
+ * (steps of ~0.0014 units) out-paces the per-pixel footprint of the small
+ * close-up bodies — speckle. Object space stays small and exact. */
 export const perturbNormalGLSL = /* glsl */ `
 vec3 perturbNormal(vec3 surfacePosition, vec3 surfaceNormal, float height) {
   // Derivatives collapse on degenerate silhouette quads; falling back to the

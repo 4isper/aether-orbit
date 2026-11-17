@@ -3,12 +3,14 @@ import { useFrame } from '@react-three/fiber'
 import { Vector3, type Group, type Mesh, type ShaderMaterial } from 'three'
 import { noiseGLSL } from '../shaders/noise'
 import { bodyVertexGLSL, perturbNormalGLSL } from '../shaders/common'
-import { erebusSpinPhase, starFlux } from '../orbits'
+import { BODY_RADII, erebusSpinPhase, starFlux } from '../orbits'
 import { flareLight } from '../flare'
 import { erebusPosition } from '../erebus'
 import { useSunDirection } from '../hooks/useSunDirection'
 
-const surfaceFragment = /* glsl */ `
+const surfaceFragment = /* glsl */`#include <common>
+#include <logdepthbuf_pars_fragment>
+
 uniform vec3 uSunDirection;
 uniform float uStarFlux;
 varying vec3 vObjectPosition;
@@ -18,6 +20,7 @@ ${noiseGLSL}
 ${perturbNormalGLSL}
 
 void main() {
+#include <logdepthbuf_fragment>
   vec3 p = normalize(vObjectPosition);
   vec3 geometricN = normalize(vWorldNormal);
   vec3 V = normalize(cameraPosition - vWorldPosition);
@@ -30,7 +33,7 @@ void main() {
   albedo *= 0.9 + regolith * 0.25;
 
   float micro = regolith * 0.0032;
-  vec3 N = perturbNormal(vWorldPosition, geometricN, micro);
+  vec3 N = perturbNormal(vObjectPosition, geometricN, micro);
 
   vec3 L = normalize(uSunDirection);
   float diffuse = max(dot(N, L), 0.0);
@@ -78,7 +81,7 @@ export function Erebus({ reducedMotion, timeRef }: {
   return (
     <group ref={groupRef}>
       <mesh ref={surfaceRef} rotation={[0.12, 0, 0.07]}>
-        <sphereGeometry args={[0.55, 64, 64]} />
+        <sphereGeometry args={[BODY_RADII.erebus, 64, 64]} />
         <shaderMaterial
           ref={materialRef}
           vertexShader={bodyVertexGLSL(true)}

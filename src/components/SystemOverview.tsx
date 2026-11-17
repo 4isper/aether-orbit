@@ -1,7 +1,7 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
-import { Vector3, type Group } from 'three'
+import { BufferGeometry, CanvasTexture, SRGBColorSpace, Vector3, type Group } from 'three'
 import { bodies, planetIds, planets, type PlanetId } from '../planets'
 import { orbitPoint, planetPosition, trojanPosition, trojanTrailingPosition } from '../orbits'
 import { cometOrbitPoint, cometPosition } from '../comet'
@@ -13,6 +13,33 @@ const guideColors: Record<PlanetId, string> = {
   cinder: '#a59688',
   vesper: '#9fb8b4',
 }
+
+/**
+ * The honest spheres are sub-pixel from the overview, so each wandering
+ * body — and Solis itself — carries a fixed-size marker dot the eye can
+ * anchor on; the labels ride the same positions and stay the click targets.
+ */
+const MARKER_COLORS = ['#fff6e8', '#8197aa', '#a59688', '#9fb8b4', '#8fa3b8', '#7d8ba0', '#b9c4d4', '#b9c4d4']
+const MARKER_COUNT = MARKER_COLORS.length
+
+/** A soft round dot for the markers, drawn once on a canvas. */
+const markerDot = (() => {
+  const canvas = document.createElement('canvas')
+  canvas.width = 32
+  canvas.height = 32
+  const context = canvas.getContext('2d')
+  if (context) {
+    const gradient = context.createRadialGradient(16, 16, 0, 16, 16, 16)
+    gradient.addColorStop(0, 'rgba(255,255,255,1)')
+    gradient.addColorStop(0.45, 'rgba(255,255,255,0.85)')
+    gradient.addColorStop(1, 'rgba(255,255,255,0)')
+    context.fillStyle = gradient
+    context.fillRect(0, 0, 32, 32)
+  }
+  const texture = new CanvasTexture(canvas)
+  texture.colorSpace = SRGBColorSpace
+  return texture
+})()
 
 type SystemOverviewProps = {
   onSelect: (id: PlanetId | 'comet' | 'erebus') => void
@@ -86,14 +113,55 @@ export function SystemOverview({ onSelect, timeRef, locale }: SystemOverviewProp
     [],
   )
 
+  const markerRef = useRef<BufferGeometry>(null)
+  const markerColors = useMemo(() => {
+    const colors = new Float32Array(MARKER_COUNT * 3)
+    MARKER_COLORS.forEach((hex, i) => {
+      colors[i * 3] = parseInt(hex.slice(1, 3), 16) / 255
+      colors[i * 3 + 1] = parseInt(hex.slice(3, 5), 16) / 255
+      colors[i * 3 + 2] = parseInt(hex.slice(5, 7), 16) / 255
+    })
+    return colors
+  }, [])
+
   useFrame(() => {
+    const t = timeRef.current
     for (const id of planetIds) {
-      labelRefs.current[id]?.position.copy(planetPosition(id, timeRef.current, scratch))
+      labelRefs.current[id]?.position.copy(planetPosition(id, t, scratch))
     }
-    cometLabelRef.current?.position.copy(cometPosition(timeRef.current, scratch))
-    erebusLabelRef.current?.position.copy(erebusPosition(timeRef.current, scratch))
-    trojanLabelRef.current?.position.copy(trojanPosition(timeRef.current, scratch))
-    trojanTrailLabelRef.current?.position.copy(trojanTrailingPosition(timeRef.current, scratch))
+    cometLabelRef.current?.position.copy(cometPosition(t, scratch))
+    erebusLabelRef.current?.position.copy(erebusPosition(t, scratch))
+    trojanLabelRef.current?.position.copy(trojanPosition(t, scratch))
+    trojanTrailLabelRef.current?.position.copy(trojanTrailingPosition(t, scratch))
+    // The marker dots ride the same live positions; slot 0 is Solis at the
+    // origin, parked once by the zero-filled array.
+    const attribute = markerRef.current?.attributes.position
+    if (attribute) {
+      const array = attribute.array as Float32Array
+      planetIds.forEach((id, i) => {
+        planetPosition(id, t, scratch)
+        array[(i + 1) * 3] = scratch.x
+        array[(i + 1) * 3 + 1] = scratch.y
+        array[(i + 1) * 3 + 2] = scratch.z
+      })
+      cometPosition(t, scratch)
+      array[12] = scratch.x
+      array[13] = scratch.y
+      array[14] = scratch.z
+      erebusPosition(t, scratch)
+      array[15] = scratch.x
+      array[16] = scratch.y
+      array[17] = scratch.z
+      trojanPosition(t, scratch)
+      array[18] = scratch.x
+      array[19] = scratch.y
+      array[20] = scratch.z
+      trojanTrailingPosition(t, scratch)
+      array[21] = scratch.x
+      array[22] = scratch.y
+      array[23] = scratch.z
+      attribute.needsUpdate = true
+    }
   })
 
   return (
@@ -133,6 +201,23 @@ export function SystemOverview({ onSelect, timeRef, locale }: SystemOverviewProp
           depthWrite={false}
         />
       </lineLoop>
+      {/* Fixed-size marker dots: the honest bodies are sub-pixel out here.
+        * The first marker is Solis itself, parked at the origin. */}
+      <points frustumCulled={false} raycast={() => null}>
+        <bufferGeometry ref={markerRef}>
+          <bufferAttribute attach="attributes-position" args={[new Float32Array(MARKER_COUNT * 3), 3]} />
+          <bufferAttribute attach="attributes-color" args={[markerColors, 3]} />
+        </bufferGeometry>
+        <pointsMaterial
+          size={7}
+          sizeAttenuation={false}
+          vertexColors
+          map={markerDot}
+          transparent
+          opacity={0.95}
+          depthWrite={false}
+        />
+      </points>
       {planetIds.map((id, index) => (
         <group
           key={id}

@@ -3,7 +3,7 @@ import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { useCursor } from '@react-three/drei'
 import { Bloom, EffectComposer, EffectComposerContext, ToneMapping, Vignette } from '@react-three/postprocessing'
 import { ToneMappingMode } from 'postprocessing'
-import { Vector3, type Group } from 'three'
+import { MathUtils, Vector3, type Group, type Scene } from 'three'
 import { Backdrop } from './Backdrop'
 import { Belt } from './Belt'
 import { CameraRig } from './CameraRig'
@@ -35,6 +35,16 @@ import type { Locale } from '../strings'
 
 function SceneReady({ onReady }: { onReady: () => void }) {
   const frames = useRef(0)
+  const scene = useThree((state) => state.scene)
+  const camera = useThree((state) => state.camera)
+  const renderer = useThree((state) => state.gl)
+  useEffect(() => {
+    // A debug handle: console tools and probes can walk the live scene.
+    (window as unknown as { __aetherScene?: Scene; __aetherCamera?: unknown }).__aetherScene = scene;
+    (window as unknown as { __aetherCamera?: unknown }).__aetherCamera = camera;
+    (window as unknown as { __aetherRenderer?: unknown }).__aetherRenderer = renderer
+    return () => { (window as unknown as { __aetherScene?: Scene }).__aetherScene = undefined }
+  }, [scene, camera])
 
   useFrame(() => {
     frames.current += 1
@@ -129,6 +139,27 @@ function soonestMoment(moments: (EventAnnouncement | null)[]): EventAnnouncement
   }, null)
 }
 
+/** The pilot's time dilation: the sky's fast moments — a transit, an
+ * eclipse — last hours of honest time, under a second at the day-per-second
+ * pace, so the playback eases to a twentieth of speed through their windows
+ * and eases back out. Presentation only: the clock's ratios stay honest,
+ * this is the projector's slow motion, not the sky's. */
+const DILATION_SCALE = 0.02
+const DILATION_RAMP = 0.5
+type DilationWindow = { entry: number; exit: number }
+
+function dilationFactor(now: number, win: DilationWindow | null): number {
+  if (!win) return 1
+  const { entry, exit } = win
+  const a = entry - DILATION_RAMP
+  const d = exit + DILATION_RAMP
+  if (now < a || now > d) return 1
+  const rampIn = MathUtils.smoothstep(now, a, entry)
+  const rampOut = 1 - MathUtils.smoothstep(now, exit, d)
+  const depth = Math.min(rampIn, rampOut)
+  return 1 - (1 - DILATION_SCALE) * depth
+}
+
 /** One own event per view, each on the view where the sky actually shows
  * it: the transit shadow and the cyclone belong to Aurelia's orbit, the
  * eclipse darkens Nox, the periapsis flares on the comet, the conjunctions
@@ -212,6 +243,11 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
   const eventTimer = useRef(0)
   const lastEventView = useRef(initialView)
   const eventRef = useRef<EventAnnouncement | null>(null)
+  // The dilation window caches the view's next shadow moment: scanned once,
+  // checked every frame, rescanned only after it passes, the view changes or
+  // a seek moves the clock.
+  const dilation = useRef<{ view: SceneView; entry: number; exit: number } | null>(null)
+  const dilationScanAt = useRef(-1)
   // The ephemerides panel reads the schedule while it is open: the interface
   // turns it on and off, the scene casts it on its own clock.
   const ephemerisWanted = useRef(false)
@@ -247,6 +283,8 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
       const time = (event as CustomEvent<{ time?: number }>).detail?.time
       if (Number.isFinite(time)) {
         orbitTime.current = time as number
+        // The dilation's cached window belongs to the old moment: recast.
+        dilation.current = null
         // The panel's countdowns measure from the clock it knows: a jump
         // recasts the schedule at once.
         if (ephemerisWanted.current) emitEphemeris()
@@ -276,9 +314,29 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
     }
   }, [emitEphemeris])
 
-  useFrame((_, rawDelta) => {
+  useFrame((state, rawDelta) => {
     const delta = Math.min(rawDelta, 0.1)
-    if (!reducedMotion) orbitTime.current += delta * timeScale
+    // The dilation reads the cached window and eases the clock through the
+    // moment; the window itself is rescanned only when it is gone past.
+    const factor = dilationFactor(orbitTime.current, dilation.current)
+    if (!reducedMotion) orbitTime.current += delta * timeScale * factor
+    if (!dilation.current || dilation.current.view !== activeView
+      || orbitTime.current > dilation.current.exit + DILATION_RAMP) {
+      const wall = state.clock.elapsedTime
+      if (wall - dilationScanAt.current > 0.3) {
+        dilationScanAt.current = wall
+        const now = orbitTime.current
+        if (activeView === 'aurelia') {
+          const ev = nextTransit(now)
+          dilation.current = ev ? { view: activeView, entry: ev.entry, exit: ev.exit } : null
+        } else if (activeView === 'moon') {
+          const ev = nextEclipse(now)
+          dilation.current = ev ? { view: activeView, entry: ev.entry, exit: ev.exit } : null
+        } else {
+          dilation.current = null
+        }
+      }
+    }
     for (const id of planetIds) {
       groupRefs.current[id]?.position.copy(planetPosition(id, orbitTime.current, scratch))
     }
@@ -340,8 +398,6 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
   return (
     <>
       <color attach="background" args={['#010205']} />
-      <Backdrop />
-      <Starfield reducedMotion={reducedMotion} timeRef={orbitTime} />
       {/* Meteors are motion — the reduced-motion promise means none at all. */}
       {!reducedMotion && <Meteors timeRef={orbitTime} />}
       <Belt timeRef={orbitTime} />
@@ -352,7 +408,7 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
         <Star timeRef={orbitTime} />
       </group>
       <group ref={(node) => { groupRefs.current.aurelia = node }} position={initialPositions[0]} {...planetEvents('aurelia')}>
-        <Planet reducedMotion={reducedMotion} showMoonLabel={overview} locale={locale} timeRef={orbitTime} moonWorldRef={moonWorld} />
+        <Planet reducedMotion={reducedMotion} showMoonLabel={false} locale={locale} timeRef={orbitTime} moonWorldRef={moonWorld} />
       </group>
       <group ref={(node) => { groupRefs.current.cinder = node }} position={initialPositions[1]} {...planetEvents('cinder')}>
         <Cinder reducedMotion={reducedMotion} timeRef={orbitTime} />
@@ -373,6 +429,10 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
         timeRef={orbitTime}
         moonWorldRef={moonWorld}
       />
+      {/* The sky rides the camera: mounted after the rig, so its per-frame
+        * follow reads the frame's final camera pose with no one-frame lag. */}
+      <Backdrop />
+      <Starfield reducedMotion={reducedMotion} timeRef={orbitTime} />
       {/* Names in the void: only while the pilot is detached and flying. */}
       {freeFlight && (
         <FlightMarkers

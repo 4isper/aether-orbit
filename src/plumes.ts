@@ -9,8 +9,9 @@ import { Vector3 } from 'three'
 import { cycleEnvelope, seededCycle } from './cycles.ts'
 import { createRandom } from './random.ts'
 
-/** The shepherd's surface radius, mirroring the mesh in Vesper.tsx. */
-export const SHEPHERD_RADIUS = 0.12
+/** The shepherd's surface radius, mirroring the mesh in Vesper.tsx: a
+ * ~320 km ice moon, honest for a ring shepherd. */
+export const SHEPHERD_RADIUS = 0.05
 
 /** How many cryo-vents the little moon carries. */
 export const PLUME_VENTS = 3

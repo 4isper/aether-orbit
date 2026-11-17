@@ -1,24 +1,31 @@
 import { useLayoutEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Euler, Matrix4, Quaternion, ShaderMaterial, Vector3, type InstancedMesh } from 'three'
-import { keplerSpeedAroundVesper } from '../orbits'
+import { AURELIA_SEMI_MAJOR, keplerSpeedAroundVesper } from '../orbits'
 import { ringRockLayout } from '../ring-rocks'
 
-const vertexShader = /* glsl */ `
+const vertexShader = /* glsl */`#include <common>
+#include <logdepthbuf_pars_vertex>
+
 varying vec3 vWorldPosition;
 
 void main() {
   vec4 worldPosition = modelMatrix * instanceMatrix * vec4(position, 1.0);
   vWorldPosition = worldPosition.xyz;
   gl_Position = projectionMatrix * viewMatrix * worldPosition;
+#include <logdepthbuf_vertex>
 }
 `
 
-const fragmentShader = /* glsl */ `
+const fragmentShader = /* glsl */`#include <common>
+#include <logdepthbuf_pars_fragment>
+
 uniform vec3 uCenter;
+uniform float uUnity;
 varying vec3 vWorldPosition;
 
 void main() {
+#include <logdepthbuf_fragment>
   // The derivative-based face normal degenerates on silhouette quads; the
   // radial fallback keeps a single NaN pixel out of the bloom chain, where
   // the blur would otherwise spread it over the whole frame.
@@ -29,8 +36,8 @@ void main() {
   vec3 L = normalize(-vWorldPosition);
   float ndl = max(dot(N, L), 0.0);
 
-  // Starlight falloff, unity at Aurelia's 9 u orbit, exponent 1.5 (see orbits.ts).
-  float flux = pow(9.0 / max(length(uCenter), 0.0001), 2.0);
+  // Starlight falloff, unity at Aurelia's orbit, exponent 1.5 (see orbits.ts).
+  float flux = pow(uUnity / max(length(uCenter), 0.0001), 2.0);
   vec3 albedo = vec3(0.62, 0.64, 0.68);
 
   vec3 color = albedo * (0.012 + ndl * flux);
@@ -43,10 +50,11 @@ void main() {
 const ROCK_COUNT = 420
 const ROCK_SEED = 2026
 /** Level of detail: the layer lives for close flights only. Zero size past
- * FADE_FAR, full size inside FADE_NEAR — the rocks grow in as the pilot
- * descends on the plane, with no transparency to sort against the rings. */
-const FADE_FAR = 7
-const FADE_NEAR = 5
+ * FADE_FAR, full size inside FADE_NEAR — the blocks grow in as the pilot
+ * descends toward the ring plane (the ring's inner edge sits at ~3 planet
+ * radii), with no transparency to sort against the rings. */
+const FADE_FAR = 4.2
+const FADE_NEAR = 3.0
 
 /**
  * The ring's coarse cargo: instanced ice blocks in Vesper's ring plane, the
@@ -74,7 +82,7 @@ export function RingRocks({ timeRef, worldPosition }: { timeRef: { current: numb
     () => new ShaderMaterial({
       vertexShader,
       fragmentShader,
-      uniforms: { uCenter: { value: new Vector3() } },
+      uniforms: { uCenter: { value: new Vector3() }, uUnity: { value: AURELIA_SEMI_MAJOR } },
     }),
     [],
   )

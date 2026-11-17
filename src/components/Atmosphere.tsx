@@ -1,7 +1,9 @@
 import { useMemo } from 'react'
 import { AdditiveBlending, FrontSide, Vector3 } from 'three'
 
-const atmosphereVertexShader = /* glsl */ `
+const atmosphereVertexShader = /* glsl */`#include <common>
+#include <logdepthbuf_pars_vertex>
+
 varying vec3 vWorldPosition;
 varying vec3 vPlanetCenter;
 varying float vAtmosphereRadius;
@@ -12,10 +14,13 @@ void main() {
   vPlanetCenter = (modelMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
   vAtmosphereRadius = 2.0 * length(modelMatrix[0].xyz);
   gl_Position = projectionMatrix * viewMatrix * worldPosition;
+#include <logdepthbuf_vertex>
 }
 `
 
-const atmosphereFragment = /* glsl */ `
+const atmosphereFragment = /* glsl */`#include <common>
+#include <logdepthbuf_pars_fragment>
+
 uniform vec3 uSunDirection;
 uniform vec3 uRayleighCoefficients;
 uniform float uMieCoefficient;
@@ -26,7 +31,7 @@ varying float vAtmosphereRadius;
 
 const int VIEW_STEPS = 5;
 const int LIGHT_STEPS = 2;
-const float PI = 3.14159265359;
+// PI comes from three's <common> chunk, included above.
 
 vec2 raySphere(vec3 origin, vec3 direction, vec3 center, float radius) {
   vec3 offset = origin - center;
@@ -55,6 +60,7 @@ float miePhase(float cosTheta) {
 }
 
 void main() {
+#include <logdepthbuf_fragment>
   vec3 rayOrigin = cameraPosition;
   vec3 rayDirection = normalize(vWorldPosition - rayOrigin);
   vec3 lightDirection = normalize(uSunDirection);

@@ -3,7 +3,9 @@ import { useFrame } from '@react-three/fiber'
 import { AdditiveBlending, Vector3, type BufferAttribute, type ShaderMaterial } from 'three'
 import { SHOWER_SLOTS, meteorAlpha, meteorPhase, meteorPoint, showerIntensity, showerMeteor } from '../meteors'
 
-const meteorVertex = /* glsl */ `
+const meteorVertex = /* glsl */`#include <common>
+#include <logdepthbuf_pars_vertex>
+
 attribute float aSize;
 attribute float aAlpha;
 uniform float uPixelRatio;
@@ -13,14 +15,18 @@ void main() {
   vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
   gl_PointSize = min(6.0, aSize * uPixelRatio * (85.0 / -mvPosition.z));
   gl_Position = projectionMatrix * mvPosition;
+#include <logdepthbuf_vertex>
   vAlpha = aAlpha;
 }
 `
 
-const meteorFragment = /* glsl */ `
+const meteorFragment = /* glsl */`#include <common>
+#include <logdepthbuf_pars_fragment>
+
 varying float vAlpha;
 
 void main() {
+#include <logdepthbuf_fragment>
   vec2 uv = gl_PointCoord - 0.5;
   float core = smoothstep(0.5, 0.0, length(uv));
   float alpha = core * core * vAlpha;

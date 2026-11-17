@@ -34,6 +34,7 @@ export function BodyPanel({
   copied: boolean
 }) {
   const isStar = activeView === 'star'
+  const radiusUnit = body.radiusUnit ?? (isStar ? 'R☉' : 'R⊕')
   return (
     <>
       <section className="intro reveal" aria-labelledby="scene-title" aria-hidden={travelling}>
@@ -51,7 +52,7 @@ export function BodyPanel({
       <aside className="telemetry reveal" aria-label={t(locale, 'bodyTelemetry')} aria-hidden={travelling}>
         <div className="telemetry-item">
           <span className="telemetry-label">{t(locale, 'radius')}</span>
-          <strong>{body.radius} <small>{isStar ? 'R☉' : 'R⊕'}</small></strong>
+          <strong>{body.radius} <small>{radiusUnit}</small></strong>
         </div>
         <span className="telemetry-divider" />
         <div className="telemetry-item">

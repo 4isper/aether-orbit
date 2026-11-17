@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { ringRockLayout } from './ring-rocks.ts'
+import { RING_INNER, RING_OUTER, RING_THICKNESS, ringRockLayout } from './ring-rocks.ts'
+import { VESPER_GAP_CORE, VESPER_RING_INNER, VESPER_RING_OUTER } from './orbits.ts'
 
 test('every rock sits inside the ring annulus, on a thin plane', () => {
   const layout = ringRockLayout(400, 2026)
@@ -10,16 +11,17 @@ test('every rock sits inside the ring annulus, on a thin plane', () => {
     const y = layout.positions[i * 3 + 1]
     const z = layout.positions[i * 3 + 2]
     const radius = Math.hypot(x, z)
-    assert.ok(radius >= 2.5 && radius <= 4.0, `rock ${i} radius ${radius} leaves the annulus`)
-    assert.ok(Math.abs(y) <= 0.035, `rock ${i} drifts ${y} off the ring plane`)
+    assert.ok(radius >= RING_INNER && radius <= RING_OUTER, `rock ${i} radius ${radius} leaves the annulus`)
+    assert.ok(Math.abs(y) <= RING_THICKNESS, `rock ${i} drifts ${y} off the ring plane`)
   }
 })
 
 test('the Cassini gap core stays swept, like the shepherd keeps it', () => {
-  // The gap core is t in [0.64, 0.70] of the ring density in Vesper.tsx:
-  // t = (r - 2.5) / 1.5. Rocks may thin toward the gap, never crowd it.
-  const coreInner = 2.5 + 0.64 * 1.5
-  const coreOuter = 2.5 + 0.7 * 1.5
+  // The gap core is t in [0.64, 0.70] of the honest ring span shared with
+  // Vesper.tsx. Rocks may thin toward the gap, never crowd it.
+  const span = VESPER_RING_OUTER - VESPER_RING_INNER
+  const coreInner = VESPER_RING_INNER + 0.64 * span
+  const coreOuter = VESPER_RING_INNER + VESPER_GAP_CORE * span
   const layout = ringRockLayout(400, 2026)
   for (let i = 0; i < layout.count; i++) {
     const radius = Math.hypot(layout.positions[i * 3], layout.positions[i * 3 + 2])

@@ -1,23 +1,30 @@
 import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { ShaderMaterial, Vector3, type Mesh } from 'three'
-import { trojanPosition, trojanTrailingPosition } from '../orbits'
+import { AURELIA_SEMI_MAJOR, trojanPosition, trojanTrailingPosition } from '../orbits'
 
-const vertexShader = /* glsl */ `
+const vertexShader = /* glsl */`#include <common>
+#include <logdepthbuf_pars_vertex>
+
 varying vec3 vWorldPosition;
 
 void main() {
   vec4 worldPosition = modelMatrix * vec4(position, 1.0);
   vWorldPosition = worldPosition.xyz;
   gl_Position = projectionMatrix * viewMatrix * worldPosition;
+#include <logdepthbuf_vertex>
 }
 `
 
-const fragmentShader = /* glsl */ `
+const fragmentShader = /* glsl */`#include <common>
+#include <logdepthbuf_pars_fragment>
+
 uniform vec3 uCenter;
+uniform float uUnity;
 varying vec3 vWorldPosition;
 
 void main() {
+#include <logdepthbuf_fragment>
   // The derivative-based face normal degenerates on silhouette quads; the
   // radial fallback keeps a single NaN pixel out of the bloom chain, where
   // the blur would otherwise spread it over the whole frame.
@@ -28,8 +35,8 @@ void main() {
   vec3 L = normalize(-vWorldPosition);
   float ndl = max(dot(N, L), 0.0);
 
-  // Starlight falloff, unity at Aurelia's 9 u orbit, exponent 1.5 (see orbits.ts).
-  float flux = pow(9.0 / max(length(uCenter), 0.0001), 2.0);
+  // Starlight falloff, unity at Aurelia's orbit, exponent 1.5 (see orbits.ts).
+  float flux = pow(uUnity / max(length(uCenter), 0.0001), 2.0);
   vec3 albedo = vec3(0.36, 0.33, 0.29);
 
   vec3 color = albedo * (0.012 + ndl * flux);
@@ -50,7 +57,7 @@ export function Trojan({ timeRef, trail = false }: { timeRef: { current: number 
     () => new ShaderMaterial({
       vertexShader,
       fragmentShader,
-      uniforms: { uCenter: { value: new Vector3() } },
+      uniforms: { uCenter: { value: new Vector3() }, uUnity: { value: AURELIA_SEMI_MAJOR } },
     }),
     [],
   )
@@ -71,7 +78,8 @@ export function Trojan({ timeRef, trail = false }: { timeRef: { current: number 
 
   return (
     <mesh ref={ref} raycast={() => null}>
-      <icosahedronGeometry args={[0.16, 1]} />
+      {/* Honest size: a mid-sized trojan boulder, ~130 km across. */}
+      <icosahedronGeometry args={[0.01, 1]} />
       <primitive object={material} attach="material" />
     </mesh>
   )
