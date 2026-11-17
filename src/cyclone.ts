@@ -11,7 +11,8 @@ import { cycleEnvelope, seededCycle } from './cycles.ts'
 import { createRandom } from './random.ts'
 
 /** Lifecycle shares one period: the vortex spins up while the eye closes,
- * holds at full spiral, decays, then a long calm season. */
+ * holds at full spiral, decays, then a calm season. The honest clock: a
+ * storm system every 6–18 days, the life of a real cyclone. */
 const RISE_END = 0.16
 const HOLD_END = 0.28
 const ACTIVE_END = 0.44
@@ -29,7 +30,7 @@ export function cycloneEnvelope(phase: number) {
 }
 
 /** The cyclone's own clock: seeded once, fixed forever. */
-const cycle = seededCycle(8841, 180, 260)
+const cycle = seededCycle(8841, 6, 18)
 
 /** The storm's period, in time units — exported so tests can walk cycles. */
 export const CYCLONE_PERIOD = cycle.period

@@ -9,16 +9,22 @@
  * rise-hold-decay envelope — announced ahead through the shared window scan.
  */
 import { Vector3 } from 'three'
+import { AURELIA_SEMI_MAJOR, STAR_GM } from './orbits.ts'
 import { cometPosition } from './comet.ts'
 import { createRandom } from './random.ts'
 import { cycleEnvelope, seededCycle } from './cycles.ts'
 import { nextWindow } from './eclipse.ts'
 
-/** Shell the streaks live in: inside the starfield band (30..92), away from bodies. */
-export const METEOR_ORBIT_RADIUS: [number, number] = [38, 66]
-/** Scene units per meteor-time second. */
-export const METEOR_SPEED: [number, number] = [26, 48]
-/** Flight seconds and the dark pause between flights, drawn per slot. */
+/** Shell the streaks live in: the meteoroid band between Aurelia's orbit
+ * and the belt's far edge (0.9–2.2 AU) — where real meteoroid streams fly. */
+export const METEOR_ORBIT_RADIUS: [number, number] = [0.9 * AURELIA_SEMI_MAJOR, 2.2 * AURELIA_SEMI_MAJOR]
+/** Circular speed at the band's edges, honest vis-viva: √(GM/r) falls from
+ * 426 to 272 Earth-radii per day across the shell. */
+export const METEOR_SPEED: [number, number] = [
+  Math.sqrt(STAR_GM / METEOR_ORBIT_RADIUS[1]),
+  Math.sqrt(STAR_GM / METEOR_ORBIT_RADIUS[0]),
+]
+/** Flight days and the dark pause between flights, drawn per slot. */
 export const METEOR_LIFE: [number, number] = [0.9, 1.8]
 export const METEOR_IDLE: [number, number] = [2.5, 12]
 
@@ -128,8 +134,9 @@ const SHOWER_RISE_END = 0.05
 const SHOWER_HOLD_END = 0.1
 const SHOWER_ACTIVE_END = 0.16
 
-/** The rain's own clock: seeded once, fixed forever. */
-const showerCycle = seededCycle(7741, 320, 460)
+/** The rain's own clock: seeded once, fixed forever — an annual season of
+ * ~330–400 days, as a yearly crossing of the comet's trail would keep. */
+const showerCycle = seededCycle(7741, 330, 400)
 
 /** An announced shower is one the eye actually sees: below this the veil is
  * too thin to tell apart from the ambient blink. */
@@ -162,8 +169,8 @@ function showerSlotTiming(slotSeed: number) {
 
 const scratchRadiant = new Vector3()
 /** How far behind the comet its wake hangs: the trail the rain radiates
- * from, in time units before the shower's own start. */
-const RADIANT_TRAIL_LAG = 12
+ * from, half a day of flight back along the orbit. */
+const RADIANT_TRAIL_LAG = 0.5
 
 /**
  * The sky point every streak of one shower flies away from: the direction
@@ -231,5 +238,6 @@ export function nextShower(now: number) {
     measure: (time) => 1 - showerIntensity(time),
     threshold: 1 - SHOWER_THRESHOLD,
     horizon: SHOWER_PERIOD * 1.25,
+    step: 2,
   })
 }

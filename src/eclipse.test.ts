@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { Group, Mesh, Vector3 } from 'three'
-import { moonPhaseAngle, planetPosition, aureliaClock, aureliaFrame } from './orbits.ts'
+import { Group, Mesh, Quaternion, Vector3 } from 'three'
+import { moonOrbitLocalQuaternion, moonPhaseAngle, planetPosition, aureliaClock, aureliaFrame } from './orbits.ts'
 import {
   shadowDistance,
   nextTransit,
@@ -15,16 +15,17 @@ import {
 } from './eclipse.ts'
 
 /**
- * The scene graph rebuilt from raw literals: this pins the pure math in
- * eclipse.ts to the real geometry of Planet.tsx. If the frame constants
- * change, this test fails until the change is conscious.
+ * The scene graph rebuilt from the frame constants: this pins the pure math
+ * in eclipse.ts to the real geometry of Planet.tsx — the moon-orbit group
+ * rides the same precessing quaternion the scene applies per frame. If the
+ * frame constants change, this test fails until the change is conscious.
  */
 function sceneMoonWorld(time: number, target: Vector3) {
   const outer = new Group()
-  outer.rotation.set(0.08, 0, -0.09)
+  outer.rotation.set(...aureliaFrame.worldRotation)
   outer.position.copy(planetPosition('aurelia', time, new Vector3()))
   const inner = new Group()
-  inner.rotation.set(0.24, 0, 0.09)
+  inner.quaternion.copy(moonOrbitLocalQuaternion(time, new Quaternion()))
   const moon = new Mesh()
   const angle = moonPhaseAngle(time)
   moon.position.set(
@@ -56,7 +57,7 @@ test('shadow margin is finite or the no-shadow sentinel', () => {
     // The margin is signed: negative is a surface point inside the cone.
     // The deep end bottoms out at the planet radius plus the cone, both in
     // moon radii, so anything below this bound is a bug, not a shadow.
-    const floor = -(aureliaFrame.planetRadius / 0.34 + 4)
+    const floor = -(aureliaFrame.planetRadius / aureliaFrame.moonRadius + 4)
     assert.ok(Number.isNaN(distance) === false && (distance === Number.POSITIVE_INFINITY || distance > floor), `out of range at t=${t}: ${distance}`)
   }
 })
@@ -92,10 +93,9 @@ test('nextTransit returns a bounded window with a peak inside it', () => {
   const event = nextTransit(0)
   assert.ok(event, 'expected a transit ahead of t=0')
   assert.ok(event.entry < event.peak && event.peak < event.exit, 'window is not ordered')
-  // The honest cone widened the crossing: Solis's disc is enormous from the
-  // surface, so the silhouette clips it for a long sweep — still well under
-  // half a month, and the peak is the ring dead-center.
-  assert.ok(event.exit - event.entry < 32, `window too long: ${event.exit - event.entry}`)
+  // The honest crossing: the 0.32° moon sweeps its ring across the 0.53°
+  // sun in a few hours of real time, and the peak is the ring dead-center.
+  assert.ok(event.exit - event.entry < 1, `window too long: ${event.exit - event.entry}`)
   assert.ok(shadowDistance(event.peak) < shadowDistance(event.entry), 'peak is not the deepest point')
 })
 

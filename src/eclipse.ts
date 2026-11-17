@@ -3,18 +3,19 @@
  * simulation time. The composition matches the scene graph in Planet.tsx:
  * the moon rides inside two rotated groups, so its world position is the
  * planet position plus the local orbit offset through both rotations (the
- * compact scale cancels — every distance below is measured in moon radii).
+ * honest scale cancels — every distance below is measured in moon radii).
  * The scan mirrors what the surface shader actually renders: shadow falls
  * where the sun-moon axis passes within the penumbra of the surface.
  */
-import { Euler, Quaternion, Vector3 } from 'three'
+import { Quaternion, Vector3 } from 'three'
 import { FLIGHT_BODY_RADII } from './camera-math.ts'
 import { smoothstep } from './cycles.ts'
-import { aureliaClock, aureliaFrame, moonPhaseAngle, planetPeriod, planetPosition } from './orbits.ts'
+import { aureliaClock, aureliaFrame, moonOrbitWorldQuaternion, moonPhaseAngle, planetPosition } from './orbits.ts'
 
-const qWorld = new Quaternion().setFromEuler(new Euler(...aureliaFrame.worldRotation))
-const qMoon = new Quaternion().setFromEuler(new Euler(...aureliaFrame.moonOrbitRotation))
-const qFrame = new Quaternion().multiplyQuaternions(qWorld, qMoon)
+// The moon's orbit plane regresses (the honest nodal precession), so the
+// frame is a function of time, rebuilt per call — the same quaternion the
+// scene graph applies through moonOrbitLocalQuaternion.
+const qFrame = new Quaternion()
 
 const planetScratch = new Vector3()
 const moonScratch = new Vector3()
@@ -26,6 +27,7 @@ const shadowOffsetScratch = new Vector3()
 export function moonWorldPosition(time: number, target: Vector3) {
   planetPosition('aurelia', time, target)
   const angle = moonPhaseAngle(time)
+  moonOrbitWorldQuaternion(time, qFrame)
   moonOffsetScratch.set(
     Math.cos(angle) * aureliaClock.moonOrbitRadius,
     0,
@@ -38,11 +40,12 @@ export function moonWorldPosition(time: number, target: Vector3) {
  * Closest margin of Aurelia's surface to the moon's shadow cone, in moon
  * radii: negative means some surface point stands where the silhouette
  * overlaps Solis's disc. Solis sits at the world origin and the shadow
- * falls along the sun→moon line — at this compact scale the moon's
- * parallax (≈0.4 rad from the planet's vantage) bends that line far off
- * the parallel-ray shortcut, so the axis is honest geometry. Solis
- * outgrows Nox: the umbra cone closes at an apex behind the moon and the
- * annular antumbra diverges past it — a ring, never a total shadow.
+ * falls along the sun→moon line — at the honest scale the moon's parallax
+ * from the planet's vantage is tiny (moon orbit / sun distance ≈ 0.003 rad,
+ * the real geometry of lunar shadow paths), and the axis is exact anyway.
+ * Solis outgrows Nox: the umbra cone closes at an apex behind the moon and
+ * the annular antumbra diverges past it — a ring, never a total shadow,
+ * the 0.32° moon crossing the 0.53° sun.
  */
 export function shadowDistance(time: number) {
   planetPosition('aurelia', time, planetScratch)
@@ -117,19 +120,29 @@ export function moonLight(time: number) {
   return MOON_UMBRA_LIGHT + (1 - MOON_UMBRA_LIGHT) * lit
 }
 
-const SCAN_STEP = 0.5
+/**
+ * The honest transit lasts ~0.073 days (~1.75 hours: the 0.32° moon
+ * crossing the 0.53° sun at the moon's orbital pace), so the scan step
+ * stays a small fraction of a window — 0.005 days = 7.2 minutes.
+ */
+const SCAN_STEP = 0.005
 // Conjunctions repeat on the synodic clock (moon vs the planet's year), not
 // on the moon's own month, and the tilted orbit makes some of them miss the
 // disc entirely. The scan horizon covers the worst measured gap between
-// windows (87 time units) with margin, so a scan never comes up empty.
-const SYNODIC = 1 / (1 / ((Math.PI * 2) / aureliaClock.moonAngularSpeed) - 1 / planetPeriod('aurelia'))
-const SCAN_HORIZON = SYNODIC + (Math.PI * 2) / aureliaClock.moonAngularSpeed
+// windows (the synodic period plus a month) with margin, so a scan never
+// comes up empty.
+// Transits come in seasons set by the regressing node: the sun crosses the
+// node line every ~386 days, the new moon drifts through the shadow band
+// twice per that beat, so opportunities land ~193 days apart — and a
+// season can miss. A 900-day horizon holds the next one through any
+// measured run of missed seasons.
+const TRANSIT_SCAN_HORIZON = 900
 
-// Eclipses come in seasons tied to the planet's year (the moon-orbit nodes
-// are fixed in the world frame, so the anti-sun direction visits each node
-// once a year). A year plus a month covers every measured gap between
-// windows; the horizon test in eclipse.test.ts keeps this honest.
-export const ECLIPSE_SCAN_HORIZON = planetPeriod('aurelia') + (Math.PI * 2) / aureliaClock.moonAngularSpeed
+// Eclipses ride the same seasons at the other node, with a tighter catch
+// (the moon must dip into the umbra itself), so their gaps run longer; the
+// same 900 days covers every measured gap between windows, and the horizon
+// test in eclipse.test.ts keeps this honest.
+export const ECLIPSE_SCAN_HORIZON = 900
 
 export type WindowScan = {
   /** Depth of the alignment at time t; a window is where it dips below threshold. */
@@ -137,6 +150,10 @@ export type WindowScan = {
   threshold: number
   /** How far ahead to look for the next window before giving up. */
   horizon: number
+  /** Scan stride, time units — defaults to SCAN_STEP. Wider windows on
+   * longer horizons (planet conjunctions) pass a coarser stride so the
+   * scan stays cheap. */
+  step?: number
 }
 
 /** Bisect the threshold crossing between an outside and an inside sample. */
@@ -150,19 +167,20 @@ function refineEdge(scan: WindowScan, outside: number, inside: number) {
 }
 
 /**
- * Shared scan for both shadow events: walk forward at SCAN_STEP, catch the
- * first window where the depth dips below the threshold, refine its edges by
- * bisection and its peak with a fine walk. `entry` is first contact, `peak`
- * the deepest alignment, `exit` the last moment inside; the edges land well
- * below the scan step so countdowns and the in-progress flag stay honest
- * even when a window runs past the horizon.
+ * Shared scan for both shadow events: walk forward at the scan's stride,
+ * catch the first window where the depth dips below the threshold, refine
+ * its edges by bisection and its peak with a fine walk. `entry` is first
+ * contact, `peak` the deepest alignment, `exit` the last moment inside;
+ * the edges land well below the scan step so countdowns and the
+ * in-progress flag stay honest even when a window runs past the horizon.
  */
-/** Walk forward at SCAN_STEP, catch the first window where the depth dips
- * below the threshold, refine its edges by bisection and its peak with a
- * fine walk. `entry` is first contact, `peak` the deepest alignment, `exit`
- * the last moment inside. Shared by every event in the sky: shadow geometry
- * here, conjunctions in conjunction.ts. */
+/** Walk forward at the scan's stride, catch the first window where the
+ * depth dips below the threshold, refine its edges by bisection and its
+ * peak with a fine walk. `entry` is first contact, `peak` the deepest
+ * alignment, `exit` the last moment inside. Shared by every event in the
+ * sky: shadow geometry here, conjunctions in conjunction.ts. */
 export function nextWindow(now: number, scan: WindowScan): TransitEvent | null {
+  const step = scan.step ?? SCAN_STEP
   let entry = -1
   let coarsePeak = -1
   let depth = Number.POSITIVE_INFINITY
@@ -197,7 +215,7 @@ export function nextWindow(now: number, scan: WindowScan): TransitEvent | null {
         break
       }
       inside = back
-      back -= SCAN_STEP
+      back -= step
     }
   }
 
@@ -217,14 +235,14 @@ export function nextWindow(now: number, scan: WindowScan): TransitEvent | null {
       break
     }
     // A window may outlive the horizon; keep scanning until it closes.
-    if (entry >= 0 && t + SCAN_STEP > horizon) horizon = t + SCAN_STEP
+    if (entry >= 0 && t + step > horizon) horizon = t + step
     previous = t
-    t += SCAN_STEP
+    t += step
   }
   if (entry < 0) return null
   // The coarse peak is within half a step of the true one; a fine walk nails it.
   let peak = coarsePeak
-  for (let fine = coarsePeak - SCAN_STEP; fine <= coarsePeak + SCAN_STEP; fine += 0.02) {
+  for (let fine = coarsePeak - step; fine <= coarsePeak + step; fine += step / 4) {
     if (scan.measure(fine) < scan.measure(peak)) peak = fine
   }
   return { entry, peak, exit, inProgress: now >= entry && now <= exit }
@@ -237,7 +255,8 @@ export function nextTransit(now: number): TransitEvent | null {
   return nextWindow(now, {
     measure: shadowDistance,
     threshold: TRANSIT_THRESHOLD_MOON_RADII,
-    horizon: SCAN_HORIZON,
+    horizon: TRANSIT_SCAN_HORIZON,
+    step: 0.02,
   })
 }
 
@@ -251,5 +270,6 @@ export function nextEclipse(now: number): TransitEvent | null {
     measure: moonLight,
     threshold: ECLIPSE_THRESHOLD_BRIGHTNESS,
     horizon: ECLIPSE_SCAN_HORIZON,
+    step: 0.02,
   })
 }

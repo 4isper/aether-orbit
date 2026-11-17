@@ -24,11 +24,13 @@ test('the orbit repeats after one period', () => {
 })
 
 test('the Kepler solver stays continuous across a full orbit', () => {
+  // At the honest scale the ellipse spans ~56 000 units, so continuity is
+  // judged on a fine mean-anomaly step against a proportionate bound.
   let previous = cometOrbitPoint(0, new Vector3())
-  for (let m = 0.01; m <= Math.PI * 2; m += 0.01) {
+  for (let m = 0.001; m <= Math.PI * 2; m += 0.001) {
     const current = cometOrbitPoint(m, scratch)
     const step = previous.distanceTo(current)
-    assert.ok(step < 0.5, `position jumped ${step} at mean anomaly ${m}`)
+    assert.ok(step < 200, `position jumped ${step} at mean anomaly ${m}`)
     const radius = current.length()
     assert.ok(radius >= cometOrbit.periapsis - 1e-6, `radius ${radius} below periapsis at m=${m}`)
     assert.ok(radius <= cometOrbit.apoapsis + 1e-6, `radius ${radius} above apoapsis at m=${m}`)

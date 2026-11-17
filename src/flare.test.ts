@@ -37,8 +37,10 @@ test('nextFlare finds a window the chip can announce', () => {
   assert.ok(event.entry < event.peak && event.peak < event.exit, 'window edges are ordered')
   assert.ok(flareIntensity(event.peak) >= FLARE_THRESHOLD,
     `peak intensity ${flareIntensity(event.peak)} is too faint to announce`)
-  assert.ok(flareIntensity(event.entry - 0.5) < FLARE_THRESHOLD, 'entry sits inside the calm')
-  assert.ok(flareIntensity(event.exit + 0.5) < FLARE_THRESHOLD, 'exit is inside the calm')
+  // The honest flare cycle is 0.5–2 days, so the calm check rides offsets
+  // well under the shortest rise.
+  assert.ok(flareIntensity(event.entry - 0.05) < FLARE_THRESHOLD, 'entry sits inside the calm')
+  assert.ok(flareIntensity(event.exit + 0.05) < FLARE_THRESHOLD, 'exit is inside the calm')
 })
 
 test('flares recur: the scan walks cycle after cycle without repeats', () => {

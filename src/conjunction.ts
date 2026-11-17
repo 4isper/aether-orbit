@@ -37,13 +37,16 @@ export function alignmentDepth(observer: PlanetId, target: PlanetId, time: numbe
 }
 
 /**
- * The announce threshold: the target's center inside 0.6 Solis radii of the
- * line of sight. The disc edge is 1.0, but the tilt mismatch between any two
- * orbits can leave a closest approach as high as ~0.5 — the wider cut keeps
- * every synodic meeting inside the announced window instead of dropping
- * some alignments as invisible.
+ * The announce threshold: the target's center inside 15 Solis radii of the
+ * line of sight — a conjunction the eye can read (the target slips within
+ * a few degrees of the star). The honest tilt mismatch between any two
+ * orbits spreads a meeting's closest approach from a true disc crossing
+ * (0.07 R☉, a once-per-century transit the way real Venus keeps) out to
+ * ~12.5 R☉ of pure miss, so the 15-R☉ cut keeps every synodic meeting
+ * inside an announced window while the rarest alignments still shine as
+ * the silhouettes they are.
  */
-export const CONJUNCTION_THRESHOLD_SOLIS_RADII = 0.6
+export const CONJUNCTION_THRESHOLD_SOLIS_RADII = 15
 
 /** Horizon: one synodic period of the pair (the alignment clock) with a
  * quarter as margin, so a scan never misses the next meeting. The shared
@@ -54,12 +57,16 @@ function synodicPeriod(observer: PlanetId, target: PlanetId) {
 
 /**
  * The next conjunction of `target` with Solis as seen from `observer`'s
- * orbit, at or after `now`.
+ * orbit, at or after `now`. The horizon spans a synodic period (up to
+ * ~1 700 days for the outer pairs), so the scan rides a coarser stride —
+ * a conjunction window is wide on the honest scale, and the bisection
+ * still lands its edges exactly.
  */
 export function nextConjunction(observer: PlanetId, target: PlanetId, now: number): TransitEvent | null {
   return nextWindow(now, {
     measure: (time) => alignmentDepth(observer, target, time),
     threshold: CONJUNCTION_THRESHOLD_SOLIS_RADII,
     horizon: synodicPeriod(observer, target) * 1.25,
+    step: 0.05,
   })
 }

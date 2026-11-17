@@ -4,8 +4,8 @@ import { t, type Locale } from '../../strings'
 
 const SPEED_OPTIONS = [0.5, 1, 2, 4]
 
-/** The jog wheel's reach: half a moon-month in either direction. */
-const SCRUB_REACH = 45
+/** The jog wheel's reach: half a moon-month (about 14 days) either way. */
+const SCRUB_REACH = 14
 
 function formatSpeed(speed: number) {
   return speed === 0.5 ? '½' : String(speed)

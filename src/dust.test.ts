@@ -44,9 +44,9 @@ test('the grain\'s flight agrees with numeric integration', () => {
 })
 
 test('strong radiation pressure lets the grain escape, mild keeps it bound', () => {
-  // Released near perihelion (t ≈ 452.6, r = 4.6), a grain escapes once β
-  // passes 1 − r/(2a) ≈ 0.15: radiation pressure buys it a lighter sun.
-  const { position, velocity } = cometState(452.6)
+  // Released near perihelion (t ≈ 525.9, r = 0.511 AU), a grain escapes
+  // once β passes r/(2a) ≈ 0.15: radiation pressure buys it a lighter sun.
+  const { position, velocity } = cometState(525.9)
   const escaping = dustOrbit(position, velocity, 0.4)
   assert.ok(escaping.hyperbolic, 'the grain should be on an escape path')
   assert.ok(escaping.eccentricity > 1)
@@ -56,15 +56,15 @@ test('strong radiation pressure lets the grain escape, mild keeps it bound', () 
 })
 
 test('the dust trails behind the comet along the path of motion', () => {
-  // The whole point of the ballistic tail: a grain released eight units ago
+  // The whole point of the ballistic tail: a grain released twenty days ago
   // near perihelion hangs behind the head along the orbit's wake — its true
   // anomaly never catches up with the comet's. (Near perihelion the radial
   // motion dominates, so a velocity dot-product would read ~zero.)
   const beta = 0.4
-  const now = 455
-  const { position, velocity } = cometState(now - 8)
+  const now = 545.9
+  const { position, velocity } = cometState(now - 20)
   const comet = dustOrbit(position, velocity, 0)
-  const grain = cometDustPosition(now - 8, beta, now, new Vector3())
+  const grain = cometDustPosition(now - 20, beta, now, new Vector3())
   const head = cometPosition(now, new Vector3())
   const trueAnomaly = (p: Vector3) => Math.atan2(
     new Vector3().crossVectors(comet.periapsis, p).dot(comet.planeNormal),

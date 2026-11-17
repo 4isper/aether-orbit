@@ -18,7 +18,11 @@ export type BodyInfo = {
   /** Latin name, shared by both locales. */
   name: string
   code: string
+  /** Honest surface radius, in the body's own unit (see radiusUnit). */
   radius: string
+  /** The unit the radius reads in: solar radii for the star, Earth radii
+   * for the worlds, astronomical units for the belt. */
+  radiusUnit?: string
   metricValue: string
   copy: Record<Locale, BodyCopy>
 }
@@ -101,7 +105,8 @@ export const planets: Record<PlanetId, BodyInfo> = {
 export const starInfo: BodyInfo = {
   name: 'Solis',
   code: '000',
-  radius: '8.4',
+  radius: '1.0',
+  radiusUnit: 'R☉',
   metricValue: '5 800',
   copy: {
     ru: {
@@ -152,7 +157,7 @@ export const moonInfo: BodyInfo = {
   name: 'Nox',
   code: '005',
   radius: '0.19',
-  metricValue: '79',
+  metricValue: '29',
   copy: {
     ru: {
       label: 'Нокс',
@@ -176,7 +181,8 @@ export const moonInfo: BodyInfo = {
 export const beltInfo: BodyInfo = {
   name: 'The Belt',
   code: 'BLT',
-  radius: '9.5',
+  radius: '1.9',
+  radiusUnit: 'AU',
   metricValue: '1 620',
   copy: {
     ru: {
@@ -202,14 +208,14 @@ export const erebusInfo: BodyInfo = {
   name: 'Erebus',
   code: '006',
   radius: '0.98',
-  metricValue: '520',
+  metricValue: '5.1',
   copy: {
     ru: {
       label: 'Эреб',
       title: ['Дальний', 'сторож'],
       description: ['Мир, который редко подходит близко.', 'Большую часть года — во тьме за поясом.'],
       metricLabel: 'Год',
-      metricUnit: 'сут',
+      metricUnit: 'лет',
       facts: ['Наклонная орбита за Vesper', 'У перицентра ныряет внутрь орбиты Веспера', 'Мороз на тёмном реголите'],
     },
     en: {
@@ -217,7 +223,7 @@ export const erebusInfo: BodyInfo = {
       title: ['The far', 'sentinel'],
       description: ['A world that rarely comes close.', 'Most of its year is spent dark, past the belt.'],
       metricLabel: 'Year',
-      metricUnit: 'days',
+      metricUnit: 'yr',
       facts: ['Tilted orbit beyond Vesper', 'Dips inside Vesper at periapsis', 'Frost over dark regolith'],
     },
   },

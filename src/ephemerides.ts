@@ -62,14 +62,14 @@ const STREAMS: EventStream[] = [
 ]
 
 /**
- * How far ahead the schedule reaches, in time units. The slowest sky clock
- * is the Cinder→Vesper conjunction: the two outer years (≈610 and ≈1041)
- * put their synodic meeting ≈1471 units apart, and its scan horizon adds a
+ * How far ahead the schedule reaches, in days. The slowest sky clock is the
+ * Cinder→Vesper conjunction: the two outer years (≈708 and ≈1210 days) put
+ * their synodic meeting ≈1706 days apart, and its scan horizon adds a
  * quarter for safety. The deepest reach belongs to Erebus: its honest
- * Kepler-3 year is ≈1596 units, so a second plunge window lands ≈3057 units
- * out — 3400 covers two meetings of every stream.
+ * Kepler-3 year is ≈1857 days, so a second plunge window lands ≈3714 days
+ * out — 4000 covers two meetings of every stream.
  */
-export const EPHEMERIS_HORIZON = 3400
+export const EPHEMERIS_HORIZON = 4000
 
 /** Occurrences per stream: the next two show the rhythm of the sky without
  * crowding the panel with comet laps. */
@@ -108,10 +108,10 @@ export function listEphemerides(now: number): EphemerisEntry[] {
 }
 
 /**
- * How far back the diary reaches, in time units: a couple of the sky's
- * faster laps, enough for the moment that just ended to still be listed.
+ * How far back the diary reaches, in days: a couple of the sky's faster
+ * laps, enough for the moment that just ended to still be listed.
  */
-export const EPHEMERIS_LOOKBACK = 240
+export const EPHEMERIS_LOOKBACK = 300
 
 /** How many finished moments the diary keeps. */
 export const EPHEMERIS_PAST_DEPTH = 6

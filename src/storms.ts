@@ -9,7 +9,8 @@ import { nextWindow } from './eclipse.ts'
 import { cycleEnvelope, seededCycle } from './cycles.ts'
 
 /** Lifecycle shares one period: rise while the dust lifts off the regolith,
- * hold at full veil, decay, then a long clear season. */
+ * hold at full veil, decay, then a long clear season. The honest clock:
+ * a dust season every 10–30 days, the way Mars-weather keeps. */
 const RISE_END = 0.14
 const HOLD_END = 0.22
 const ACTIVE_END = 0.32
@@ -27,7 +28,7 @@ export function stormEnvelope(phase: number) {
 }
 
 /** The desert's own clock: seeded once, fixed forever. */
-const cycle = seededCycle(4127, 160, 240)
+const cycle = seededCycle(4127, 10, 30)
 
 /** The storm's period, in time units — exported so tests can walk cycles. */
 export const STORM_PERIOD = cycle.period

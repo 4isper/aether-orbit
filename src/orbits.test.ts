@@ -1,7 +1,28 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { Vector3 } from 'three'
-import { aureliaClock, aureliaSpinPhase, beltAnchorAngle, beltAnchorPosition, beltClock, beltRings, keplerSpeedAroundVesper, moonPhaseAngle, orbitPoint, planetPeriod, planetPosition, starFlux, vesperClock } from './orbits.ts'
+import {
+  AURELIA_GM,
+  AURELIA_SEMI_MAJOR,
+  ORBIT_SCALE,
+  STAR_GM,
+  VESPER_GM,
+  VESPER_RING_INNER,
+  VESPER_RING_OUTER,
+  aureliaClock,
+  aureliaSpinPhase,
+  beltAnchorAngle,
+  beltAnchorPosition,
+  beltClock,
+  beltRings,
+  keplerSpeedAroundVesper,
+  moonPhaseAngle,
+  orbitPoint,
+  planetPeriod,
+  planetPosition,
+  starFlux,
+  vesperClock,
+} from './orbits.ts'
 import { planetIds } from './planets.ts'
 
 const scratch = new Vector3()
@@ -40,21 +61,24 @@ test('orbits are tilted but stay close to the ecliptic', () => {
 })
 
 test('mean anomaly 0 sits at the periapsis radius', () => {
-  // The elements pin Aurelia at a = 9, e = 0.021: mean anomaly 0 must land
-  // on the periapsis, π on the apoapsis, whatever the longitude says.
+  // The elements pin Aurelia at a = 1 AU, e = 0.021 (the authored shape on
+  // the honest scale): mean anomaly 0 must land on the periapsis, π on the
+  // apoapsis, whatever the longitude says.
   const peri = orbitPoint('aurelia', 0, new Vector3()).length()
   const apo = orbitPoint('aurelia', Math.PI, new Vector3()).length()
-  assert.ok(Math.abs(peri - 8.811) < 1e-6, `periapsis ${peri}`)
-  assert.ok(Math.abs(apo - 9.189) < 1e-6, `apoapsis ${apo}`)
+  assert.ok(Math.abs(peri - 8.811 * ORBIT_SCALE) < 1e-6, `periapsis ${peri}`)
+  assert.ok(Math.abs(apo - 9.189 * ORBIT_SCALE) < 1e-6, `apoapsis ${apo}`)
 })
 
 test('planet positions move continuously', () => {
+  // At the honest scale a world crosses ~4 Earth-radii per day, so the
+  // continuity check rides a 0.01-day step against a generous bound.
   for (const id of planetIds) {
     const previous = planetPosition(id, 100, new Vector3())
-    for (let t = 100.5; t < 140; t += 0.5) {
+    for (let t = 100.01; t < 100.4; t += 0.01) {
       const next = planetPosition(id, t, scratch)
       const step = previous.distanceTo(next)
-      assert.ok(step < 1, `${id} jumped ${step} units between t=${t - 0.5} and t=${t}`)
+      assert.ok(step < 15, `${id} jumped ${step} units between t=${t - 0.01} and t=${t}`)
       previous.copy(next)
     }
   }
@@ -68,12 +92,12 @@ test('the moon orbits outside the synchronous orbit', () => {
   assert.ok(month > day, `moon period ${month.toFixed(1)} is not above the ${day.toFixed(1)} day`)
 })
 
-test('the moon makes a handful of orbits per year, Earth-scale', () => {
+test('the year holds a dozen months, Earth-scale', () => {
   const year = planetPeriod('aurelia')
   const month = (Math.PI * 2) / aureliaClock.moonAngularSpeed
   const monthsPerYear = year / month
   assert.ok(
-    monthsPerYear > 2 && monthsPerYear < 7,
+    monthsPerYear > 6 && monthsPerYear < 20,
     `${monthsPerYear.toFixed(1)} months per year is outside the plausible band`,
   )
 })
@@ -100,19 +124,20 @@ test('the moon phase angle advances exactly with the shared clock', () => {
   assert.ok(Math.abs(moonPhaseAngle(-month) - moonPhaseAngle(0) + Math.PI * 2) < 1e-9)
 })
 
-test('a year of Aurelia holds several day-night cycles', () => {
+test('a year of Aurelia holds Earth-scale day-night cycles', () => {
   const year = planetPeriod('aurelia')
   const day = (Math.PI * 2) / aureliaClock.spin
   const daysPerYear = year / day
   assert.ok(
-    daysPerYear > 2 && daysPerYear < 60,
+    daysPerYear > 200 && daysPerYear < 600,
     `${daysPerYear.toFixed(1)} days per year is outside the plausible band`,
   )
 })
 
 test('planet speeds follow Kepler-3 at their semi-major axes', () => {
   // T ∝ a^1.5 at the ellipse's semi-major axis — the same law the belt,
-  // the comet and the dwarf ride, now exact for the planets too.
+  // the comet and the dwarf ride, exact for the planets too. The ratios
+  // 1 : 1.556 : 2.222 AU are the authored orbit shapes on the honest scale.
   const aureliaSpeed = (Math.PI * 2) / planetPeriod('aurelia')
   const expected = {
     cinder: aureliaSpeed * (9 / 14) ** 1.5,
@@ -129,9 +154,9 @@ test('planet speeds follow Kepler-3 at their semi-major axes', () => {
 })
 
 test('starlight falls off with the honest inverse square, unity at Aurelia', () => {
-  assert.ok(Math.abs(starFlux(new Vector3(9, 0, 0)) - 1) < 1e-9)
-  const cinder = starFlux(new Vector3(14, 0, 0))
-  const vesper = starFlux(new Vector3(20, 0, 0))
+  assert.ok(Math.abs(starFlux(new Vector3(9 * ORBIT_SCALE, 0, 0)) - 1) < 1e-9)
+  const cinder = starFlux(new Vector3(14 * ORBIT_SCALE, 0, 0))
+  const vesper = starFlux(new Vector3(20 * ORBIT_SCALE, 0, 0))
   assert.ok(Math.abs(cinder - (9 / 14) ** 2) < 1e-9, `Cinder flux ${cinder}`)
   assert.ok(Math.abs(vesper - (9 / 20) ** 2) < 1e-9, `Vesper flux ${vesper}`)
   assert.ok(cinder > vesper, 'inner worlds must receive more light')
@@ -164,23 +189,25 @@ test('the belt anchor rides the middle ring between Cinder and Vesper', () => {
   assert.ok(beltAnchorAngle(10) > beltAnchorAngle(0))
 })
 
-test('satellite clocks imply the declared compact-scale masses', () => {
-  // The satellite speeds are declared, not derived from a mass table — the
-  // scene's scale is artistic (see the fictions note in orbits.ts). Pin the
-  // GMs their clocks imply, so any retune shows up here as a deliberate
-  // change of the planets' implied masses, never as a silent drift.
-  const starGM = ((Math.PI * 2) / planetPeriod('aurelia')) ** 2 * 9 ** 3
+test('satellite clocks follow the honest masses', () => {
+  // The satellite speeds are *derived* from honest mass ratios now: Aurelia
+  // 1.3 Earth masses, Vesper 1.55 — their GMs are the star's GM scaled by
+  // the mass fraction, and the clocks reproduce them exactly.
+  const starGM = ((Math.PI * 2) / planetPeriod('aurelia')) ** 2 * AURELIA_SEMI_MAJOR ** 3
   const moonGM = aureliaClock.moonAngularSpeed ** 2 * aureliaClock.moonOrbitRadius ** 3
   const shepherdGM = vesperClock.shepherdAngularSpeed ** 2 * vesperClock.shepherdOrbitRadius ** 3
-  assert.ok(Math.abs(starGM - 0.2916) < 1e-3, `star GM ${starGM}`)
-  assert.ok(Math.abs(moonGM - 0.2986) < 1e-3, `Aurelia GM ${moonGM}`)
-  assert.ok(Math.abs(shepherdGM - 0.1811) < 1e-3, `Vesper GM ${shepherdGM}`)
-  // The trojans ride a kinematic pin: the implied mass ratio breaks the
-  // Routh limit (0.0385) that keeps real L4/L5 captives stable. Documented
-  // fiction — this assertion keeps it declared rather than forgotten.
+  assert.ok(Math.abs(starGM - STAR_GM) < 1, `star GM ${starGM} vs ${STAR_GM}`)
+  assert.ok(Math.abs(moonGM / AURELIA_GM - 1) < 1e-12, `Aurelia GM ${moonGM} vs ${AURELIA_GM}`)
+  assert.ok(Math.abs(shepherdGM / VESPER_GM - 1) < 1e-12, `Vesper GM ${shepherdGM} vs ${VESPER_GM}`)
+  // The mass ratio now sits far under the Routh limit (0.0385) that keeps
+  // real L4/L5 captives stable: the trojans are honest residents, not pins.
   const routhLimit = 0.0385
-  const aureliaRatio = moonGM / (starGM + moonGM)
-  assert.ok(aureliaRatio > routhLimit, `Aurelia ratio ${aureliaRatio} slipped under Routh — update the trojan story`)
+  const aureliaRatio = AURELIA_GM / (STAR_GM + AURELIA_GM)
+  assert.ok(aureliaRatio < routhLimit, `Aurelia ratio ${aureliaRatio} broke Routh — update the trojan story`)
+  // And the moon rides comfortably inside the Hill sphere (prograde
+  // long-term stability wants ≲ 0.5).
+  const hillFraction = aureliaClock.moonOrbitRadius / (AURELIA_SEMI_MAJOR * Math.cbrt(1.3 / 3 / 332_946))
+  assert.ok(hillFraction > 0 && hillFraction < 0.5, `moon at ${hillFraction} of the Hill radius`)
 })
 
 test('Vesper ring ice rides the shepherd\'s own Kepler law', () => {
@@ -190,11 +217,11 @@ test('Vesper ring ice rides the shepherd\'s own Kepler law', () => {
     Math.abs(keplerSpeedAroundVesper(vesperClock.shepherdOrbitRadius) - vesperClock.shepherdAngularSpeed) < 1e-12,
     'the shepherd lost the ring material it guards',
   )
-  const inner = keplerSpeedAroundVesper(2.5)
-  const outer = keplerSpeedAroundVesper(4)
+  const inner = keplerSpeedAroundVesper(VESPER_RING_INNER)
+  const outer = keplerSpeedAroundVesper(VESPER_RING_OUTER)
   assert.ok(inner > outer, 'ring ice must shear: inner rocks overtake outer ones')
   assert.ok(
-    Math.abs(keplerSpeedAroundVesper(5) * Math.pow(2, 1.5) - keplerSpeedAroundVesper(2.5)) < 1e-12,
+    Math.abs(keplerSpeedAroundVesper(VESPER_RING_INNER * 2) * Math.pow(2, 1.5) - keplerSpeedAroundVesper(VESPER_RING_INNER)) < 1e-12,
     'ring mean motion must fall as r^-1.5',
   )
 })
@@ -202,10 +229,10 @@ test('Vesper ring ice rides the shepherd\'s own Kepler law', () => {
 test('the belt rides the same Kepler-3 as the planets', () => {
   // T ∝ a^1.5 holds for the planets; the debris rings orbit the same star,
   // so one gravity constant must govern their midlines too. The
-  // calibration lives at Aurelia's semi-major axis (9), not the momentary
+  // calibration lives at Aurelia's semi-major axis, not the momentary
   // radius the ellipse happens to be at.
   const aureliaSpeed = (Math.PI * 2) / planetPeriod('aurelia')
-  const calibration = aureliaSpeed * 9 ** 1.5
+  const calibration = aureliaSpeed * AURELIA_SEMI_MAJOR ** 1.5
   for (const ring of beltRings) {
     const midline = (ring.inner + ring.outer) / 2
     const own = ring.speed * midline ** 1.5

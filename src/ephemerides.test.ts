@@ -44,7 +44,7 @@ test('the same moment reads the same schedule twice (determinism)', () => {
 
 test('every stream of the sky reaches the schedule at every moment', () => {
   // Each scanner promises its next window inside its own horizon (the slowest
-  // is the Cinder→Vesper synodic, ~1462 units); a 3400-unit schedule horizon
+  // is the Cinder→Vesper synodic, ~1706 days); a 4000-day schedule horizon
   // therefore never comes up thin on any stream, at any moment.
   for (let start = 0; start <= 3000; start += 113) {
     const seen = new Set(listEphemerides(start).map(streamName))
@@ -87,14 +87,14 @@ test('a window still covers its own peak when the clock lands on it', () => {
 
 test('the schedule stays honest at deep time, where deep links wander', () => {
   // Deep links may carry ?t= up to 1e9, and the panel reads the schedule
-  // there too. No single window outlives 150 units — the widest is the
-  // storm's active veil (0.32 of a 240-unit period) — so a window whose
+  // there too. No single window outlives 80 days — the widest is the
+  // shower's active veil (0.16 of a ~400-day period) — so a window whose
   // peak lies further back than that is a stale leftover, not a moment.
   for (const start of [1e5, 1e6, 1e8]) {
     for (const entry of listEphemerides(start)) {
       assert.ok(Number.isFinite(entry.peak),
         `window ${streamName(entry)} has a non-finite peak at t=${start}`)
-      assert.ok(entry.peak >= start - 150,
+      assert.ok(entry.peak >= start - 80,
         `stale window ${streamName(entry)} at t=${start}: peak ${entry.peak}`)
     }
   }
@@ -108,8 +108,8 @@ test('the diary reads only finished windows, most recent first', () => {
       assert.ok(entry.exit <= start, `window ${entry.kind} at t=${start} is not finished`)
       // The diary keeps what finished within the lookback. A wide window may
       // have opened long before the boundary — the dwarf's plunge alone runs
-      // ~270 units — what matters is when it ended.
-      assert.ok(entry.exit >= start - 240, `window ${entry.kind} at t=${start} reaches past the diary`)
+      // ~314 days — what matters is when it ended.
+      assert.ok(entry.exit >= start - 320, `window ${entry.kind} at t=${start} reaches past the diary`)
     }
     for (let i = 1; i < past.length; i++) {
       assert.ok(past[i - 1].exit >= past[i].exit,

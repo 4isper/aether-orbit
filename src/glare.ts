@@ -13,11 +13,13 @@ function smoothstep(x: number, min: number, max: number) {
 const CENTER_MIN = 0.955
 const CENTER_MAX = 0.998
 
-/** Distances inside which the glare reaches full strength: past the free
- * flight's closest approach (9.5) it bites, at the composed star view
- * (11.5) it is already a memory, and the overview never sees it. */
-const NEAR_DISTANCE = 8
-const FAR_DISTANCE = 12
+import { FLIGHT_BODY_RADII } from './camera-math.ts'
+
+/** Distances (from the star) inside which the glare reaches full strength:
+ * past 3.4 solar radii it bites, at the composed star view (4.9 R☉) it is
+ * already a memory, and the overview never sees it. */
+const NEAR_DISTANCE = 3.4 * FLIGHT_BODY_RADII.star
+const FAR_DISTANCE = 4.9 * FLIGHT_BODY_RADII.star
 
 /** 0..1 strength of the white-out for a camera looking with `viewDot`
  * (cosine of the angle between view direction and direction to the star)

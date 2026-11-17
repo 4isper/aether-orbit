@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { cycloneCenter, cycloneIntensity, nextCyclone, CYCLONE_THRESHOLD } from './cyclone.ts'
+import { cycloneCenter, cycloneIntensity, nextCyclone, CYCLONE_PERIOD, CYCLONE_THRESHOLD } from './cyclone.ts'
 
 test('the cyclone is a pure function of the clock', () => {
   for (const time of [0, 61.7, -240, 900]) {
@@ -50,14 +50,15 @@ test('the eye wanders deterministically and slowly', () => {
   const b = cycloneCenter(500)
   assert.deepEqual(a, b, 'the same moment reads a different centre')
   assert.ok(a.v >= 0.3 && a.v <= 0.7, `latitude ${a.v} leaves the tropics`)
-  // Drift is continuous: ten units of time move the centre a hair, never a
-  // jump — the seam wrap is the only allowed discontinuity in u.
-  for (let t = 0; t < 900; t += 10) {
+  // Drift rides the storm's own clock: over one cycle the eye crosses about
+  // a quarter of the map, and the seam wrap is the only allowed
+  // discontinuity in u.
+  for (let t = 0; t < 90; t += 1) {
     const here = cycloneCenter(t)
-    const there = cycloneCenter(t + 10)
+    const there = cycloneCenter(t + CYCLONE_PERIOD / 4)
     const du = Math.abs(there.u - here.u)
     const wrapped = Math.min(du, 1 - du)
-    assert.ok(wrapped < 0.05, `centre jumped from ${here.u} to ${there.u} over ten units`)
+    assert.ok(wrapped < 0.07, `centre jumped from ${here.u} to ${there.u} over a quarter cycle`)
     assert.ok(Math.abs(there.v - here.v) < 1e-9, 'latitude drifts')
   }
 })

@@ -11,7 +11,8 @@ import { nextWindow } from './eclipse.ts'
 import { cycleEnvelope, seededCycle } from './cycles.ts'
 
 /** Lifecycle shares one period: a flare is quick — flash up, hold, fade,
- * then a long quiet stretch before the next burst. */
+ * then a quiet stretch before the next burst. The honest clock: bursts
+ * come every half-day to two days. */
 const RISE_END = 0.08
 const HOLD_END = 0.16
 const ACTIVE_END = 0.26
@@ -27,7 +28,7 @@ export function flareEnvelope(phase: number) {
 }
 
 /** The flare's own clock: seeded once, fixed forever. */
-const cycle = seededCycle(3313, 120, 190)
+const cycle = seededCycle(3313, 0.5, 2)
 
 /** The flare's period, in time units — exported so tests can walk cycles. */
 export const FLARE_PERIOD = cycle.period

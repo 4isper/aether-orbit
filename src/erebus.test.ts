@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { Vector3 } from 'three'
-import { keplerSpeed, orbitPoint } from './orbits.ts'
+import { ORBIT_SCALE, keplerSpeed, orbitPoint } from './orbits.ts'
 import { EREBUS_PERIAPSIS_RADIUS, erebusOrbit, erebusPeriod, erebusPosition, nextErebusPeriapsis } from './erebus.ts'
 
 test('Erebus rides a deterministic ellipse, reversal included', () => {
@@ -39,7 +39,7 @@ test('periapsis dips just inside Vesper and matches the window radius', () => {
   assert.ok(minRadius < vesperSemiMajor, 'periapsis never overtakes Vesper')
   assert.ok(minRadius < vesperApo, 'the plunge never reaches the space Vesper itself visits')
   assert.ok(
-    Math.abs(minRadius - 19.2) < 0.05,
+    Math.abs(minRadius - 19.2 * ORBIT_SCALE) < 1,
     `closest approach ${minRadius} disagrees with the periapsis constant`,
   )
   assert.ok(EREBUS_PERIAPSIS_RADIUS > minRadius, 'the announced window never opens')
@@ -50,16 +50,16 @@ test('nextErebusPeriapsis finds the plunge and its edges', () => {
   assert.ok(event.entry < event.peak && event.peak < event.exit, 'window edges are ordered')
   const peak = erebusPosition(event.peak, new Vector3()).length()
   assert.ok(
-    Math.abs(peak - 19.2) < 0.05,
+    Math.abs(peak - 19.2 * ORBIT_SCALE) < 1,
     `the announced peak sits ${peak} from the star, not at periapsis`,
   )
   const edgeOut = erebusPosition(event.exit + 0.5, new Vector3()).length()
   assert.ok(edgeOut > EREBUS_PERIAPSIS_RADIUS, 'exit sits outside the window radius')
   const mid = nextErebusPeriapsis(event.peak + 1)
   assert.ok(mid.inProgress, 'the plunge in progress goes unannounced')
-  // The honest plunge window runs ±135 units around the peak; well past the
+  // The honest plunge window runs ±157 days around the peak; well past the
   // half-width the announcement must let go.
-  const far = nextErebusPeriapsis(event.peak + 140)
+  const far = nextErebusPeriapsis(event.peak + 170)
   assert.ok(!far.inProgress, 'the window refuses to close')
 })
 
