@@ -122,11 +122,51 @@ export function moonLight(time: number) {
 
 /**
  * The honest transit lasts ~0.073 days (~1.75 hours: the 0.32° moon
- * crossing the 0.53° sun at the moon's orbital pace), so the scan step
- * stays a fraction of a window — 0.004 days = 5.8 minutes, three samples
- * across the narrowest window. The bisection lands the edges exactly.
+ * crossing the 0.53° sun at the moon's orbital pace), so the fine scan
+ * rides a 0.004-day step — three samples across the narrowest window,
+ * with the bisection landing the edges exactly.
  */
 const SCAN_STEP = 0.004
+
+/**
+ * The coarse approach walk: the moon's passages through the shadow
+ * geometry, bracketed at one-day steps by the cheap cone measure alone —
+ * no textures, no brightness curve, one Kepler solve per sample. Each
+ * bracket then gets a fine brightness scan. A flat fine walk over the
+ * whole horizon would cost tens of thousands of Kepler solves per query;
+ * the two stages cost a few thousand.
+ */
+const APPROACH_STEP = 0.1
+/** The approach threshold, in moon radii: the penumbra catch of both
+ * shadow geometries (~8.5 moon radii) with a margin for the mean-angle
+ * estimate. */
+const APPROACH_THRESHOLD = 9.5
+
+function approachTransit(time: number): number {
+  planetPosition('aurelia', time, planetScratch)
+  moonWorldPosition(time, moonScratch)
+  // The moon stands between Solis and the planet: the approach axis runs
+  // from the planet back toward Solis, and the transit sits along it.
+  const axis = sunScratch.copy(planetScratch).negate().normalize()
+  const offset = shadowOffsetScratch.copy(moonScratch).sub(planetScratch)
+  const along = offset.dot(axis)
+  if (along <= 0) return Number.POSITIVE_INFINITY
+  const perp = Math.sqrt(Math.max(offset.lengthSq() - along * along, 0))
+  return perp / TRANSIT_MOON_RADIUS
+}
+
+function approachEclipse(time: number): number {
+  planetPosition('aurelia', time, planetScratch)
+  moonWorldPosition(time, moonScratch)
+  // The moon stands beyond the planet, away from Solis: the approach axis
+  // runs from the planet out into the anti-sun, and the eclipse sits on it.
+  const axis = sunScratch.copy(planetScratch).normalize()
+  const offset = shadowOffsetScratch.copy(moonScratch).sub(planetScratch)
+  const along = offset.dot(axis)
+  if (along <= 0) return Number.POSITIVE_INFINITY
+  const perp = Math.sqrt(Math.max(offset.lengthSq() - along * along, 0))
+  return perp / TRANSIT_MOON_RADIUS
+}
 // Conjunctions repeat on the synodic clock (moon vs the planet's year), not
 // on the moon's own month, and the tilted orbit makes some of them miss the
 // disc entirely. The scan horizon covers the worst measured gap between
@@ -250,15 +290,46 @@ export function nextWindow(now: number, scan: WindowScan): TransitEvent | null {
 }
 
 /**
- * The next transit at or after `now`.
+ * The two-stage shadow scan: the coarse approach walk brackets the moon's
+ * passages at one-day steps by the cheap cone measure alone, and every
+ * bracket gets a fine scan of its own measure — the brightness for the
+ * eclipses, the cone margin for the transits. Brackets the fine measure
+ * rejects (a graze above the announce cut) are skipped and the walk
+ * resumes past them. A flat fine walk over the whole horizon would cost
+ * tens of thousands of Kepler solves per query; the two stages cost a few
+ * thousand.
+ */
+function nextShadowWindow(now: number, fineMeasure: (t: number) => number, fineThreshold: number, horizon: number, approach: (t: number) => number): TransitEvent | null {
+  const deadline = now + horizon
+  let cursor = now
+  while (cursor <= deadline) {
+    const coarseWin = nextWindow(cursor, {
+      measure: approach,
+      threshold: APPROACH_THRESHOLD,
+      horizon: deadline - cursor + APPROACH_STEP * 1.5,
+      step: APPROACH_STEP,
+    })
+    if (!coarseWin) return null
+    const from = Math.max(now, coarseWin.entry - APPROACH_STEP)
+    const span = (coarseWin.exit - coarseWin.entry) + APPROACH_STEP * 2
+    const fine = nextWindow(from, {
+      measure: fineMeasure,
+      threshold: fineThreshold,
+      horizon: span,
+      step: SCAN_STEP,
+    })
+    if (fine && fine.exit > now) return fine
+    cursor = coarseWin.exit + APPROACH_STEP
+  }
+  return null
+}
+
+/**
+ * The next transit at or after `now`: the coarse approach walk brackets
+ * the moon's passages, the fine brightness scan lands each shadow.
  */
 export function nextTransit(now: number): TransitEvent | null {
-  return nextWindow(now, {
-    measure: shadowDistance,
-    threshold: TRANSIT_THRESHOLD_MOON_RADII,
-    horizon: TRANSIT_SCAN_HORIZON,
-    step: 0.04,
-  })
+  return nextShadowWindow(now, shadowDistance, TRANSIT_THRESHOLD_MOON_RADII, TRANSIT_SCAN_HORIZON, approachTransit)
 }
 
 /**
@@ -267,10 +338,5 @@ export function nextTransit(now: number): TransitEvent | null {
  * brightness in the shadow cone — the scan's peak is the darkest moment.
  */
 export function nextEclipse(now: number): TransitEvent | null {
-  return nextWindow(now, {
-    measure: moonLight,
-    threshold: ECLIPSE_THRESHOLD_BRIGHTNESS,
-    horizon: ECLIPSE_SCAN_HORIZON,
-    step: 0.04,
-  })
+  return nextShadowWindow(now, moonLight, ECLIPSE_THRESHOLD_BRIGHTNESS, ECLIPSE_SCAN_HORIZON, approachEclipse)
 }
