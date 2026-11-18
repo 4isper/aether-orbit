@@ -67,6 +67,6 @@ export function nextConjunction(observer: PlanetId, target: PlanetId, now: numbe
     measure: (time) => alignmentDepth(observer, target, time),
     threshold: CONJUNCTION_THRESHOLD_SOLIS_RADII,
     horizon: synodicPeriod(observer, target) * 1.25,
-    step: 0.05,
+    step: 0.1,
   })
 }

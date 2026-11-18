@@ -123,9 +123,10 @@ export function moonLight(time: number) {
 /**
  * The honest transit lasts ~0.073 days (~1.75 hours: the 0.32° moon
  * crossing the 0.53° sun at the moon's orbital pace), so the scan step
- * stays a small fraction of a window — 0.005 days = 7.2 minutes.
+ * stays a fraction of a window — 0.004 days = 5.8 minutes, three samples
+ * across the narrowest window. The bisection lands the edges exactly.
  */
-const SCAN_STEP = 0.005
+const SCAN_STEP = 0.004
 // Conjunctions repeat on the synodic clock (moon vs the planet's year), not
 // on the moon's own month, and the tilted orbit makes some of them miss the
 // disc entirely. The scan horizon covers the worst measured gap between
@@ -256,7 +257,7 @@ export function nextTransit(now: number): TransitEvent | null {
     measure: shadowDistance,
     threshold: TRANSIT_THRESHOLD_MOON_RADII,
     horizon: TRANSIT_SCAN_HORIZON,
-    step: 0.02,
+    step: 0.04,
   })
 }
 
@@ -270,6 +271,6 @@ export function nextEclipse(now: number): TransitEvent | null {
     measure: moonLight,
     threshold: ECLIPSE_THRESHOLD_BRIGHTNESS,
     horizon: ECLIPSE_SCAN_HORIZON,
-    step: 0.02,
+    step: 0.04,
   })
 }

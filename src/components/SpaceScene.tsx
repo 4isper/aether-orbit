@@ -166,11 +166,11 @@ const VIEW_PACE: Record<SceneView, number> = {
 const DILATION_TARGET_SECONDS = 18
 const DILATION_MIN = 0.02
 const DILATION_RAMP = 0.5
-type DilationWindow = { entry: number; exit: number }
+type DilationWindow = { view: SceneView; event: TransitEvent }
 
 function dilationFactor(now: number, win: DilationWindow | null, pace: number): number {
   if (!win) return 1
-  const { entry, exit } = win
+  const { entry, exit } = win.event
   const a = entry - DILATION_RAMP
   const d = exit + DILATION_RAMP
   if (now < a || now > d) return 1
@@ -188,20 +188,22 @@ function dilationFactor(now: number, win: DilationWindow | null, pace: number): 
  * Solis, Vesper sees Aurelia cross the disc). The worlds also own their
  * weather: the desert's dust storm and the ocean's cyclone compete with the
  * shadow moments, and the nearer one wins. */
-function viewMoment(view: SceneView, now: number): EventAnnouncement | null {
-  if (view === 'aurelia') {
-    return soonestMoment([
-      announce('transit', nextTransit(now), now),
-      announce('cyclone', nextCyclone(now), now),
-    ])
-  }
-  if (view === 'moon') return announce('eclipse', nextEclipse(now), now)
+function viewMoment(view: SceneView, now: number, cachedShadow: TransitEvent | null): EventAnnouncement | null {
   // The star owns its own outbursts: the flare is the one moment the star's
   // view announces, and its light touches every world at once.
   if (view === 'star') return announce('flare', nextFlare(now), now)
   if (view === 'comet') return announce('perihelion', nextPerihelion(now), now)
   // The dwarf's plunge past Vesper: rare, so the chip waits for it long.
   if (view === 'erebus') return announce('perihelion', nextErebusPeriapsis(now), now)
+  // The transit and the eclipse moments ride the dilation's cached window:
+  // the scan runs once per window, the chip reads it every frame.
+  if (view === 'aurelia') {
+    return soonestMoment([
+      announce('transit', cachedShadow, now),
+      announce('cyclone', nextCyclone(now), now),
+    ])
+  }
+  if (view === 'moon') return announce('eclipse', cachedShadow, now)
   if (view === 'cinder') {
     return soonestMoment([
       announce('storm', nextStorm(now), now),
@@ -214,9 +216,9 @@ function viewMoment(view: SceneView, now: number): EventAnnouncement | null {
 
 /** The chip's moment: the view's own sky plus the shower — the one sky
  * event that rains on every view — and the nearer of them wins. */
-function sceneEvent(view: SceneView, now: number): EventAnnouncement | null {
+function sceneEvent(view: SceneView, now: number, cachedShadow: TransitEvent | null): EventAnnouncement | null {
   return soonestMoment([
-    viewMoment(view, now),
+    viewMoment(view, now, cachedShadow),
     announce('shower', nextShower(now), now),
   ])
 }
@@ -267,7 +269,7 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
   // The dilation window caches the view's next shadow moment: scanned once,
   // checked every frame, rescanned only after it passes, the view changes or
   // a seek moves the clock.
-  const dilation = useRef<{ view: SceneView; entry: number; exit: number } | null>(null)
+  const dilation = useRef<DilationWindow | null>(null)
   const dilationScanAt = useRef(-1)
   // The ephemerides panel reads the schedule while it is open: the interface
   // turns it on and off, the scene casts it on its own clock.
@@ -343,17 +345,17 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
     const factor = dilationFactor(orbitTime.current, dilation.current, pace)
     if (!reducedMotion) orbitTime.current += delta * timeScale * pace * factor
     if (!dilation.current || dilation.current.view !== activeView
-      || orbitTime.current > dilation.current.exit + DILATION_RAMP) {
+      || orbitTime.current > dilation.current.event.exit + DILATION_RAMP) {
       const wall = state.clock.elapsedTime
       if (wall - dilationScanAt.current > 0.3) {
         dilationScanAt.current = wall
         const now = orbitTime.current
         if (activeView === 'aurelia') {
           const ev = nextTransit(now)
-          dilation.current = ev ? { view: activeView, entry: ev.entry, exit: ev.exit } : null
+          dilation.current = ev ? { view: activeView, event: ev } : null
         } else if (activeView === 'moon') {
           const ev = nextEclipse(now)
-          dilation.current = ev ? { view: activeView, entry: ev.entry, exit: ev.exit } : null
+          dilation.current = ev ? { view: activeView, event: ev } : null
         } else {
           dilation.current = null
         }
@@ -371,7 +373,10 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
       eventTimer.current = 0
       lastEventView.current = activeView
       if (onEvent) {
-        const next = sceneEvent(activeView, orbitTime.current)
+        // The shadow moment rides the dilation's cached window: the scan
+        // runs once per window, the chip reads it every frame.
+        const shadow = dilation.current && dilation.current.view === activeView ? dilation.current.event : null
+        const next = sceneEvent(activeView, orbitTime.current, shadow)
         const prev = eventRef.current
         const changed = (next === null) !== (prev === null)
           || (next && prev && (next.kind !== prev.kind
