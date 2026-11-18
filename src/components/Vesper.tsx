@@ -356,7 +356,7 @@ export function Vesper({ reducedMotion, timeRef }: VesperProps) {
         * between; invisible from the orbiting distances of the fixed views. */}
       <RingRocks timeRef={timeRef} worldPosition={worldPosition} />
 
-      <Atmosphere sunDirection={sunDirection} variant="ice" />
+      <Atmosphere sunDirection={sunDirection} variant="ice" planetRadius={BODY_RADII.vesper} />
     </group>
   )
 }

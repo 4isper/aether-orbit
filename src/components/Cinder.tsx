@@ -113,7 +113,7 @@ export function Cinder({ reducedMotion, timeRef }: CinderProps) {
         />
       </mesh>
 
-      <Atmosphere sunDirection={sunDirection} variant="dust" />
+      <Atmosphere sunDirection={sunDirection} variant="dust" planetRadius={BODY_RADII.cinder} />
     </group>
   )
 }

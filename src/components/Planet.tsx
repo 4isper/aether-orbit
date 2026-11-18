@@ -597,7 +597,7 @@ export function Planet({ reducedMotion, showMoonLabel, locale, timeRef, moonWorl
         </Moon>
       </group>
 
-      <Atmosphere sunDirection={sunDirection} />
+      <Atmosphere sunDirection={sunDirection} planetRadius={aureliaFrame.planetRadius} />
     </group>
   )
 }

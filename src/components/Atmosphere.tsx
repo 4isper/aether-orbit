@@ -139,10 +139,13 @@ const presets = {
 
 type AtmosphereProps = {
   sunDirection: Vector3
+  /** The honest radius of the planet the air belongs to: the shell sits at
+   * 1.05× this radius, so the glow hugs the limb it belongs to. */
+  planetRadius: number
   variant?: 'aurelia' | 'dust' | 'ice'
 }
 
-export function Atmosphere({ sunDirection, variant = 'aurelia' }: AtmosphereProps) {
+export function Atmosphere({ sunDirection, planetRadius, variant = 'aurelia' }: AtmosphereProps) {
   const atmosphereUniforms = useMemo(() => {
     const preset = presets[variant]
     return {
@@ -154,7 +157,10 @@ export function Atmosphere({ sunDirection, variant = 'aurelia' }: AtmosphereProp
   }, [sunDirection, variant])
 
   return (
-    <mesh scale={1.05} renderOrder={2}>
+    // The unit sphere is radius 2 and the shader derives the planet radius
+    // from the shell (atmosphereRadius / 1.05), so the mesh scale places the
+    // gas edge exactly at 1.05× the honest planet radius.
+    <mesh scale={planetRadius * 1.05 / 2} renderOrder={2}>
       <sphereGeometry args={[2, 128, 128]} />
       <shaderMaterial
         vertexShader={atmosphereVertexShader}
