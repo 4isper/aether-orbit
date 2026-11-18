@@ -36,8 +36,15 @@ for (const candidate of [
 ]) {
   try { browser = await chromium.launch({ headless: true, ...candidate }); break } catch {}
 }
-const [,, name, url] = process.argv
+const [,, name, url, locale] = process.argv
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } })
+// An optional third argument pins the UI locale (localStorage, RU default):
+// release checks open every view in EN to catch layout drift.
+if (locale) {
+  await page.addInitScript((value) => {
+    localStorage.setItem('aether-locale', value)
+  }, locale)
+}
 const messages = []
 page.on('console', (m) => { if (['error', 'warning'].includes(m.type())) messages.push(`${m.type()}: ${m.text().slice(0, 300)}`) })
 page.on('pageerror', (e) => messages.push(`pageerror: ${String(e).slice(0, 300)}`))

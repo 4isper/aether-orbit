@@ -46,6 +46,11 @@ vec3 perturbNormal(vec3 surfacePosition, vec3 surfaceNormal, float height) {
     dFdx(height) * R1 + dFdy(height) * R2
   );
   vec3 bent = abs(det) * surfaceNormal - gradient;
-  return length(bent) > 1e-9 ? bent / length(bent) : surfaceNormal;
+  vec3 safeBent = length(bent) > 1e-9 ? bent / length(bent) : surfaceNormal;
+  // Where the screen frame degenerates (|det| -> 0) the gradient is noise,
+  // not signal — and sign(det) starts flipping between neighbouring
+  // triangles, drawing dashed bands along the fold. The frame is trusted
+  // only where it actually spans; the geometric normal wins otherwise.
+  return mix(surfaceNormal, safeBent, smoothstep(0.0, 0.08, abs(det)));
 }
 `

@@ -116,7 +116,7 @@ npm run golden:update      # re-record the references
 | Click the star in the overview or the "Solis" button | Fly to the star |
 | The "Boreas" button or its label in the overview | Fly to the comet |
 | The "Nox" button | Fly to Aurelia's moon |
-| ×½ · ×1 · ×2 · ×4 buttons | Simulation speed |
+| ×¼ · ×½ · ×1 · ×2 buttons | Simulation speed |
 | Time scrub (beside the speeds) | A jog wheel: ±14 days around the current moment, release re-centers |
 | The reverse button (◀◀ next to pause) | Time runs backwards: orbits, phases, the comet and the star's boiling reverse |
 | The pause button | Stop and resume time |
