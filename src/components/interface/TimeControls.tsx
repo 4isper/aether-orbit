@@ -121,7 +121,7 @@ export function TimeControls({
       />
       <button
         type="button"
-        className="time-button"
+        className="time-button ambience-toggle"
         aria-pressed={sound}
         aria-label={t(locale, sound ? 'ambienceOff' : 'ambienceOn')}
         disabled={!ready}

@@ -1533,7 +1533,6 @@ h1 > em {
   .planet-nav {
     left: 34px;
   }
-
   .intro {
     left: 34px;
   }
@@ -1552,6 +1551,41 @@ h1 > em {
 
   .control-hint {
     left: 46%;
+  }
+}
+
+/* A phone in landscape shares the top band with the clock: the clock takes
+ * its row, the nav slides under it — no shared band, no clipped tail. */
+@media (max-width: 900px) and (max-height: 520px) {
+  .time-controls {
+    top: 56px;
+  }
+
+  .time-button {
+    min-width: 40px;
+    justify-content: center;
+  }
+
+  .tour-link {
+    min-width: 44px;
+    justify-content: center;
+  }
+
+  .event-go {
+    padding: 8px 12px;
+  }
+
+  .planet-nav {
+    top: 108px;
+    right: 34px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 20px, #000 calc(100% - 20px), transparent 100%);
+    mask-image: linear-gradient(90deg, transparent 0, #000 20px, #000 calc(100% - 20px), transparent 100%);
+  }
+
+  .planet-nav::-webkit-scrollbar {
+    display: none;
   }
 }
 
@@ -1576,24 +1610,48 @@ h1 > em {
     height: 28px;
   }
 
-  .scene-status > span:not(.status-dot):not(.status-code) {
+  .scene-status {
     display: none;
   }
 
-  .status-code {
-    margin-left: 4px;
-    padding-left: 12px;
+  /* The phone's top chrome stacks in three honest rows — brand, the clock,
+   * the nav — instead of two absolutely-positioned clusters sharing a band. */
+  .planet-nav {
+    top: 128px;
+    left: 24px;
+    right: 24px;
+    gap: 14px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 20px, #000 calc(100% - 20px), transparent 100%);
+    mask-image: linear-gradient(90deg, transparent 0, #000 20px, #000 calc(100% - 20px), transparent 100%);
   }
 
-  .planet-nav {
-    top: 76px;
-    left: 24px;
-    gap: 14px;
+  .planet-nav::-webkit-scrollbar {
+    display: none;
   }
 
   .time-controls {
-    top: 60px;
-    right: 12px;
+    top: 74px;
+    right: 22px;
+    left: 22px;
+    justify-content: flex-start;
+  }
+
+  /* The jog wheel is a desktop power tool; on the phone the chip's
+   * "to the moment" jump and the speed row carry the same work. */
+  .time-scrub {
+    display: none;
+  }
+
+  .time-button {
+    min-width: 44px;
+    justify-content: center;
+    padding: 8px 4px;
+  }
+
+  .exposure-scrub {
+    width: 64px;
   }
 
   .planet-link {
@@ -1601,12 +1659,18 @@ h1 > em {
     gap: 7px;
   }
 
+  /* Icon-only nav links get a thumb-wide hit area. */
+  .tour-link {
+    min-width: 44px;
+    justify-content: center;
+  }
+
   .planet-number {
     display: none;
   }
 
   .system-intro {
-    top: 148px;
+    top: 196px;
   }
 
   .system-intro h1 {
@@ -1627,7 +1691,7 @@ h1 > em {
   }
 
   .intro {
-    top: max(132px, 17.5%);
+    top: max(196px, 23.5%);
     right: 22px;
     left: 24px;
     transform: translateY(12px);
@@ -1657,9 +1721,11 @@ h1 > em {
     line-height: 1.7;
   }
 
+  /* The telemetry card climbs above the event chip: both anchor bottom-left,
+   * and the chip's tap target needs the clearance. */
   .telemetry {
     right: auto;
-    bottom: 88px;
+    bottom: 152px;
     left: 25px;
     gap: 20px;
   }
@@ -1674,6 +1740,18 @@ h1 > em {
 
   .control-hint {
     display: none;
+  }
+
+  /* The chip reads a touch larger on the phone and its jump button gets a
+   * real thumb-sized hit area. */
+  .event-chip {
+    bottom: 96px;
+    font-size: 9px;
+    padding: 12px 16px;
+  }
+
+  .event-go {
+    padding: 10px 14px;
   }
 
   .view-actions {
@@ -1699,6 +1777,33 @@ h1 > em {
   .footer > span:first-child,
   .footer > span:last-child,
   .footer-line {
+    display: none;
+  }
+}
+
+/* The narrowest phones: the wordmark yields its space to the panel buttons,
+ * the orbit mark alone still names the app; the brightness slider joins the
+ * jog wheel in the desktop drawer — auto-exposure carries the phone. */
+@media (max-width: 480px) {
+  .brand > span {
+    display: none;
+  }
+
+  .ephemeris-toggle {
+    padding: 6px 7px;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+  }
+
+  .time-button {
+    min-width: 40px;
+  }
+
+  .exposure-scrub {
+    display: none;
+  }
+
+  .ambience-toggle {
     display: none;
   }
 }

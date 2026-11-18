@@ -405,6 +405,9 @@ export function computeOverviewPose(width: number, height: number): OverviewPose
   const screenUp = new Vector3().crossVectors(direction, right)
   const usableHeight = Math.max(height - (portrait ? 300 : 380), height * (portrait ? 0.52 : 0.45))
   const usableWidth = width - (portrait ? 40 : 110)
+  // The portrait frame crowds the labels against the bottom chrome: a wider
+  // margin shrinks the composition and gives every label its own air.
+  const framingBoost = portrait ? 1.5 : 1
   const halfFov = Math.tan(MathUtils.degToRad(OVERVIEW_HALF_FOV_DEG))
   let halfHeight = 0
   let halfWidth = 0
@@ -415,7 +418,7 @@ export function computeOverviewPose(width: number, height: number): OverviewPose
     for (let i = 0; i < 48; i++) {
       orbitPoint(id, (i / 48) * Math.PI * 2, point)
       const length = point.length()
-      point.multiplyScalar((length + PLANET_FRAMING_MARGIN) / length)
+      point.multiplyScalar((length + PLANET_FRAMING_MARGIN * framingBoost) / length)
       halfHeight = Math.max(halfHeight, Math.abs(point.dot(screenUp)))
       halfWidth = Math.max(halfWidth, Math.abs(point.dot(right)))
       maxDepth = Math.max(maxDepth, point.dot(direction))
@@ -424,7 +427,7 @@ export function computeOverviewPose(width: number, height: number): OverviewPose
   for (let i = 0; i < 32; i++) {
     cometOrbitPoint((i / 32) * Math.PI * 2, point)
     const length = point.length()
-    point.multiplyScalar((length + COMET_FRAMING_MARGIN) / length)
+    point.multiplyScalar((length + COMET_FRAMING_MARGIN * framingBoost) / length)
     halfHeight = Math.max(halfHeight, Math.abs(point.dot(screenUp)))
     halfWidth = Math.max(halfWidth, Math.abs(point.dot(right)))
     maxDepth = Math.max(maxDepth, point.dot(direction))
