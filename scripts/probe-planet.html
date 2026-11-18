@@ -1,0 +1,178 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>body{margin:0;background:#000}</style></head>
+<body>
+<script type="module">
+import * as THREE from '/three.module.js'
+const NOISE = "
+vec3 mod289(vec3 x) {
+  return x - floor(x * (1.0 / 289.0)) * 289.0;
+}
+
+vec4 mod289(vec4 x) {
+  return x - floor(x * (1.0 / 289.0)) * 289.0;
+}
+
+vec4 permute(vec4 x) {
+  return mod289(((x * 34.0) + 1.0) * x);
+}
+
+vec4 taylorInvSqrt(vec4 r) {
+  return 1.79284291400159 - 0.85373472095314 * r;
+}
+
+float snoise(vec3 v) {
+  const vec2 C = vec2(1.0 / 6.0, 1.0 / 3.0);
+  const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
+
+  vec3 i = floor(v + dot(v, C.yyy));
+  vec3 x0 = v - i + dot(i, C.xxx);
+  vec3 g = step(x0.yzx, x0.xyz);
+  vec3 l = 1.0 - g;
+  vec3 i1 = min(g.xyz, l.zxy);
+  vec3 i2 = max(g.xyz, l.zxy);
+
+  vec3 x1 = x0 - i1 + C.xxx;
+  vec3 x2 = x0 - i2 + C.yyy;
+  vec3 x3 = x0 - D.yyy;
+
+  i = mod289(i);
+  vec4 p = permute(permute(permute(
+    i.z + vec4(0.0, i1.z, i2.z, 1.0))
+    + i.y + vec4(0.0, i1.y, i2.y, 1.0))
+    + i.x + vec4(0.0, i1.x, i2.x, 1.0));
+
+  float n_ = 0.142857142857;
+  vec3 ns = n_ * D.wyz - D.xzx;
+  vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
+  vec4 x_ = floor(j * ns.z);
+  vec4 y_ = floor(j - 7.0 * x_);
+  vec4 x = x_ * ns.x + ns.yyyy;
+  vec4 y = y_ * ns.x + ns.yyyy;
+  vec4 h = 1.0 - abs(x) - abs(y);
+  vec4 b0 = vec4(x.xy, y.xy);
+  vec4 b1 = vec4(x.zw, y.zw);
+  vec4 s0 = floor(b0) * 2.0 + 1.0;
+  vec4 s1 = floor(b1) * 2.0 + 1.0;
+  vec4 sh = -step(h, vec4(0.0));
+  vec4 a0 = b0.xzyw + s0.xzyw * sh.xxyy;
+  vec4 a1 = b1.xzyw + s1.xzyw * sh.zzww;
+  vec3 p0 = vec3(a0.xy, h.x);
+  vec3 p1 = vec3(a0.zw, h.y);
+  vec3 p2 = vec3(a1.xy, h.z);
+  vec3 p3 = vec3(a1.zw, h.w);
+
+  vec4 norm = taylorInvSqrt(vec4(
+    dot(p0, p0), dot(p1, p1), dot(p2, p2), dot(p3, p3)
+  ));
+  p0 *= norm.x;
+  p1 *= norm.y;
+  p2 *= norm.z;
+  p3 *= norm.w;
+
+  vec4 m = max(0.6 - vec4(
+    dot(x0, x0), dot(x1, x1), dot(x2, x2), dot(x3, x3)
+  ), 0.0);
+  m = m * m;
+  return 42.0 * dot(m * m, vec4(
+    dot(p0, x0), dot(p1, x1), dot(p2, x2), dot(p3, x3)
+  ));
+}
+
+float fbm(vec3 p) {
+  float value = 0.0;
+  float amplitude = 0.5;
+  for (int i = 0; i < 5; i++) {
+    value += amplitude * snoise(p);
+    p = p * 2.03 + vec3(13.7, 9.2, 7.5);
+    amplitude *= 0.5;
+  }
+  return value;
+}
+
+float fbm4(vec3 p) {
+  float value = 0.0;
+  float amplitude = 0.5;
+  for (int i = 0; i < 4; i++) {
+    value += amplitude * snoise(p);
+    p = p * 2.03 + vec3(13.7, 9.2, 7.5);
+    amplitude *= 0.5;
+  }
+  return value;
+}
+
+float fbm3(vec3 p) {
+  float value = 0.0;
+  float amplitude = 0.5;
+  for (int i = 0; i < 3; i++) {
+    value += amplitude * snoise(p);
+    p = p * 2.03 + vec3(13.7, 9.2, 7.5);
+    amplitude *= 0.5;
+  }
+  return value;
+}
+
+float ridgedFbm3(vec3 p) {
+  float value = 0.0;
+  float amplitude = 0.5;
+  for (int i = 0; i < 3; i++) {
+    float ridge = 1.0 - abs(snoise(p));
+    ridge *= ridge;
+    value += ridge * amplitude;
+    p = p * 2.08 + vec3(9.2, 14.6, 5.3);
+    amplitude *= 0.5;
+  }
+  return value;
+}
+
+float ridgedFbm(vec3 p) {
+  float value = 0.0;
+  float amplitude = 0.5;
+  for (int i = 0; i < 4; i++) {
+    float ridge = 1.0 - abs(snoise(p));
+    ridge *= ridge;
+    value += ridge * amplitude;
+    p = p * 2.08 + vec3(9.2, 14.6, 5.3);
+    amplitude *= 0.5;
+  }
+  return value;
+}
+"
+const PERTURB = "\nvec3 perturbNormal(vec3 surfacePosition, vec3 surfaceNormal, float height) {\n  // Derivatives collapse on degenerate silhouette quads; falling back to the\n  // geometric normal there keeps a single NaN pixel out of the bloom chain,\n  // where the blur would otherwise spread it over the whole frame.\n  vec3 dx = dFdx(surfacePosition);\n  vec3 dy = dFdy(surfacePosition);\n  vec3 sigmaX = length(dx) > 1e-7 ? dx / length(dx) : surfaceNormal;\n  vec3 sigmaY = length(dy) > 1e-7 ? dy / length(dy) : surfaceNormal;\n  vec3 R1 = cross(sigmaY, surfaceNormal);\n  vec3 R2 = cross(surfaceNormal, sigmaX);\n  float det = dot(sigmaX, R1);\n  vec3 gradient = sign(det) * (\n    dFdx(height) * R1 + dFdy(height) * R2\n  );\n  vec3 bent = abs(det) * surfaceNormal - gradient;\n  return length(bent) > 1e-9 ? bent / length(bent) : surfaceNormal;\n}\n"
+const FRAG_BODY = "#include <common>\n#include <logdepthbuf_pars_fragment>\n\nuniform sampler2D uDayMap;\nuniform sampler2D uNightMap;\nuniform sampler2D uNormalMap;\nuniform sampler2D uSpecularMap;\nuniform sampler2D uCloudMap;\nuniform float uCloudOffset;\nuniform vec3 uSunDirection;\nuniform vec3 uMoonPosition;\nuniform float uMoonRadius;\nuniform float uSunRadius;\nuniform vec3 uPlanetCenter;\nuniform float uDeckRadius;\nuniform float uDeckSpin;\nuniform float uStarFlux;\nuniform float uTime;\nuniform float uCyclone;\nuniform vec2 uCycloneCenter;\nvarying vec2 vUv;\nvarying vec3 vObjectPosition;\nvarying vec3 vWorldPosition;\nvarying vec3 vWorldNormal;\n${noiseGLSL}\n${perturbNormalGLSL}\n\nmat3 getTangentFrame(vec3 surfacePosition, vec3 surfaceNormal, vec2 uv) {\n  vec3 q0 = dFdx(surfacePosition);\n  vec3 q1 = dFdy(surfacePosition);\n  vec2 st0 = dFdx(uv);\n  vec2 st1 = dFdy(uv);\n  vec3 q1perp = cross(q1, surfaceNormal);\n  vec3 q0perp = cross(surfaceNormal, q0);\n  vec3 T = q1perp * st0.x + q0perp * st1.x;\n  vec3 B = q1perp * st0.y + q0perp * st1.y;\n  float det = max(dot(T, T), dot(B, B));\n  float frameScale = det == 0.0 ? 0.0 : inversesqrt(det);\n  return mat3(T * frameScale, B * frameScale, surfaceNormal);\n}\n\nfloat distributionGGX(float NoH, float roughness) {\n  float alpha = roughness * roughness;\n  float alpha2 = alpha * alpha;\n  float denom = NoH * NoH * (alpha2 - 1.0) + 1.0;\n  return alpha2 / max(3.14159265 * denom * denom, 0.00001);\n}\n\nfloat geometrySchlickGGX(float NoV, float roughness) {\n  float r = roughness + 1.0;\n  float k = r * r * 0.125;\n  return NoV / (NoV * (1.0 - k) + k);\n}\n\nvoid main() {\n#include <logdepthbuf_fragment>\n  vec3 p = normalize(vObjectPosition);\n  vec3 albedo = texture2D(uDayMap, vUv).rgb;\n  float oceanMask = texture2D(uSpecularMap, vUv).r;\n  float land = 1.0 - oceanMask;\n  float roughness = mix(0.92, 0.18, oceanMask);\n\n  vec3 geometricN = normalize(vWorldNormal);\n  vec3 V = normalize(cameraPosition - vWorldPosition);\n  vec3 mapN = texture2D(uNormalMap, vUv).xyz * 2.0 - 1.0;\n  mapN.xy *= 1.5;\n  mat3 tbn = getTangentFrame(vWorldPosition, geometricN, vUv);\n  vec3 mappedN = normalize(tbn * normalize(mapN));\n\n  float micro = fbm4(p * 84.0 + vec3(1.7, 8.2, -3.4));\n  float bumpFade = smoothstep(0.08, 0.34, max(dot(geometricN, V), 0.0));\n  float elevation = land * micro * 0.002 * bumpFade;\n  vec3 N = perturbNormal(vObjectPosition, mappedN, elevation);\n\n  vec3 L = normalize(uSunDirection);\n  float ndl = dot(geometricN, L);\n  float daylight = smoothstep(-0.12, 0.25, ndl);\n  float diffuse = max(dot(N, L), 0.0);\n  // Projected cloud shadow, honest rays: Solis sits at the world origin, so\n  // the ray toward the sun from this point crosses the deck 1.25% of the\n  // radius above the surface \u2014 straight overhead only at the sub-solar\n  // point, stretched far along the slant near the terminator. The hit's map\n  // UV is read in the deck's own spinning frame.\n  vec3 centerToFragment = vWorldPosition - uPlanetCenter;\n  vec3 rayDir = normalize(-vWorldPosition);\n  float b = dot(centerToFragment, rayDir);\n  float tHit = -b + sqrt(max(b * b + uDeckRadius * uDeckRadius - dot(centerToFragment, centerToFragment), 0.0));\n  vec3 hitLocal = centerToFragment + rayDir * tHit;\n  float cD = cos(uDeckSpin);\n  float sD = sin(uDeckSpin);\n  vec3 hitDeck = vec3(cD * hitLocal.x - sD * hitLocal.z, hitLocal.y, sD * hitLocal.x + cD * hitLocal.z);\n  float hitU = fract(atan(hitDeck.z, -hitDeck.x) / 6.28318530718);\n  float hitV = acos(clamp(hitDeck.y / uDeckRadius, -1.0, 1.0)) / 3.14159265359;\n  float cloudDensity = texture2D(uCloudMap, vec2(hitU, hitV)).r;\n  float cloudShadow = 1.0 - smoothstep(0.06, 0.76, cloudDensity) * 0.42;\n  // The cyclone shades the water itself: the same vortex, read in the map\n  // frame the projected shadow now uses \u2014 the shade rides the decks'\n  // rotation drift and sits under the spiral the cloud layer draws.\n  vec2 cycloneDelta = vec2(hitU - uCycloneCenter.x, hitV - uCycloneCenter.y);\n  float cycloneDu = abs(cycloneDelta.x);\n  cycloneDu = min(cycloneDu, 1.0 - cycloneDu);\n  float cycloneDistance = length(vec2(cycloneDu * 2.0, cycloneDelta.y)) * 9.0;\n  float shade = cloudShadow * (1.0 - uCyclone * exp(-cycloneDistance * cycloneDistance * 0.5) * 0.5);\n  vec3 color = albedo * (0.004 + pow(diffuse, 0.78) * 1.18 * shade * uStarFlux);\n\n  // Sun glint on the water: a drifting field of micro-slopes perturbs the\n  // ocean normal inside the specular lobe only, so the mirror spot shimmers.\n  // At grazing angles the wave slopes spread the reflection the way a real\n  // sea does \u2014 the compact spot opens into a glittering path along the sun\n  // side of the disc. The clock is the shared simulation time \u2014 pause and\n  // reversal replay the same sea.\n  vec3 glintN = N;\n  float glintRoughness = roughness;\n  if (oceanMask > 0.001) {\n    float grazing = pow(1.0 - max(dot(geometricN, V), 0.0), 2.0);\n    float wx = fbm3(p * 130.0 + vec3(uTime * 0.4));\n    float wy = fbm3(p * 130.0 - vec3(uTime * 0.4) + vec3(4.7, 1.3, 8.1));\n    glintN = normalize(N + (tbn[0] * wx + tbn[1] * wy) * (0.055 + grazing * 0.05));\n    glintRoughness = clamp(roughness + grazing * 0.55 + (wx * 0.5 + 0.5) * 0.2, 0.06, 0.9);\n  }\n\n  vec3 H = normalize(L + V);\n  float NoV = max(dot(glintN, V), 0.001);\n  float NoL = max(dot(N, L), 0.0);\n  float NoH = max(dot(glintN, H), 0.0);\n  float VoH = max(dot(V, H), 0.0);\n  float D = distributionGGX(NoH, glintRoughness);\n  float G = geometrySchlickGGX(NoV, glintRoughness) * geometrySchlickGGX(NoL, glintRoughness);\n  vec3 F = vec3(0.02) + vec3(0.98) * pow(1.0 - VoH, 5.0);\n  vec3 specular = (D * G * F) / max(4.0 * NoV * NoL, 0.001);\n  specular *= NoL * oceanMask * daylight * shade * uStarFlux;\n  color += vec3(1.0, 0.96, 0.86) * specular * 1.5;\n\n  float fresnel = pow(1.0 - max(dot(geometricN, V), 0.0), 4.0);\n  color += vec3(0.015, 0.045, 0.09) * fresnel * daylight * 0.7 * uStarFlux;\n\n  // The moon's shadow is honest cone geometry: Solis outgrows Nox, so the\n  // umbra closes at an apex behind the moon and the annular antumbra\n  // diverges past it \u2014 a soft ring with a warm refracted rim, never a hard\n  // disc. The axis runs sun\u2192moon\u2192out (Solis sits at the world origin): at\n  // this compact scale the moon's parallax bends it far off the sun\n  // direction the planet sees.\n  vec3 toMoonFragment = vWorldPosition - uMoonPosition;\n  vec3 shadowAxis = normalize(uMoonPosition);\n  float shadowAlong = dot(toMoonFragment, shadowAxis);\n  if (shadowAlong > 0.0) {\n    float shadowPerp = sqrt(max(dot(toMoonFragment, toMoonFragment) - shadowAlong * shadowAlong, 0.0));\n    float sunMoon = length(uMoonPosition);\n    float apex = uMoonRadius * sunMoon / (uSunRadius - uMoonRadius);\n    float coneInner = uMoonRadius * abs(1.0 - shadowAlong / apex);\n    float coneOuter = uMoonRadius + (uSunRadius + uMoonRadius) * shadowAlong / sunMoon;\n    float penumbra = 1.0 - smoothstep(coneInner, coneOuter, shadowPerp);\n    color *= 1.0 - penumbra * 0.68;\n    color *= mix(vec3(1.0), vec3(1.35, 0.78, 0.6), penumbra);\n  }\n\n  vec3 nightSample = texture2D(uNightMap, vUv).rgb;\n  float lightPeak = max(max(nightSample.r, nightSample.g), nightSample.b);\n  float cityMask = smoothstep(0.018, 0.09, lightPeak);\n  float night = 1.0 - smoothstep(-0.22, 0.08, ndl);\n  color += nightSample * cityMask * night * 4.0;\n\n  gl_FragColor = vec4(color, 1.0);\n  #include <tonemapping_fragment>\n  #include <colorspace_fragment>\n}\n"
+const VERTEX_BODY = "#include <common>\n#include <logdepthbuf_pars_vertex>\n\nvarying vec2 vUv;\nvarying vec3 vObjectPosition;\nvarying vec3 vWorldPosition;\nvarying vec3 vWorldNormal;\n\nvoid main() {\n  vUv = uv;\n  vObjectPosition = normalize(position);\n  vec4 worldPosition = modelMatrix * vec4(position, 1.0);\n  vWorldPosition = worldPosition.xyz;\n  vWorldNormal = normalize(mat3(modelMatrix) * normal);\n  gl_Position = projectionMatrix * viewMatrix * worldPosition;\n#include <logdepthbuf_vertex>\n}\n"
+const loader = new THREE.TextureLoader()
+const load = (url) => new Promise((res) => loader.load(url, (t) => { t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.RepeatWrapping; res(t) }, undefined, () => res(new THREE.Texture())))
+const [dayTex, nightTex, normalTex, specTex, cloudTex] = await Promise.all([
+  load('/textures/earth-day.webp'), load('/textures/earth-night.webp'), load('/textures/earth-normal.webp'),
+  load('/textures/earth-specular.webp'), load('/textures/earth-clouds.webp'),
+])
+const scene = new THREE.Scene()
+scene.background = new THREE.Color('#010205')
+const camera = new THREE.PerspectiveCamera(36, 640/400, 0.1, 500000)
+camera.position.set(0, 0.5, 4.26)
+camera.lookAt(0, 0, 0)
+const renderer = new THREE.WebGLRenderer({ canvas: document.querySelector('canvas'), antialias: true })
+renderer.setSize(640, 400)
+const stage = +(new URLSearchParams(location.search).get('stage') || 1)
+const uniforms = {
+  uSunDirection: { value: new THREE.Vector3(-0.3, 0.4, 0.85).normalize() },
+  uDayMap: { value: dayTex }, uNightMap: { value: nightTex }, uNormalMap: { value: normalTex },
+  uSpecularMap: { value: specTex }, uCloudMap: { value: cloudTex },
+  uCloudOffset: { value: 0 }, uMoonPosition: { value: new THREE.Vector3(0, 60, 0) },
+  uMoonRadius: { value: 0.19 }, uSunRadius: { value: 109.2 },
+  uPlanetCenter: { value: new THREE.Vector3(0, 0, 0) },
+  uDeckRadius: { value: 1.12 * 1.0125 }, uDeckSpin: { value: 0 },
+  uStarFlux: { value: 1 }, uTime: { value: 41.6 }, uCyclone: { value: 0.8 },
+  uCycloneCenter: { value: new THREE.Vector2(0.5, 0.5) },
+}
+let frag = FRAG_BODY.replace('${noiseGLSL}', NOISE).replace('${perturbNormalGLSL}', PERTURB)
+if (stage >= 2) frag = frag.replace('vec3 N = perturbNormal(vObjectPosition, mappedN, elevation);', 'vec3 N = mappedN;')
+if (stage >= 3) frag = frag.replace('float cloudShadow = 1.0 - smoothstep(0.06, 0.76, cloudDensity) * 0.42;', 'float cloudShadow = 1.0;')
+const material = new THREE.MeshBasicMaterial({ color: 0xff0000 })
+const mesh = new THREE.Mesh(new THREE.SphereGeometry(1.12, 160, 160), material)
+scene.add(mesh)
+renderer.setAnimationLoop(() => renderer.render(scene, camera))
+window.__stage = stage
+</script>
+<canvas></canvas>
+</body></html>
