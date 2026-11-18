@@ -5,7 +5,7 @@
  * of this file re-runs install/activate, and activate prunes every cache
  * that is not the current one.
  */
-const CACHE = 'aether-v1'
+const CACHE = 'aether-v2'
 const SHELL = ['/', '/manifest.webmanifest', '/favicon.svg', '/icons.svg']
 
 self.addEventListener('install', (event) => {
@@ -30,8 +30,12 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(event.request)
         .then((response) => {
-          const copy = response.clone()
-          caches.open(CACHE).then((cache) => cache.put('/', copy))
+          // A rebuild window can answer with an error page: caching it would
+          // poison the shell, so only a good response is remembered.
+          if (response.ok) {
+            const copy = response.clone()
+            caches.open(CACHE).then((cache) => cache.put('/', copy))
+          }
           return response
         })
         .catch(() => caches.match('/')),
@@ -40,11 +44,13 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Hashed assets and textures are immutable: serve from cache, fall back to
-  // the network once and remember it.
+  // the network once and remember it — again only good responses.
   event.respondWith(
     caches.match(event.request).then((cached) => cached ?? fetch(event.request).then((response) => {
-      const copy = response.clone()
-      caches.open(CACHE).then((cache) => cache.put(event.request, copy))
+      if (response.ok) {
+        const copy = response.clone()
+        caches.open(CACHE).then((cache) => cache.put(event.request, copy))
+      }
       return response
     })),
   )
