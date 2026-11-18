@@ -55,9 +55,11 @@ void main() {
 `
 
 // Zodiacal light: sunlight scattered by the belt's dust, laid in the belt's
-// own plane. Brightest just outside the star's corona, gone by the outer
-// orbits; kept faint so it reads as haze, not as a solid disc.
-const GLOW_INNER = 0.9 * AURELIA_SEMI_MAJOR
+// own plane. Poynting–Robertson drag feeds the dust inward, so the haze
+// runs from just outside the star's corona — where it is brightest — out
+// past the belt, fading along the way; kept faint so it reads as haze,
+// not as a solid disc.
+const GLOW_INNER = 0.12 * AURELIA_SEMI_MAJOR
 const GLOW_OUTER = 21.12 * ORBIT_SCALE
 
 const glowVertex = /* glsl */ `
@@ -79,11 +81,11 @@ ${noiseGLSL}
 
 void main() {
   float t = (vRadius - uInner) / (uOuter - uInner);
-  float falloff = exp(-t * 1.6) * smoothstep(0.0, 0.15, t);
+  float falloff = exp(-t * 1.0) * smoothstep(0.0, 0.04, t);
   // Broad radial and angular wisps keep it from reading as a flat disc.
   float wisps = fbm3(vec3(vLocal * 0.22, 3.1)) * 0.5 + 0.5;
-  float alpha = falloff * (0.35 + 0.65 * wisps) * 0.14;
-  vec3 color = vec3(1.0, 0.84, 0.62);
+  float alpha = falloff * (0.35 + 0.65 * wisps) * 0.1;
+  vec3 color = vec3(1.0, 0.88, 0.7);
   gl_FragColor = vec4(color, alpha);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
