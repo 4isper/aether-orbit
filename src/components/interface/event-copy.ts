@@ -32,11 +32,16 @@ export function eventLabel(kind: EventAnnouncement['kind'], view: SceneView): St
   return ephemerisLabel({ kind, body: viewEventBody(view) })
 }
 
-/** The countdown text: minutes and seconds past the minute mark. */
-export function formatDuration(seconds: number, locale: Locale) {
-  const m = Math.floor(seconds / 60)
-  const s = Math.round(seconds % 60)
-  return m > 0
-    ? t(locale, 'eventDuration', { m, s })
-    : t(locale, 'eventSeconds', { s })
+/** The countdown text in the honest sky calendar — one sim unit is one
+ * day, so the windows read in days, hours and minutes. */
+export function formatDuration(days: number, locale: Locale) {
+  const totalMinutes = Math.round(days * 24 * 60)
+  const d = Math.floor(totalMinutes / 1440)
+  const h = Math.floor((totalMinutes % 1440) / 60)
+  const m = totalMinutes % 60
+  const s = Math.round((days * 86400) % 60)
+  if (d > 0) return t(locale, 'eventDays', { d, h })
+  if (h > 0) return t(locale, 'eventHours', { h, m })
+  if (m > 0) return t(locale, 'eventDuration', { m, s })
+  return t(locale, 'eventSeconds', { s })
 }
