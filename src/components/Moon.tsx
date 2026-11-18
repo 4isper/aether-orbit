@@ -47,16 +47,24 @@ void main() {
   vec3 offset = vWorldPosition - uPlanetPosition;
   float along = dot(offset, axis);
   float lit = 1.0;
+  vec3 refracted = vec3(0.0);
   if (along > 0.0) {
     float perp = length(offset - axis * along);
     float sunPlanet = length(uPlanetPosition);
     float penumbraR = uPlanetRadius + along * (uSunRadius + uPlanetRadius) / sunPlanet;
     float umbraR = uPlanetRadius * max(1.0 - along * (uSunRadius - uPlanetRadius) / (sunPlanet * uPlanetRadius), 0.0);
-    lit = 0.08 + 0.92 * smoothstep(umbraR, penumbraR, perp);
+    float shadow = smoothstep(umbraR, penumbraR, perp);
+    lit = shadow;
+    // The umbra is not black: Aurelia's own ring of sunrises and sunsets
+    // refracts a dim copper glow onto it — every sunrise at once, blue
+    // scattered away on the long limb path. The penumbra reddens the same
+    // way as direct light grazes the limb.
+    refracted = vec3(0.85, 0.30, 0.08) * 0.07 * uStarFlux * (1.0 - shadow * shadow);
+    refracted += vec3(0.35, 0.10, 0.02) * 0.5 * uStarFlux * shadow * (1.0 - shadow);
   }
 
   float diffuse = max(dot(N, L), 0.0);
-  vec3 color = albedo * (0.012 + diffuse * 1.1 * uStarFlux) * lit;
+  vec3 color = albedo * (0.012 + diffuse * 1.1 * uStarFlux * lit) + albedo * refracted;
 
   gl_FragColor = vec4(color, 1.0);
   #include <tonemapping_fragment>
