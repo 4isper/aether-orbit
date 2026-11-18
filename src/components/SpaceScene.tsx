@@ -139,16 +139,36 @@ function soonestMoment(moments: (EventAnnouncement | null)[]): EventAnnouncement
   }, null)
 }
 
+/**
+ * The documentary pace: a close-up breathes at a fifth of a day per
+ * second — one honest 24-hour turn in twenty seconds, the weather and
+ * the moon drifting at a watchable gait — while the wide views run the
+ * orbits at full speed. Presentation only: the ratios inside every pace
+ * stay honest, this is the projector's gear box, not the sky's.
+ */
+const VIEW_PACE: Record<SceneView, number> = {
+  aurelia: 0.05,
+  cinder: 0.05,
+  vesper: 0.05,
+  erebus: 0.05,
+  moon: 0.05,
+  comet: 0.25,
+  star: 0.25,
+  belt: 1,
+  system: 1,
+}
+
 /** The pilot's time dilation: the sky's fast moments — a transit, an
- * eclipse — last hours of honest time, under a second at the day-per-second
- * pace, so the playback eases to a twentieth of speed through their windows
- * and eases back out. Presentation only: the clock's ratios stay honest,
+ * eclipse — last hours of honest time, so their windows ease to play for
+ * about eighteen seconds of screen time at the view's own pace, whatever
+ * the gear box says. Presentation only: the clock's ratios stay honest,
  * this is the projector's slow motion, not the sky's. */
-const DILATION_SCALE = 0.02
+const DILATION_TARGET_SECONDS = 18
+const DILATION_MIN = 0.02
 const DILATION_RAMP = 0.5
 type DilationWindow = { entry: number; exit: number }
 
-function dilationFactor(now: number, win: DilationWindow | null): number {
+function dilationFactor(now: number, win: DilationWindow | null, pace: number): number {
   if (!win) return 1
   const { entry, exit } = win
   const a = entry - DILATION_RAMP
@@ -157,7 +177,8 @@ function dilationFactor(now: number, win: DilationWindow | null): number {
   const rampIn = MathUtils.smoothstep(now, a, entry)
   const rampOut = 1 - MathUtils.smoothstep(now, exit, d)
   const depth = Math.min(rampIn, rampOut)
-  return 1 - (1 - DILATION_SCALE) * depth
+  const scale = MathUtils.clamp((exit - entry) / (DILATION_TARGET_SECONDS * pace), DILATION_MIN, 1)
+  return 1 - (1 - scale) * depth
 }
 
 /** One own event per view, each on the view where the sky actually shows
@@ -318,8 +339,9 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
     const delta = Math.min(rawDelta, 0.1)
     // The dilation reads the cached window and eases the clock through the
     // moment; the window itself is rescanned only when it is gone past.
-    const factor = dilationFactor(orbitTime.current, dilation.current)
-    if (!reducedMotion) orbitTime.current += delta * timeScale * factor
+    const pace = VIEW_PACE[activeView] ?? 1
+    const factor = dilationFactor(orbitTime.current, dilation.current, pace)
+    if (!reducedMotion) orbitTime.current += delta * timeScale * pace * factor
     if (!dilation.current || dilation.current.view !== activeView
       || orbitTime.current > dilation.current.exit + DILATION_RAMP) {
       const wall = state.clock.elapsedTime
