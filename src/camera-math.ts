@@ -403,7 +403,7 @@ export function computeOverviewPose(width: number, height: number): OverviewPose
   const up = portrait ? new Vector3(-1, 0, 0) : new Vector3(0, 1, 0)
   const right = new Vector3().crossVectors(up, direction).normalize()
   const screenUp = new Vector3().crossVectors(direction, right)
-  const usableHeight = Math.max(height - (portrait ? 320 : 420), height * (portrait ? 0.5 : 0.42))
+  const usableHeight = Math.max(height - (portrait ? 300 : 380), height * (portrait ? 0.52 : 0.45))
   const usableWidth = width - (portrait ? 40 : 110)
   const halfFov = Math.tan(MathUtils.degToRad(OVERVIEW_HALF_FOV_DEG))
   let halfHeight = 0
@@ -434,7 +434,7 @@ export function computeOverviewPose(width: number, height: number): OverviewPose
     halfHeight / (halfFov * usableHeight / height),
     halfWidth / (halfFov * aspect * usableWidth / width),
   ) + maxDepth + 3) * (portrait ? 1.05 : 1)
-  const centerOffset = (portrait ? 60 : 40) * (2 * distance * halfFov) / height
+  const centerOffset = (portrait ? 45 : 22) * (2 * distance * halfFov) / height
   const target = new Vector3().addScaledVector(screenUp, centerOffset)
   return { target, position: target.clone().addScaledVector(direction, distance), up }
 }
