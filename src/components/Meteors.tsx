@@ -60,7 +60,7 @@ export function Meteors({ timeRef }: { timeRef: { current: number } }) {
   }, [])
 
   const uniforms = useMemo(
-    () => ({ uPixelRatio: { value: Math.min(window.devicePixelRatio, 1.75) } }),
+    () => ({ uPixelRatio: { value: Math.min(window.devicePixelRatio, 1.4) } }),
     [],
   )
 

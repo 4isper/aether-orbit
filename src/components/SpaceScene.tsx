@@ -365,11 +365,11 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
       groupRefs.current[id]?.position.copy(planetPosition(id, orbitTime.current, scratch))
     }
 
-    // Announce the active view's event at a calm one-update-per-second pace;
-    // a view change announces immediately so the chip switches without lag.
-    // The open ephemerides panel recasts its schedule on the same cadence.
+    // Announce the active view's event at a calm cadence; a view change
+    // announces immediately so the chip switches without lag. The open
+    // ephemerides panel recasts its schedule every 2.5 seconds.
     eventTimer.current += delta
-    if (eventTimer.current >= 1 || lastEventView.current !== activeView) {
+    if (eventTimer.current >= 2.5 || lastEventView.current !== activeView) {
       eventTimer.current = 0
       lastEventView.current = activeView
       if (onEvent) {
@@ -472,7 +472,7 @@ export function SpaceScene({ activeView, destination, initialView, initialPose, 
       )}
       {overview && <SystemOverview onSelect={selectBody} timeRef={orbitTime} locale={locale} />}
       <SceneReady onReady={onReady} />
-      <EffectComposer multisampling={0} enabled={!lowEnd}>
+      <EffectComposer multisampling={0}>
         <ComposerCapture />
         {lowEnd ? null : (
           <>

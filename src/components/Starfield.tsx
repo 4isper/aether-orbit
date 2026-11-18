@@ -114,7 +114,7 @@ export function Starfield({ reducedMotion, timeRef }: StarfieldProps) {
   const uniforms = useMemo(
     () => ({
       uTime: { value: 0 },
-      uPixelRatio: { value: Math.min(window.devicePixelRatio, 1.75) },
+      uPixelRatio: { value: Math.min(window.devicePixelRatio, 1.4) },
     }),
     [],
   )

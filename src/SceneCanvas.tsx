@@ -28,7 +28,7 @@ function ExposureDrive({ exposure }: { exposure: number }) {
 }
 
 const MIN_DPR = 0.85
-const MAX_DPR = 1.75
+const MAX_DPR = 1.4
 
 function getMaxDpr() {
   return Math.max(MIN_DPR, Math.min(window.devicePixelRatio, MAX_DPR))

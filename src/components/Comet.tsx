@@ -141,14 +141,14 @@ export function Comet({ timeRef }: CometProps) {
   const headColor = useMemo(() => new Color(2.4, 3.4, 5.2), [])
   const ionUniforms = useMemo(
     () => ({
-      uPixelRatio: { value: Math.min(window.devicePixelRatio, 1.75) },
+      uPixelRatio: { value: Math.min(window.devicePixelRatio, 1.4) },
       uColor: { value: ionColor },
     }),
     [ionColor],
   )
   const dustUniforms = useMemo(
     () => ({
-      uPixelRatio: { value: Math.min(window.devicePixelRatio, 1.75) },
+      uPixelRatio: { value: Math.min(window.devicePixelRatio, 1.4) },
       uColor: { value: dustColor },
     }),
     [dustColor],
